@@ -97,28 +97,30 @@ internal sealed partial class ConvexSweepQueryWorker
 
     private readonly struct ClosestSimplexResult
     {
-        public ClosestSimplexResult(
-            bool intersects,
-            Vector3d point,
-            FixedPointAnchor pointA,
-            FixedPointAnchor pointB)
+        private readonly int _count;
+        private readonly Fixed64 _first;
+        private readonly Fixed64 _second;
+        private readonly Fixed64 _third;
+        private readonly Fixed64 _fourth;
+
+        private ClosestSimplexResult(bool intersects, Vector3d point, int count,
+            Fixed64 first, Fixed64 second, Fixed64 third, Fixed64 fourth)
         {
             Intersects = intersects;
             Point = point;
-            PointA = pointA;
-            PointB = pointB;
+            _count = count;
+            _first = first;
+            _second = second;
+            _third = third;
+            _fourth = fourth;
         }
 
         public bool Intersects { get; }
 
         public Vector3d Point { get; }
 
-        public FixedPointAnchor PointA { get; }
-
-        public FixedPointAnchor PointB { get; }
-
         public static ClosestSimplexResult Intersection =>
-            new(true, Vector3d.Zero, default, default);
+            new(true, Vector3d.Zero, 0, default, default, default, default);
 
         public static ClosestSimplexResult FromWeights(
             SupportPoint[] simplex,
@@ -128,84 +130,62 @@ internal sealed partial class ConvexSweepQueryWorker
             Fixed64 third,
             Fixed64 fourth)
         {
-            Span<Fixed64> weights = stackalloc Fixed64[4];
-            weights[0] = first;
-            weights[1] = second;
-            weights[2] = third;
-            weights[3] = fourth;
-            return FromArrayWeights(simplex, weights, count);
+            ReadOnlySpan<Fixed64> weights = stackalloc Fixed64[4] { first, second, third, fourth };
+            return FromSpanWeights(simplex, weights, count);
         }
 
         public static ClosestSimplexResult FromSpanWeights(
-            Span<SupportPoint> simplex,
-            Span<Fixed64> weights,
+            ReadOnlySpan<SupportPoint> simplex,
+            ReadOnlySpan<Fixed64> weights,
             int count)
         {
+            if (count == 1)
+                return new ClosestSimplexResult(false, simplex[0].Point, count,
+                    weights[0], weights[1], weights[2], weights[3]);
             Span<Vector3d> points = stackalloc Vector3d[4];
+            for (int i = 0; i < count; i++)
+                points[i] = simplex[i].Point;
+            _ = Vector3d.TryGetWeightedAverage(points[..count], weights[..count], out Vector3d point);
+            return new ClosestSimplexResult(false, point, count,
+                weights[0], weights[1], weights[2], weights[3]);
+        }
+
+        public void GetWitnesses(ReadOnlySpan<SupportPoint> simplex,
+            out FixedPointAnchor pointA, out FixedPointAnchor pointB)
+        {
+            // Iterations need only the Minkowski point; materialize the selected witnesses once.
+            if (_count == 1)
+            {
+                FixedPointAnchor first = simplex[0].PointA;
+                FixedPointAnchor second = simplex[0].PointB;
+                pointA = new FixedPointAnchor(first.Origin, first.Rotation, first.LocalPoint, first.LocalDisplacement);
+                pointB = new FixedPointAnchor(second.Origin, second.Rotation, second.LocalPoint, second.LocalDisplacement);
+                return;
+            }
+            ReadOnlySpan<Fixed64> weights = stackalloc Fixed64[4] { _first, _second, _third, _fourth };
             Span<Vector3d> firstLocalPoints = stackalloc Vector3d[4];
             Span<Vector3d> firstLocalDisplacements = stackalloc Vector3d[4];
             Span<Vector3d> secondLocalPoints = stackalloc Vector3d[4];
             Span<Vector3d> secondLocalDisplacements = stackalloc Vector3d[4];
             int frameIndex = 0;
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < _count; i++)
             {
-                points[i] = simplex[i].Point;
                 firstLocalPoints[i] = simplex[i].PointA.LocalPoint;
-                firstLocalDisplacements[i] =
-                    simplex[i].PointA.LocalDisplacement;
+                firstLocalDisplacements[i] = simplex[i].PointA.LocalDisplacement;
                 secondLocalPoints[i] = simplex[i].PointB.LocalPoint;
-                secondLocalDisplacements[i] =
-                    simplex[i].PointB.LocalDisplacement;
-                if (weights[frameIndex] <= Fixed64.Zero
-                    && weights[i] > Fixed64.Zero)
-                {
+                secondLocalDisplacements[i] = simplex[i].PointB.LocalDisplacement;
+                if (weights[frameIndex] <= Fixed64.Zero && weights[i] > Fixed64.Zero)
                     frameIndex = i;
-                }
             }
 
-            _ = Vector3d.TryGetWeightedAverage(
-                points[..count],
-                weights[..count],
-                out Vector3d point);
-            _ = Vector3d.TryGetWeightedAverage(
-                firstLocalPoints[..count],
-                weights[..count],
-                out Vector3d firstLocalPoint);
-            _ = Vector3d.TryGetWeightedAverage(
-                firstLocalDisplacements[..count],
-                weights[..count],
-                out Vector3d firstLocalDisplacement);
-            _ = Vector3d.TryGetWeightedAverage(
-                secondLocalPoints[..count],
-                weights[..count],
-                out Vector3d secondLocalPoint);
-            _ = Vector3d.TryGetWeightedAverage(
-                secondLocalDisplacements[..count],
-                weights[..count],
-                out Vector3d secondLocalDisplacement);
+            _ = Vector3d.TryGetWeightedAverage(firstLocalPoints[.._count], weights[.._count], out Vector3d firstLocalPoint);
+            _ = Vector3d.TryGetWeightedAverage(firstLocalDisplacements[.._count], weights[.._count], out Vector3d firstLocalDisplacement);
+            _ = Vector3d.TryGetWeightedAverage(secondLocalPoints[.._count], weights[.._count], out Vector3d secondLocalPoint);
+            _ = Vector3d.TryGetWeightedAverage(secondLocalDisplacements[.._count], weights[.._count], out Vector3d secondLocalDisplacement);
             FixedPointAnchor firstFrame = simplex[frameIndex].PointA;
             FixedPointAnchor secondFrame = simplex[frameIndex].PointB;
-            return new ClosestSimplexResult(
-                false,
-                point,
-                new FixedPointAnchor(
-                    firstFrame.Origin,
-                    firstFrame.Rotation,
-                    firstLocalPoint,
-                    firstLocalDisplacement),
-                new FixedPointAnchor(
-                    secondFrame.Origin,
-                    secondFrame.Rotation,
-                    secondLocalPoint,
-                    secondLocalDisplacement));
-        }
-
-        private static ClosestSimplexResult FromArrayWeights(
-            SupportPoint[] simplex,
-            Span<Fixed64> weights,
-            int count)
-        {
-            return FromSpanWeights(simplex.AsSpan(), weights, count);
+            pointA = new FixedPointAnchor(firstFrame.Origin, firstFrame.Rotation, firstLocalPoint, firstLocalDisplacement);
+            pointB = new FixedPointAnchor(secondFrame.Origin, secondFrame.Rotation, secondLocalPoint, secondLocalDisplacement);
         }
     }
 

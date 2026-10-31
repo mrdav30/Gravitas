@@ -61,101 +61,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-026 — Initial Generic Convex Mesh Contact Resolution Cost
-
-**Discovered:** 2026-10-07 during GRV-Issue-094 correctness validation.
-**Status:** Measured correctness cost; ordinary impacts unchanged. **Owner:**
-Gravitas prepared convex sweep initial-contact resolution and its FixedMathSharp
-complete contact/projection operations.
-
-The warmed public `ConvexMeshInitialContactBenchmarks.SweepCuboidAll` compares
-ordinary impacts with initially overlapping, separating cuboids. On this Windows
-x64 i7-9700K host (.NET 8.0.29), the corrected geometric initial normal costs
-**59.01 us** for a convex quad, **151.38 us** for a concave quad, and **59.59
-us** for a compound convex mesh leaf, versus the incorrect baseline's **16.51 /
-39.42 / 16.21 us**. Ordinary impacts remain **27.56 / 83.36 / 27.30 us** versus
-**26.89 / 82.57 / 27.09 us**. All six cases allocate **0 B/op**.
-
-```powershell
-$env:UseLocalLsfStack = 'true'
-$env:DOTNET_PROCESSOR_COUNT = '2'
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*ConvexMeshInitialContactBenchmarks*' --job short --warmupCount 3 --iterationCount 5 --artifacts artifacts/grv-issue-094/final-confirmation
-```
-
-Ignored baseline/final captures under `artifacts/grv-issue-094` retain the
-measurements. The baseline answered a different, incorrect geometric contract;
-restoring travel-facing normals or suppressing real edge contacts is not an
-optimization. **Next isolation:** profile complete initial contacts and exact
-support/projection comparisons, then measure touching, overlap, containment,
-curved sources and dense concave initial-contact workloads. Prefer reusable
-exact certificates or reduced duplicated work, with the same geometric normals,
-leaf ordering, full-domain witnesses and allocation gates. Measure scene
-frequency before assigning a host capacity budget.
-
-**2026-10-11 refinement during GRV-Issue-108:** Initial triangle sweeps now
-certify contact against the finite trusted filled surface, including nonconvex
-patches, before accepting a covered seam witness. The existing distance/authored
-index comparator also rejects candidates that could not win even at distance
-zero. This removes repeated GJK and face-admission work after an admitted
-initial hit, without caches or a different geometric answer path.
-
-The isolated before/after fixtures use the same benchmark source and exclude the
-cuboid and capsule query sources from each other's target layer. Native Release
-means on the same host, with three warmups and five measurements, are:
-
-| Public query workload                       |    Before |     After |
-| ------------------------------------------- | --------: | --------: |
-| Concave quad, initially overlapping cuboid  | 128.79 us |  75.53 us |
-| Concave quad, initially overlapping capsule | 230.27 us | 129.49 us |
-| Capsule, filled quad at subdivision 2       |  1.551 ms |  0.701 ms |
-| Capsule, notched patch at subdivision 2     |  1.184 ms |  0.693 ms |
-| Capsule, filled quad at subdivision 8       | 10.590 ms |  4.953 ms |
-| Capsule, notched patch at subdivision 8     |  6.387 ms |  4.973 ms |
-
-All 16 ordinary/initial, convex/concave/compound and dense-patch rows report
-`0 B/op`. Ordinary concave cuboid/capsule controls are 74.29/583.60 us before
-and 76.02/587.35 us after; convex and compound controls remain within about 2%
-of their isolated baselines. These short-run means are not gameplay-frame
-latency or capacity guarantees. Dense initial capsule sweeps still approach 5
-ms, so this existing signal remains active. Profile candidate ordering, GJK and
-finite-contact work separately before another optimization; keep nonconvex
-holes, exposed rims, initial closing admission and authored tie ordering intact.
-
-Reproduce both maintained benchmark classes with `UseLocalLsfStack=true`:
-
-```powershell
-$env:UseLocalLsfStack = 'true'
-$env:DOTNET_PROCESSOR_COUNT = '2'
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -p:BuildInParallel=false -p:UseSharedCompilation=false -- --filter '*ConvexMeshInitialContactBenchmarks*' '*CoplanarPatchInitialSweepBenchmarks*' --warmupCount 3 --iterationCount 5 --artifacts artifacts/grv-issue-108/final-confirmation
-```
-
-Ignored `artifacts/grv-issue-108/isolated-baseline` and `final-confirmation`
-retain the matched measurements. The preliminary unisolated source capture and
-the pre-pruning correctness capture are not the retained comparison.
-
-**2026-10-29 small mixed CCD control:** A millisecond-scale capacity boundary
-also appears without dense subdivision. The existing
-`JoinedStaticSurfaceMixedSimulationBenchmarks`, `Shape=Circle`,
-`Layout=Continuous`, with its body switched to
-`ContinuousCollisionMode.Continuous` after setup, costs **6.607/6.896 ms per
-full frame** on committed Gravitas `9175653` and **6.816/6.772 ms** on the Phase
-13 candidate in normal/reversed paired runs. Both use the same driver, preserve
-physical witnesses and allocate **0 B/frame**; the combined difference is
-+0.63%, with opposite order effects. This records an existing cost, not a Phase
-13 regression or a speedup claim.
-
-The source is a radius-0.5 circle slab, half-thickness 0.5, centered at host
-Y=0.25, sliding against one bodyless two-triangle wall at Z=0, X=[-8,8],
-Y=[-2,2]. Use the fixture's 16-Hz Mixed settings, frozen rotation, manual
-grounding, disabled sleep and alternating X speed +/-1 with inward impulse
--1/16; advance 64 complete host frames per invocation. Windows x64, i7-9700K,
-.NET 10.0.10 Release and `UseLocalLsfStack=true`; each order uses 24 alternating
-paired windows after warmup. Profile the complete mixed CCD call chain before
-attributing this to initial-contact math or indexing. Ignored
-`artifacts/static-surface/phase13/ccd-controls-ba-{forward,reverse}.json`
-retains loaded module hashes and raw windows.
-
 ### GRV-Benchmark-027 — Nonconvex Rotational CCD Step Cost
 
 **Discovered:** 2026-10-12 during GRV-Issue-101 validation. **Status:** Correct
@@ -377,6 +282,26 @@ Reproduce the maintained fixtures with `UseLocalLsfStack=true`:
 $env:UseLocalLsfStack = 'true'
 dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -- --filter '*MeshQuery3DTriangleScalingBenchmarks*' '*MixedMeshTriangleScalingBenchmarks*' --job short
 ```
+
+**2026-10-30 shared-worker refinement:** GRV-Benchmark-026 defers GJK witness
+construction. Frozen-source Release ABBA controls use the same maintained
+`MeshQuery3DTriangleScalingBenchmarks`, with 24 warmed windows per launch and
+two launches per payload. The convex-source path improves; the unchanged
+analytic-sphere path provides an approximate timing control:
+
+| Ordinary all-hit query | Triangles | Baseline ms | Candidate ms | Change |
+| --- | ---: | ---: | ---: | ---: |
+| Sphere control | 128 | 2.020 | 1.997 | -1.16% |
+| Convex mesh | 128 | 5.518 | 5.085 | -7.84% |
+| Sphere control | 2048 | 26.989 | 27.099 | +0.41% |
+| Convex mesh | 2048 | 89.657 | 81.539 | -9.05% |
+
+All windows allocate 0 bytes and exact hit snapshots match. At 2,048 triangles
+the convex row still costs about 81.5 ms. This is a partial reduction of the
+shared worker cost, not closure of the signal, evidence about mixed reducers,
+or a game-capacity guarantee. Sphere contrasts change direction across orders
+at 128 triangles and remain small; no sphere-path improvement is claimed.
+See the closed #026 record for source identities and comparison limits.
 
 **Next isolation:** Capture the existing collider/triangle candidate counters
 and profile ordinary query work separately from finite initial-contact recovery.
@@ -701,6 +626,7 @@ and
 
 | Signal                                                                                                                                        | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-026 — Initial generic convex mesh contact cost](#grv-benchmark-026--initial-generic-convex-mesh-contact-resolution-cost) | Closed | 2026-10-30 | Deferred GJK witnesses preserve exact outputs and 0 B; dense initial patches improve 6–7% and ordinary capsule controls 9–14% in balanced warmed runs. Residual costs remain published. |
 | [GRV-Benchmark-025 — Debug ragdoll steady-state allocations](#grv-benchmark-025--debug-ragdoll-steady-state-allocations)                      | Closed | 2026-10-30 | Current Debug/Release allocation stacks agree; restore the strict warmed humanoid guard without a runtime change. Historical 4.3 MB remains unattributed.                                                                                                                                       |
 | [GRV-Benchmark-018 — Complete triangle/cylinder contact cost](#grv-benchmark-018--complete-trianglecylinder-contact-cost)                     | Closed | 2026-10-06 | Exact reciprocal-chart and opposite-direction reuse cut rim-heavy queries by 9-20% and 64-pair batches by 6.5-8.1%, at 0 B/op and 100% coverage. Root retention is reverted; scene capacity remains GRV-Benchmark-024.                                                                          |
 | [GRV-Benchmark-019 — Complete triangle/cone contact cost](#grv-benchmark-019--complete-trianglecone-contact-cost)                             | Closed | 2026-10-06 | Four measured passes retain exact complete contact geometry at 0 B/op and 100% coverage. Final root-sign refinement lowers interior rim by 4.1%; remaining costs and workload-frequency gate are published in GRV-Benchmark-024.                                                                |
@@ -724,6 +650,222 @@ and
 | GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                                                                              | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
 | GRV-Benchmark-003 — 3D full-runtime CCD allocation                                                                                            | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
 | GRV-Benchmark-004 — Grounding raycast probe allocation                                                                                        | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+### GRV-Benchmark-026 — Initial Generic Convex Mesh Contact Resolution Cost
+
+**Discovered:** 2026-10-07 during GRV-Issue-094 correctness validation.
+**Status:** Closed 2026-10-30 with deferred GJK witness construction, unchanged
+exact outputs and published residual costs. **Owner:** Gravitas prepared convex
+sweeps; complete contact/projection mathematics remains in FixedMathSharp.
+
+**Historical signal and earlier refinements:**
+
+The warmed public `ConvexMeshInitialContactBenchmarks.SweepCuboidAll` compares
+ordinary impacts with initially overlapping, separating cuboids. On this Windows
+x64 i7-9700K host (.NET 8.0.29), the corrected geometric initial normal costs
+**59.01 us** for a convex quad, **151.38 us** for a concave quad, and **59.59
+us** for a compound convex mesh leaf, versus the incorrect baseline's **16.51 /
+39.42 / 16.21 us**. Ordinary impacts remain **27.56 / 83.36 / 27.30 us** versus
+**26.89 / 82.57 / 27.09 us**. All six cases allocate **0 B/op**.
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+$env:DOTNET_PROCESSOR_COUNT = '2'
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*ConvexMeshInitialContactBenchmarks*' --job short --warmupCount 3 --iterationCount 5 --artifacts artifacts/grv-issue-094/final-confirmation
+```
+
+Ignored baseline/final captures under `artifacts/grv-issue-094` retain the
+measurements. The baseline answered a different, incorrect geometric contract;
+restoring travel-facing normals or suppressing real edge contacts is not an
+optimization. **Next isolation:** profile complete initial contacts and exact
+support/projection comparisons, then measure touching, overlap, containment,
+curved sources and dense concave initial-contact workloads. Prefer reusable
+exact certificates or reduced duplicated work, with the same geometric normals,
+leaf ordering, full-domain witnesses and allocation gates. Measure scene
+frequency before assigning a host capacity budget.
+
+**2026-10-11 refinement during GRV-Issue-108:** Initial triangle sweeps now
+certify contact against the finite trusted filled surface, including nonconvex
+patches, before accepting a covered seam witness. The existing distance/authored
+index comparator also rejects candidates that could not win even at distance
+zero. This removes repeated GJK and face-admission work after an admitted
+initial hit, without caches or a different geometric answer path.
+
+The isolated before/after fixtures use the same benchmark source and exclude the
+cuboid and capsule query sources from each other's target layer. Native Release
+means on the same host, with three warmups and five measurements, are:
+
+| Public query workload                       |    Before |     After |
+| ------------------------------------------- | --------: | --------: |
+| Concave quad, initially overlapping cuboid  | 128.79 us |  75.53 us |
+| Concave quad, initially overlapping capsule | 230.27 us | 129.49 us |
+| Capsule, filled quad at subdivision 2       |  1.551 ms |  0.701 ms |
+| Capsule, notched patch at subdivision 2     |  1.184 ms |  0.693 ms |
+| Capsule, filled quad at subdivision 8       | 10.590 ms |  4.953 ms |
+| Capsule, notched patch at subdivision 8     |  6.387 ms |  4.973 ms |
+
+All 16 ordinary/initial, convex/concave/compound and dense-patch rows report
+`0 B/op`. Ordinary concave cuboid/capsule controls are 74.29/583.60 us before
+and 76.02/587.35 us after; convex and compound controls remain within about 2%
+of their isolated baselines. These short-run means are not gameplay-frame
+latency or capacity guarantees. Dense initial capsule sweeps still approach 5
+ms, so this existing signal remains active. Profile candidate ordering, GJK and
+finite-contact work separately before another optimization; keep nonconvex
+holes, exposed rims, initial closing admission and authored tie ordering intact.
+
+Reproduce both maintained benchmark classes with `UseLocalLsfStack=true`:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+$env:DOTNET_PROCESSOR_COUNT = '2'
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -p:BuildInParallel=false -p:UseSharedCompilation=false -- --filter '*ConvexMeshInitialContactBenchmarks*' '*CoplanarPatchInitialSweepBenchmarks*' --warmupCount 3 --iterationCount 5 --artifacts artifacts/grv-issue-108/final-confirmation
+```
+
+Ignored `artifacts/grv-issue-108/isolated-baseline` and `final-confirmation`
+retain the matched measurements. The preliminary unisolated source capture and
+the pre-pruning correctness capture are not the retained comparison.
+
+**2026-10-29 small mixed CCD control:** A millisecond-scale capacity boundary
+also appears without dense subdivision. The existing
+`JoinedStaticSurfaceMixedSimulationBenchmarks`, `Shape=Circle`,
+`Layout=Continuous`, with its body switched to
+`ContinuousCollisionMode.Continuous` after setup, costs **6.607/6.896 ms per
+full frame** on committed Gravitas `9175653` and **6.816/6.772 ms** on the Phase
+13 candidate in normal/reversed paired runs. Both use the same driver, preserve
+physical witnesses and allocate **0 B/frame**; the combined difference is
++0.63%, with opposite order effects. This records an existing cost, not a Phase
+13 regression or a speedup claim.
+
+The source is a radius-0.5 circle slab, half-thickness 0.5, centered at host
+Y=0.25, sliding against one bodyless two-triangle wall at Z=0, X=[-8,8],
+Y=[-2,2]. Use the fixture's 16-Hz Mixed settings, frozen rotation, manual
+grounding, disabled sleep and alternating X speed +/-1 with inward impulse
+-1/16; advance 64 complete host frames per invocation. Windows x64, i7-9700K,
+.NET 10.0.10 Release and `UseLocalLsfStack=true`; each order uses 24 alternating
+paired windows after warmup. Profile the complete mixed CCD call chain before
+attributing this to initial-contact math or indexing. Ignored
+`artifacts/static-surface/phase13/ccd-controls-ba-{forward,reverse}.json`
+retains loaded module hashes and raw windows.
+
+**2026-10-30 refinement and closeout:** The dense initial-capsule profile
+places approximately 47% of sampled thread time under GJK distance evaluation
+and 31% under its endpoint fallback (inclusive, overlapping attribution).
+These are localization samples, not a decomposition of exact elapsed query
+cost. GJK constructed both physical witnesses after every simplex reduction,
+although convergence used only the weighted Minkowski point.
+
+`ClosestSimplexResult` now retains that point, the selected support count and
+weights. It reconstructs the two witness frames only when `ComputeDistance`
+returns a distance or intersection. Tetrahedron containment retains the previous
+three support points and their weights; no preceding-pose or overwritten
+simplex witness is substituted. A one-support result uses the exact identity
+of a positive one-element weighted average, reconstructing the same anchor
+fields as the original path rather than retaining a different exact support
+term. Unused retained weight slots are explicitly initialized.
+
+No support selection, GJK convergence tolerance, advancement/bracketing rule,
+contact normal, source pose, candidate ordering or complete-contact reducer
+changes. No cache, new allocator, mathematical shortcut or lower-stack change.
+
+The comparison freezes committed sources into one isolated sibling graph:
+Gravitas `e9eb6d27893ab24679bea62c7b566c96994c8c88`, FixedMathSharp
+`0e7a8e5760c506db8050714b72fad2421dcd46e6`, SwiftCollections
+`47a184b1e6dc5480e65295f2228cf8d77b647422`, GridForge
+`76e2bd46380664cfa5403d3b57eca6a82cb6b88a`, Chronicler
+`af513b2ad9014cfb96a643de11dfe06bb8e4a132`. Only the three changed GJK partials
+are overlaid for the candidate. Concurrent live Chronicler edits are excluded.
+Windows x64/i7-9700K, SDK 10.0.302, .NET 10.0.10 Release, two advertised
+processors and the source-mode global transitive-reference suppression flag.
+
+Preliminary native BenchmarkDotNet runs execute all 16 rows successfully with
+zero warm allocation, but three 100-ms warmups/five measurements show tiering
+and launch instability, including conflicting large changes in small rows.
+Those runs are retained and excluded from speedup acceptance. The retained
+comparison directly invokes the same maintained fixtures and public methods,
+warms every row for at least one second, then measures 24 windows of roughly
+20 ms each. Separate launches run baseline/candidate/candidate/baseline, using
+the same driver and frozen dependency DLLs. Setup and calibration are excluded.
+The task's builds, tests and profiling do not overlap timing; unrelated machine
+activity is not controlled. Means below combine both launches per payload:
+
+| Public query (target kind; initial overlap) | Baseline us | Candidate us | Change |
+| --- | ---: | ---: | ---: |
+| Cuboid, convex (ordinary) | 21.56 | 20.07 | -6.91% |
+| Capsule, convex (ordinary) | 345.20 | 303.12 | -12.19% |
+| Cuboid, convex (initial) | 50.45 | 49.68 | -1.52% |
+| Capsule, convex (initial) | 207.24 | 204.67 | -1.24% |
+| Cuboid, concave (ordinary) | 64.76 | 59.94 | -7.43% |
+| Capsule, concave (ordinary) | 1701.05 | 1544.36 | -9.21% |
+| Cuboid, concave (initial) | 73.48 | 70.98 | -3.41% |
+| Capsule, concave (initial) | 138.45 | 133.14 | -3.83% |
+| Cuboid, compound convex (ordinary) | 23.23 | 19.97 | -14.03% |
+| Capsule, compound convex (ordinary) | 354.26 | 305.70 | -13.71% |
+| Cuboid, compound convex (initial) | 51.06 | 49.69 | -2.68% |
+| Capsule, compound convex (initial) | 209.18 | 206.25 | -1.40% |
+| Capsule, filled patch, subdivision 2 (initial) | 511.39 | 477.88 | -6.55% |
+| Capsule, notched patch, subdivision 2 (initial) | 515.64 | 485.72 | -5.80% |
+| Capsule, filled patch, subdivision 8 (initial) | 720.13 | 668.13 | -7.22% |
+| Capsule, notched patch, subdivision 8 (initial) | 790.76 | 734.12 | -7.16% |
+
+Every retained window allocates **0 bytes**. Both execution orders show the
+same direction for all 16 rows. Dense initial filled/notched patches improve
+about 6–7%; ordinary capsule controls improve about 9–14%. Smaller 1–3% point
+changes remain close to control/placement uncertainty and are not general
+throughput guarantees. The largest retained initial row still costs about
+0.73 ms per public query; these are neither complete game frames nor a host-rate
+promise. The older mixed CCD capacity control above was not measured by this
+refinement and receives no claimed speedup; representative scene budgeting
+remains the experimental GRV-Benchmark-024 gate.
+
+Exact before/after hit snapshots agree in all **84** controls: all 16 original
+rows, 64 overlapping rotated-cuboid poses whose target witness is retained from
+GJK, and four dense ordinary-mesh query controls. Compare collider ID, raw
+numerator/distance, normal, direction, materialized point and authoritative
+anchor origin/rotation/local offsets. Existing initial-contact, finite-boundary,
+full-domain, same-pose, allocation and replay tests remain the correctness gate;
+no maintained tests around benchmark/test machinery are added.
+
+Full frozen-stack validation passes **8,242 Release** and **8,171 ReleaseLean**
+tests, including shared replay expectations and allocation guards. Raw OpenCover
+counts retain **100% reachable line, branch and method coverage**:
+
+| Profile | Lines visited/total | Branches visited/total | Methods visited/total |
+| --- | ---: | ---: | ---: |
+| Release | 53,385 / 53,385 | 21,626 / 21,626 | 5,594 / 5,594 |
+| ReleaseLean | 53,383 / 53,383 | 21,626 / 21,626 | 5,593 / 5,593 |
+
+The changed simplex state covers all 48 sequence points, 12 branch points and
+five methods in each profile. Independent read-only review verifies all GJK
+exit paths, the previous-simplex invariant, single-support identity and exact
+snapshot agreement. Builds have no errors; their only warnings are
+`MultipleGlobalAnalyzerKeys` from the archived sources inheriting both their own
+and the outer checkout's `.globalconfig`.
+
+
+The shared GJK change also lowers the convex-source portion of GRV-Benchmark-029;
+that signal remains active because its analytic sphere/mixed paths and remaining
+dense cost require their own attribution. No common executed owner was
+established for the other active signals, so they are not closed here.
+
+Reproduce the maintained query matrix after a source-stack build using:
+
+```powershell
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true -m:1 -p:BuildInParallel=false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll --filter '*ConvexMeshInitialContactBenchmarks*' '*CoplanarPatchInitialSweepBenchmarks*' --warmupCount 6 --iterationCount 6 --iterationTime 500
+```
+
+Ignored `artifacts/grv-benchmark-026` retains source archives, payloads, the
+localization trace, preliminary BDN results, the disposable exact-output/timing
+driver, raw order-balanced windows and validation reports. The inputs, frozen
+revisions, workload admission, results and conclusion above remain sufficient
+when those captures are removed.
+
+**Closure criteria:** Met under the measured-gain and published-cost criterion.
+Retain the complete exact contact contract and zero warm allocation. Reopen for
+a reproducible regression in these fixtures or a demonstrated workload budget
+that warrants another owner-specific optimization; do not recover the earlier
+incorrect initial normals or reinterpret query means as frame capacity.
 
 ### GRV-Benchmark-025 — Debug Ragdoll Steady-State Allocations
 

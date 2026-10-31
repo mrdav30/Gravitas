@@ -74,18 +74,24 @@ internal sealed partial class ConvexSweepQueryWorker
                 // Tetrahedron entry follows a valid one-to-three point simplex.
                 // Preserve that same-pose closest pair as the deterministic
                 // surface witness for the intersection result.
-                return GjkResult.CreateIntersection(previousClosest.PointA, previousClosest.PointB);
+                // Tetrahedron entry leaves the preceding three support points intact.
+                previousClosest.GetWitnesses(_simplex, out FixedPointAnchor previousA, out FixedPointAnchor previousB);
+                return GjkResult.CreateIntersection(previousA, previousB);
             }
 
             if (workingDistance <= workingDistanceTolerance)
-                return GjkResult.CreateIntersection(closest.PointA, closest.PointB);
+            {
+                closest.GetWitnesses(_simplex, out FixedPointAnchor pointA, out FixedPointAnchor pointB);
+                return GjkResult.CreateIntersection(pointA, pointB);
+            }
 
             direction = -closest.Point;
         }
 
         Fixed64 distance = GjkSimplexScale.RestoreDistance(workingDistance, workingShift);
         Vector3d normal = closest.Point.Normalized;
-        return new GjkResult(false, distance, closest.PointA, closest.PointB, normal);
+        closest.GetWitnesses(_simplex, out FixedPointAnchor finalA, out FixedPointAnchor finalB);
+        return new GjkResult(false, distance, finalA, finalB, normal);
     }
 
     private static SupportPoint CreateSupportPoint(

@@ -142,6 +142,8 @@ internal sealed partial class ConvexSweepQueryWorker
     {
         Span<SupportPoint> reduced = stackalloc SupportPoint[4];
         Span<Fixed64> weights = stackalloc Fixed64[4];
+        // Deferred witness state retains all four weight slots.
+        weights.Clear();
         int reducedCount = 0;
         AddWeightedPoint(simplex[0], firstWeight, reduced, weights, ref reducedCount);
         AddWeightedPoint(simplex[1], secondWeight, reduced, weights, ref reducedCount);
