@@ -239,7 +239,10 @@ reporting retain complete contact rows.
 Conservative pure-rotation restarts reuse body-owned candidate buffers while
 the pivot and proxy bounds stay unchanged. Any translation or response gathers
 fresh candidates; target validity, prepared trajectories and earliest-hit ordering
-are checked again on every restart.
+are checked again on every restart. In both 2D and 3D, a live registry containing
+only the source collider needs no same-dimensional candidate query. The gatherer
+clears retained results; the separate mixed search still runs. Registering another
+collider resumes normal collection immediately.
 
 An unresolved interval is subdivided until a fixed depth or per-candidate work
 budget. A witnessed earliest contact can apply the contact-point response and

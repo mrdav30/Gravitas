@@ -427,6 +427,14 @@ public sealed partial class SolidBody2D
         Fixed64 pivotRadius)
     {
         _rotationalContinuousCollisionCandidateIds.FastClear();
+        // The live root registry cannot supply another target when it contains only this source.
+        if (Context.Physics2D.ColliderCount == 1
+            && ReferenceEquals(Context.Physics2D.GetColliderByServiceIndex(0), Collider))
+        {
+            _continuousCollisionHits.Clear();
+            return 0;
+        }
+
         int staticHitCount = displacement.MagnitudeSquared <= Fixed64.Epsilon
             ? Context.Query2D.OverlapCircleAgainstStaticAll(
                 startPosition,

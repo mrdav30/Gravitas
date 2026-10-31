@@ -67,9 +67,10 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ### GRV-Benchmark-027 — Nonconvex Rotational CCD Step Cost
 
-**Discovered:** 2026-10-12 during GRV-Issue-101 validation. **Status:** Correct
-first-impact timing retained; demanding angular fixtures remain expensive after
-the measured local refinements. **Owner:** Gravitas bounded rotational interval
+**Discovered:** 2026-10-12 during GRV-Issue-101 validation. **Status:** Open;
+single-source gathering optimized in both dimensions. Exact cone-contact cost
+and general rotational-refinement capacity remain separate unresolved costs.
+**Owner:** Gravitas bounded rotational interval
 search and exact finite-contact admission; FixedMathSharp only where profiles
 identify reusable geometry work.
 
@@ -138,10 +139,90 @@ attributes 62% to complete mesh/cone contact construction, including 53% in
 cone-plane ray events; its exact curved-contact frequency also belongs to
 GRV-Benchmark-024.
 
-**Next isolation:** Measure smaller per-frame angular changes, dynamic/movable
-counterparts, moving-target trajectories and increasing facet counts before
-assigning a host step budget. Profile exact Boolean finite-prism admission and
-outer conservative refinements separately from required response contacts.
+**2026-10-31 refinement:** Fresh steady-loop profiles of the maintained full-step
+fixtures exclude setup. In the mixed mesh/prism case, same-dimensional gathering
+occupies 26.4% of sampled loop time, including 18.2% below dense voxel range
+collection, although the source is the only registered 3D collider. Both body
+owners now clear retained hits/IDs and skip this gather only when their live
+dimensional registry contains exactly their own collider root. Mixed gathering
+still runs; registration/removal needs no cache invalidation or new counters.
+The post-change trace has no samples below the skipped 3D query; exact Boolean
+mixed admission now accounts for 42.7% and mixed gathering for 19.4% of inclusive
+sampled loop time. These shares overlap and are not exclusive CPU percentages.
+
+Frozen source baseline: Gravitas `68ca89f`, FixedMathSharp `0e7a8e5`,
+SwiftCollections `d605ec1`, GridForge `76e2bd4`, Chronicler `0a5f962`.
+Release source-stack builds use SDK 10.0.302 / .NET 10.0.10 on Windows x64,
+i7-9700K, blocking GC and `DOTNET_PROCESSOR_COUNT=2`. Only `Gravitas.dll`
+differs among the 35 assemblies in the frozen A/B payloads. A disposable driver
+calls the existing benchmark methods, with setup outside measurement, at least
+one second of warmup per row, 200 ms calibration and 24 approximately 30 ms
+measurement windows per process. These are direct fixture timings, not BDN
+results or gameplay frame percentiles. Four independent processes per payload
+run in ABBA then BAAB order:
+
+| Complete host-step fixture | Baseline | Candidate | Change |
+| --- | ---: | ---: | ---: |
+| Joined cone floor/wall | 6.340 ms | 6.455 ms | +1.8% |
+| Floor-only cone | 5.131 ms | 5.065 ms | -1.3% |
+| Empty 3D triangle corner | 172.0 us | 169.5 us | -1.4% |
+| 2D compound first impact | 628.6 us | 624.7 us | -0.6% |
+| Empty 2D compound bounds | 24.33 us | 23.73 us | -2.5% |
+| Moving 3D mesh / 2D prism | 5.307 ms | 4.170 ms | **-21.4%** |
+| Moving 2D prism / empty mesh corner | 150.5 us | 137.9 us | **-8.4%** |
+
+All measured windows allocate 0 B. Sixteen returned values per fixture and each
+final raw pose/velocity/TOI-count/limit snapshot match exactly. Twelve existing
+interval/moving-target controls cover 1/32 candidates or pairs in pure 2D, pure
+3D and both mixed directions. Across the same ABBA/BAAB process orders, their
+mean changes span -3.8% to +1.2%; every raw returned value and body-state snapshot
+matches, and every measured window allocates 0 B. These interval/moving fixture
+methods run `LateSimulate` only; they are controls, not the full-step rows above.
+The joined-cone
+candidate process means span 6.328-6.739 ms versus 6.295-6.376 ms baseline;
+the reversed-order pair is 6.377 ms versus 6.336 ms (+0.6%). Its aggregate +1.8%
+is retained, not described as a cone improvement or proof of zero overhead.
+
+Smaller-angle probes reuse the same cone and mixed geometry, resets and complete
+host step, changing only the authored angle. Candidate 1/5-degree joined-cone
+steps cost 117/332 us, floor-only 108/314 us, mixed mesh/prism 1.123/1.166 ms,
+and mixed empty-corner 147/161 us. All reach the complete authored angle with
+zero TOI iterations and no limit, exactly matching baseline raw states and
+allocating 0 B. They are isolated process timings, not evidence that the separate
+small-angle capsule/frontier reproductions below are solved.
+
+The joined-cone profile puts 84.9% below manifold construction and 64.3% below
+`MeshConeFaceRegions.Build`. Closing admission uses exact velocities at matched
+finite anchors. A Boolean overlap cannot replace that decision; deferring the
+manifold requires an exact-pose contact design covering joined surfaces and
+nonclosing witnesses. No search budget, tolerance, manifold or geometry change
+is retained in this refinement.
+
+Validation uses `UseLocalLsfStack=true`: Release passes 8,262 tests and
+ReleaseLean passes 8,191. Raw covered/total counts are 53,456/53,456 lines,
+21,678/21,678 branches and 5,599/5,599 methods in Release; Lean retains
+53,454/53,454, 21,678/21,678 and 5,598/5,598 respectively. Four new source-behavior
+theory cases cover static/moving target registration, removal, re-registration,
+a complete rotating step after removal, a lone other target and an empty
+registry. Independent review finds no remaining runtime/test issue. No maintained
+benchmark/test-infrastructure tests or new runtime helpers are added.
+
+Ignored `artifacts/grv-benchmark-027` contains `heads.json`, frozen source
+archives/payloads, `payload-hashes.json`, `loaded-bindings.json`, driver source,
+raw timing/snapshot logs
+and 15-second sampled-thread-time traces. Reproduce the workloads through
+`NonconvexRotationalCcdBenchmarks`, `RotationalCcdIntervalBenchmarks` (1/32
+candidates) and `RotationalMovingPairCcdBenchmarks` (1/32 pairs), using the build
+command above with current `net10.0` output. Profile warmed method loops with
+`dotnet-trace collect --profile dotnet-sampled-thread-time --format Speedscope`;
+filter stacks to the measured loop before attributing inclusive sample shares.
+The retained inputs, revisions, timing procedure and outputs here are the record;
+ignored captures are supplemental.
+
+**Next isolation:** Profile exact finite-prism admission and increasing facet
+counts separately from required cone response contacts and outer conservative
+refinements. Preserve the capsule/frontier reproductions below before changing
+motion admission or assigning a host step budget.
 Preserve whole-shape separation, earliest frontiers, closing admission, matched
 anchors, authored ties and 0 B/op; never replace an unresolved interval with a
 sample-only miss or weaken the manifold to one support pair.
