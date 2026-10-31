@@ -75,6 +75,10 @@ Collision work is part of `context.LateSimulate()`:
 Mixed contacts run after both dimension-local services have integrated and
 refreshed their own collider partitions, so mixed response observes
 post-integration 2D and 3D positions.
+When either live dimensional collider registry is empty, mixed partition copying,
+sorting and candidate distribution are skipped. Mixed index refresh, version
+advancement, pair cleanup and retained-partition retirement still run, keeping
+queries fresh and allowing later registrations to participate on the next pass.
 
 ## Pair Filtering
 

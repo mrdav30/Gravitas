@@ -5,6 +5,13 @@ Its alias runner and deterministic fixtures cover context lifecycle,
 registration/partitioning, simulation, query services, replay hashing, and
 diagnostics.
 
+`MixedEmptyDimensionBenchmarks` measures a complete `Simulate`/`LateSimulate`
+step with 64 sleeping movers and 64 static floors in one dimension. Automatic
+grounding crosses a physical gap, so support comes from queries rather than
+contact manifolds. Both 3D-only and 2D-only populations run in their pure mode
+and in Mixed mode. Setup and cleanup check stable supported sleep and an empty
+opposite-dimensional registry. Run with `--filter '*MixedEmptyDimensionBenchmarks*'`.
+
 `curved-prism-contact` includes separated and penetrating cone/cylinder pairs,
 plus exactly touching cone apex, cone generator and horizontal cylinder side. The
 touching fixtures validate zero depth, normal orientation and coincident finite

@@ -15,6 +15,7 @@ experimental signals and compact [closed index](../benchmark-signal-hardening-ba
 
 | Signal                                                                                                                                               | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-028 — Mixed broad phase with an empty opposite dimension](#grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension) | Closed | 2026-10-31 | Skipped impossible mixed distribution; 30–42% lower measured empty-population step time, zero warm allocation and preserved query/lifetime behavior. |
 | [GRV-Benchmark-027 — Nonconvex rotational CCD step cost](#grv-benchmark-027--nonconvex-rotational-ccd-step-cost) | Closed | 2026-10-31 | Deferred exact contact materialization reduces measured cone steps by 59–64% and the pressed-capsule episode by 65%, at zero warm allocation; residual conservative progress limits and reopening criteria are explicit. |
 | [GRV-Benchmark-032 — First isolated 2D pair-owner deactivation allocation](#grv-benchmark-032--first-isolated-2d-pair-owner-deactivation-allocation) | Closed | 2026-10-30 | Removed default-value boxing from SwiftCollections dictionary/set nullability initializers; cold collection regressions and unchanged 2D teardown now allocate 0 B, with full standard/Lean consumer passes and 100% reachable coverage.                                                        |
 | [GRV-Benchmark-026 — Initial generic convex mesh contact cost](#grv-benchmark-026--initial-generic-convex-mesh-contact-resolution-cost)              | Closed | 2026-10-30 | Deferred witnesses improve initial sweeps; a certified whole-patch follow-up lowers the ordinary concave capsule row by about 80%, at 0 B/op. Output tolerances and control variation are published; the pre-existing #032 validation exception was subsequently resolved upstream.             |
@@ -41,6 +42,224 @@ experimental signals and compact [closed index](../benchmark-signal-hardening-ba
 | GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                                                                                     | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
 | GRV-Benchmark-003 — 3D full-runtime CCD allocation                                                                                                   | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
 | GRV-Benchmark-004 — Grounding raycast probe allocation                                                                                               | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+### GRV-Benchmark-028 — Mixed Broad-Phase Work With An Empty Opposite Dimension
+
+**Discovered:** 2026-10-15 during #135/#136 warm validation.
+**Closed:** 2026-10-31. **Owner:** Gravitas mixed candidate distribution.
+
+`ProcessMixedContacts` now skips copying, sorting and distributing active mixed
+partitions when either live dimensional collider registry is empty. Index
+refresh, scratch clearing, version advancement, response cleanup, untouched-pair
+cleanup and retained-partition retirement still run. The next populated pass
+uses the ordinary deterministic distribution path. One private phase method sits
+beside its sole production caller; no counter, cache, public API or lower-stack
+change is added. Production growth is nine net lines in one existing file.
+
+The bounded query-support fixture is now maintained as
+`MixedEmptyDimensionBenchmarks`. Each operation runs both `Simulate` and
+`LateSimulate` with 64 sleeping movers and 64 static floors in one dimension,
+zero colliders in the other, at 16 Hz. An eight-by-eight grid spaces movers by
+eight units. Three-dimensional spheres have radius 1/2 and local offset Up 1;
+their 6×1×6 floors are centered 1/2 below the body origin. Planar circles use
+the corresponding forward offset and 6×1 floor. Automatic grounding crosses a
+real 1/2-unit collider gap; there are no supporting contact manifolds. Setup
+settles 16 steps, explicitly sleeps the movers and warms 33 more steps. Setup
+and cleanup verify stable grounded sleep, zero velocity, the physical gap,
+unchanged heights and the empty opposite registry. Pure 3D/2D modes are controls.
+
+#### Comparable source and measurement
+
+Baseline is Gravitas `76dd8bfd1b16b7b23acc1fc8b3440cb890a62c26`, plus the new
+unchanged benchmark fixture. Both versions use frozen committed FixedMathSharp
+`b4a489de5ae5ba178a5970499e7d90f7847fe0f9`, SwiftCollections
+`0418123fa52f78cbff551e6ca291ef816493069b`, GridForge
+`76e2bd46380664cfa5403d3b57eca6a82cb6b88a` and Chronicler
+`c45f9ab53913e5b1692f0717733425e0f4defeb2`. Source archives preserve the baseline;
+the isolated build graph is updated only after freezing baseline binaries and
+completing baseline benchmarks/tests. The candidate changes only the candidate-distribution
+phase. Among the 35 DLLs in the direct A/B payloads, only `Gravitas.dll` differs; module hashes are retained.
+
+Windows 11 x64, i7-9700K, SDK 10.0.302, .NET 10.0.10, Release,
+`UseLocalLsfStack=true`, `DisableTransitiveProjectReferences=true`,
+`DOTNET_PROCESSOR_COUNT=2`. Builds, tests, profiling and acceptance timings run
+serially. BenchmarkDotNet 0.15.8 uses concurrent workstation GC, two launches,
+five warmups and eight measurements with 512 invocations per iteration, unroll
+one. No BDN affinity is requested. These are synthetic iteration means, not
+gameplay frame percentiles or a general host-capacity guarantee.
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+$env:DisableTransitiveProjectReferences = 'true'
+$env:DOTNET_PROCESSOR_COUNT = '2'
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll --filter '*MixedEmptyDimensionBenchmarks*' --job short --warmupCount 5 --iterationCount 8 --launchCount 2 --invocationCount 512 --unrollFactor 1 --exporters json --artifacts artifacts/benchmark-028
+```
+
+| Complete step | Baseline mean (SD) | Final mean (SD) | Change | Allocated |
+| --- | ---: | ---: | ---: | ---: |
+| 3D population, Mixed runtime | 837.96 (30.05) us | 485.33 (3.54) us | -42.1% | 0 B/op |
+| 3D population, pure 3D control | 413.02 (5.22) us | 399.08 (2.55) us | -3.4% | 0 B/op |
+| 2D population, Mixed runtime | 687.84 (19.21) us | 441.28 (3.77) us | -35.8% | 0 B/op |
+| 2D population, pure 2D control | 367.92 (9.03) us | 352.46 (2.06) us | -4.2% | 0 B/op |
+
+Every BDN child exits zero: eight children and exactly 64 Workload/Actual
+measurements per payload (four rows × two launches × eight iterations). Pure
+runtime changes are controls, not claimed improvements.
+
+A separate disposable driver uses blocking GC, affinity 192 and High process
+priority, six seconds of warmup per row, 200 ms calibration and 24 windows
+targeting 30 ms each (1–4,096 steps per window). ABBA processes cover the same
+four complete-step rows plus maintained sparse mixed broad-phase controls with
+32 and 1,024 registered pairs. These existing controls eventually auto-sleep:
+their steady broad-phase candidate count is zero, so they measure populated,
+sleeping distribution overhead rather than awake pair generation. All measured windows allocate zero bytes. The four supported-sleep rows retain
+all sixteen returned checksums and all 64 final body positions, linear velocities
+and grounding/sleep flags. The sparse controls retain their returned candidate
+counts. These comparisons match exactly across all four processes. Final balanced means:
+
+| Direct complete step | Baseline us | Final us | Change |
+| --- | ---: | ---: | ---: |
+| 3D / pure | 395.91 | 397.45 | +0.39% |
+| 3D / Mixed | 704.30 | 492.13 | -30.13% |
+| 2D / pure | 364.22 | 361.84 | -0.65% |
+| 2D / Mixed | 659.23 | 451.71 | -31.48% |
+| Sleeping populated control, 32 pairs | 204.06 | 205.42 | +0.67% |
+| Sleeping populated control, 1,024 pairs | 17880.70 | 17970.28 | +0.50% |
+
+The sleeping controls' process ranges are 203.98–204.13 us baseline versus
+204.79–206.04 us final at 32 pairs, and 17.789–17.973 ms versus 17.699–18.242 ms
+at 1,024. The smaller isolated phase check below has overlapping process ranges.
+These sub-percent mean differences do not prove exact equivalence; they do not
+reproduce the initial 2–3% penalty. Protocols differ in GC, affinity and warmup,
+so compare payloads within each protocol rather than mixing absolute means.
+
+The initial inline guard repeatedly slowed the 32-pair sleeping control:
+206.44/206.20 us baseline versus 210.36/211.45 us candidate in the full matrix
+(+2.2%), then 188.83/189.13 versus 195.59/194.62 us in isolated BAAB processes
+(+3.2%). Those results are retained as adverse evidence, not called noise or
+zero overhead. A diagnostic with TieredPGO disabled reduces the gap to 0.5%;
+evaluating both Boolean comparisons without short circuiting does not resolve it.
+Neither experimental configuration nor Boolean rewrite is retained. Extracting
+the existing distribution phase gives overlapping default-runtime process ranges:
+187.91–191.33 us baseline versus 189.53–191.48 us final (+0.5% mean). This is a
+measured mitigation, not proof of a particular JIT/PGO/layout cause. The final
+full matrix checks both population directions and preserves the original
+controls; no universal zero-overhead claim is made.
+
+Fresh sampled-thread-time profiling reproduces the original signal: 43.9% of
+inclusive full-step loop weight is below `ProcessMixedContacts` in the baseline
+3D-only scene. The guarded profile puts 24.9% below mixed processing, almost entirely in index refresh (24.8%). The driver setup is outside the sampled method;
+the loop includes its additional 1.5-second warmup and 15 seconds of repeated
+steps. Inclusive weights overlap and are not exclusive CPU shares. The remaining
+mixed indexing serves explicit queries and future population changes; it is not
+claimed to disappear or reach pure-runtime cost.
+
+#### Correctness, validation and closure
+
+The 44 focused mixed broad-phase cases pass against the baseline and candidate,
+including six new source-behavior cases for both empty-dimension directions.
+They check query candidates after movement, version advancement, retained
+partition retirement after the final removal, repeated last-collider removal
+inside trigger callbacks and respawn, stale candidate clearing, pair/exit event
+counts and zero warm allocations. No tests or maintained verification
+harnesses around benchmark/test infrastructure are added.
+
+Full source-stack gates pass **8,293 Release tests** and **8,222 ReleaseLean
+tests**, with no failures or skips. Both library targets (`netstandard2.1` and
+`net10.0`) build in both configurations with zero errors. Each configuration has
+one fresh coverage capture; no historical coverage is merged into acceptance.
+All reachable sequence points, branches and methods are covered:
+
+| Configuration | Raw covered / total sequence points | Raw covered / total branches | Raw covered / total methods |
+| --- | ---: | ---: | ---: |
+| Release | 53,477 / 53,477 | 21,710 / 21,710 | 5,602 / 5,602 |
+| ReleaseLean | 53,475 / 53,475 | 21,710 / 21,710 | 5,601 / 5,601 |
+
+Reproduce full-suite coverage from either configuration's freshly built source:
+
+```powershell
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true --collect:"XPlat Code Coverage" --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/coverage-release
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c ReleaseLean -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true --collect:"XPlat Code Coverage" --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/coverage-lean
+```
+
+The Release execution reused built tests with the final runtime DLL/PDB installed;
+its runtime DLL exactly matches the final measured payload. Lean compiles its own
+configuration. Source/test bytes match the isolated graph. Existing replay,
+allocation, query, response and lifecycle regressions remain in the full runs.
+
+Independent review found no actionable runtime/test/benchmark issue. This closes
+the impossible-distribution signal; remaining mixed index refresh is required
+work. Reopen for a representative empty-population workload that still spends
+material time in distribution, a measured populated-path regression, stale query
+results, missed post-registration pairs, nondeterministic order, retained-payload
+leaks, incorrect callback lifetime behavior or new warm allocation.
+
+An additional awake control wraps two successive
+`MixedBroadPhaseBenchmarks.RetainedPartitionCleanupAfterChurn` calls per measured
+operation, moving 32 planar bodies between the existing fixture's 16/32-unit
+X offsets. This keeps the mixed distribution path populated and ends each cycle
+with **32 broad-phase candidates**. Default-runtime BAAB process means are
+1,380.04/1,367.35 us per two-step cycle baseline versus 1,416.80/1,367.99 us final
+(+1.4% aggregate, overlapping process ranges). Every window allocates zero bytes;
+all sixteen retained/pool return values and final candidate/collider counts match.
+The variation is retained without claiming exact equivalence or a speedup for
+populated moving scenes. The disposable `churn` driver mode reuses the same warmup,
+calibration, window, GC, affinity and priority protocol as the other direct runs.
+
+Supplemental ignored evidence is under `artifacts/grv-benchmark-028`: `heads.json`,
+five source archives, frozen baseline/final payloads, `final-payload-hashes.json`, the exact
+`final-matrix-driver`, BDN JSON and
+child logs, ABBA direct logs/driver, paired Speedscope traces, focused runs and
+final raw coverage captures. The maintained fixture and the revisions, inputs,
+commands, outcomes and reopening criteria here stand independently of those
+disposable artifacts. Changes were left unstaged/uncommitted for review; no
+released-package or cross-platform validation is claimed.
+
+#### Historical intake
+
+The following original profile describes the pre-#135/#136 stack; its timings
+are not mixed with the current comparison above.
+
+**Discovered:** 2026-10-15 during #135/#136 warm validation. **Original intake status:**
+Profiled pre-existing opportunity; the benefit of a distribution gate has not
+been measured. **Owner:** Gravitas mixed candidate distribution and partition
+maintenance.
+
+The isolated `QueryOnly136WarmBenchmarks.Stable64Frame(Domain: "Mixed")`
+contains 64 sleeping 3D spheres and their 3D static floors, with **zero 2D
+colliders**. Automatic support crosses a real collider gap without contact
+manifolds. The same fixture runs in pure 3D as a control. On the frozen
+pre-#135/#136 Windows x64 stack, a quiet native comparison measured about
+**438.6 us** for pure 3D and **804.4 us** for Mixed; both allocate `0 B`.
+
+EventPipe sampling attributes **43.98%** of original whole-frame CPU weight to
+`ProcessMixedContacts`; the candidate trace is similar at **44.65%**. These are
+inclusive sampled weights, not call counts or proof that all this work can be
+removed. Mixed indexing still serves queries and later population changes.
+However, `ProcessMixedContacts` also copies, sorts and distributes active
+partitions when one dimensional population is empty, so no mixed candidate can
+exist. Its untouched-pair cleanup and retained-partition retirement still need
+to run, including after callbacks remove the last opposite-dimension collider.
+
+The ignored isolated host can reproduce the row with the local stack:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+pwsh -NoProfile -File artifacts/grv-issue-135/perf/run-native.ps1 -Variant original -Label empty-dimension-repro -Filters '*QueryOnly136WarmBenchmarks*'
+```
+
+**Next isolation at intake:** Promote the bounded fixture into the maintained benchmark
+suite, then measure skipping only impossible candidate distribution while
+preserving partition/query freshness, pair retirement, deterministic ordering
+and `0 B` warm behavior. Exercise both empty-dimension directions and repeated
+spawn/despawn transitions. Keep the #135/#136 regression gate independent of
+this pre-existing follow-up.
+
+Ignored `artifacts/grv-issue-135/perf/` retains the frozen original eight-module
+stack (`89C15FBD...` core), unchanged fixture inputs, native rows,
+`profile-attribution.json`, paired CPU traces and zero-ground-probe diagnostics.
+
 
 ### GRV-Benchmark-027 — Nonconvex Rotational CCD Step Cost
 

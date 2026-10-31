@@ -119,7 +119,26 @@ internal sealed partial class GravitasMixedCollisionService
         Refresh2DColliderPartitions(rebuildShapes: false);
 
         Version++;
+        DistributeMixedCandidates();
+
+        _candidatePairs.SortInPlace(CandidatePairComparer);
+        LastBroadPhaseCandidateCount = _candidatePairs.Count;
+        long frame = _context.FrameCount;
+        for (int i = 0; i < _candidatePairs.Count; i++)
+            ProcessCandidate(_candidatePairs[i], frame);
+
+        SolveMixedResponsePairs();
+        CleanupUntouchedPairs(frame);
+        RetireExpiredRetainedPartitions();
+    }
+
+    private void DistributeMixedCandidates()
+    {
         _distributionPartitions.FastClear();
+        // Only distribution is impossible; the caller still refreshes indexes and retires lifetimes.
+        if (_context.Physics.ColliderCount == 0 || _context.Physics2D.ColliderCount == 0)
+            return;
+
         foreach (PhysicsMixedPartition partition in _activePartitions)
             _distributionPartitions.Add(partition);
 
@@ -134,16 +153,6 @@ internal sealed partial class GravitasMixedCollisionService
                 _distributionKinematic2DIds,
                 _distributionStatic2DIds);
         }
-
-        _candidatePairs.SortInPlace(CandidatePairComparer);
-        LastBroadPhaseCandidateCount = _candidatePairs.Count;
-        long frame = _context.FrameCount;
-        for (int i = 0; i < _candidatePairs.Count; i++)
-            ProcessCandidate(_candidatePairs[i], frame);
-
-        SolveMixedResponsePairs();
-        CleanupUntouchedPairs(frame);
-        RetireExpiredRetainedPartitions();
     }
 
     internal void Visualize()

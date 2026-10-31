@@ -65,47 +65,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-028 — Mixed Broad-Phase Work With An Empty Opposite Dimension
-
-**Discovered:** 2026-10-15 during #135/#136 warm validation. **Status:**
-Profiled pre-existing opportunity; the benefit of a distribution gate has not
-been measured. **Owner:** Gravitas mixed candidate distribution and partition
-maintenance.
-
-The isolated `QueryOnly136WarmBenchmarks.Stable64Frame(Domain: "Mixed")`
-contains 64 sleeping 3D spheres and their 3D static floors, with **zero 2D
-colliders**. Automatic support crosses a real collider gap without contact
-manifolds. The same fixture runs in pure 3D as a control. On the frozen
-pre-#135/#136 Windows x64 stack, a quiet native comparison measured about
-**438.6 us** for pure 3D and **804.4 us** for Mixed; both allocate `0 B`.
-
-EventPipe sampling attributes **43.98%** of original whole-frame CPU weight to
-`ProcessMixedContacts`; the candidate trace is similar at **44.65%**. These are
-inclusive sampled weights, not call counts or proof that all this work can be
-removed. Mixed indexing still serves queries and later population changes.
-However, `ProcessMixedContacts` also copies, sorts and distributes active
-partitions when one dimensional population is empty, so no mixed candidate can
-exist. Its untouched-pair cleanup and retained-partition retirement still need
-to run, including after callbacks remove the last opposite-dimension collider.
-
-The ignored isolated host can reproduce the row with the local stack:
-
-```powershell
-$env:UseLocalLsfStack = 'true'
-pwsh -NoProfile -File artifacts/grv-issue-135/perf/run-native.ps1 -Variant original -Label empty-dimension-repro -Filters '*QueryOnly136WarmBenchmarks*'
-```
-
-**Next isolation:** Promote the bounded fixture into the maintained benchmark
-suite, then measure skipping only impossible candidate distribution while
-preserving partition/query freshness, pair retirement, deterministic ordering
-and `0 B` warm behavior. Exercise both empty-dimension directions and repeated
-spawn/despawn transitions. Keep the #135/#136 regression gate independent of
-this pre-existing follow-up.
-
-Ignored `artifacts/grv-issue-135/perf/` retains the frozen original eight-module
-stack (`89C15FBD...` core), unchanged fixture inputs, native rows,
-`profile-attribution.json`, paired CPU traces and zero-ground-probe diagnostics.
-
 ### GRV-Benchmark-029 — Dense Mesh Sweep Cost After Exact Contact Hardening
 
 **Discovered:** 2026-10-18 during #141 ordinary-consumer validation. **Status:**
@@ -493,6 +452,7 @@ Existing signal anchors remain on the rows below.
 
 | Signal | Closed | Outcome | Evidence |
 | --- | --- | --- | --- |
+| <a id="grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension"></a>GRV-Benchmark-028 — Mixed broad phase with an empty opposite dimension | 2026-10-31 | Skipped impossible distribution while preserving index refresh and cleanup; measured empty-population steps improve 30–42% at zero warm allocation. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension) |
 | <a id="grv-benchmark-027--nonconvex-rotational-ccd-step-cost"></a>GRV-Benchmark-027 — Nonconvex rotational CCD step cost | 2026-10-31 | Deferred exact contact materialization cuts measured cone steps by 59–64% and the pressed-capsule episode by 65%, at zero warm allocation; conservative progress limits remain documented. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-027--nonconvex-rotational-ccd-step-cost) |
 | <a id="grv-benchmark-032--first-isolated-2d-pair-owner-deactivation-allocation"></a>GRV-Benchmark-032 — First isolated 2D pair-owner deactivation allocation | 2026-10-30 | Removed first-lookup boxing in SwiftCollections; cold collection queries and unchanged 2D teardown allocate zero bytes. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-032--first-isolated-2d-pair-owner-deactivation-allocation) |
 | <a id="grv-benchmark-026--initial-generic-convex-mesh-contact-resolution-cost"></a>GRV-Benchmark-026 — Initial generic convex mesh contact cost | 2026-10-30 | Deferred GJK witnesses and certified whole-patch sweeps reduce measured contact costs while retaining query tolerances and zero warm allocation. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-026--initial-generic-convex-mesh-contact-resolution-cost) |
