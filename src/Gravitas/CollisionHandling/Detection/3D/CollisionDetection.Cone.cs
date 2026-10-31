@@ -148,6 +148,31 @@ public static partial class CollisionDetection
         return true;
     }
 
+    /// <summary>Tests finite triangle surfaces without containment, joined response ownership or contact materialization.</summary>
+    internal static bool IntersectsMeshConeSurface(LSMeshCollider meshCollider, LSConeCollider cone,
+        CollisionSatScratch scratch)
+    {
+        var candidates = scratch.MeshTriangleCandidatesA;
+        meshCollider.GetTrianglesInBounds(new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax), candidates);
+        PhysicsMesh mesh = meshCollider.Mesh;
+        int preparedOwner = -1;
+        ConePlaneRayFrame frame = default;
+        foreach (int triangle in candidates.AsReadOnlySpan())
+        {
+            mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            var face = new FixedTriangle(a, b, c);
+            int owner = mesh.GetManifoldSurfaceOwner(triangle);
+            if (owner != preparedOwner)
+            {
+                frame = new ConePlaneRayFrame(face, mesh.GeometryFrame,
+                    cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius);
+                preparedOwner = owner;
+            }
+            if (ConePlaneRayEvents.IntersectsTriangle(frame, face)) return true;
+        }
+        return false;
+    }
+
     private static bool BuildMeshConeSurfaceContacts(
         LSMeshCollider meshCollider, LSConeCollider cone, CollisionSatScratch scratch, ContactManifold manifold)
     {

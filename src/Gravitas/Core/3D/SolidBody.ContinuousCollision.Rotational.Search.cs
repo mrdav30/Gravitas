@@ -13,6 +13,7 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
 using SwiftCollections.Query;
+using System;
 
 namespace Gravitas;
 
@@ -369,4 +370,197 @@ public partial class SolidBody
         }
         return support;
     }
+
+    private bool TryFindEarliestRotationalContinuousCollisionAgainstTarget(
+        LSCollider target,
+        Vector3d startPosition,
+        Vector3d displacement,
+        FixedQuaternion startRotation,
+        FixedQuaternion targetRotation,
+        Fixed64 angularDistance,
+        Fixed64 pivotRadius,
+        Fixed64 elapsedTime,
+        Fixed64 remainingTime,
+        bool isKinematic,
+        out Fixed64 safeTime,
+        out ManifoldContact contact,
+        out bool hasContact,
+        out Fixed64 contactTime)
+    {
+        safeTime = Fixed64.Zero;
+        contact = default;
+        hasContact = false;
+        contactTime = Fixed64.Zero;
+        SolidBody? targetBody = target.Body;
+        bool samplesTargetMotion = targetBody != null
+            && IsMovingRotationalContinuousCollisionTarget(targetBody);
+        Vector3d originalTargetPosition = targetBody?.Position3d ?? Vector3d.Zero;
+        FixedQuaternion originalTargetRotation = targetBody?.Rotation ?? FixedQuaternion.Identity;
+        bool originalTargetPositionMutated = targetBody?._positionMutated ?? false;
+        bool originalTargetRotationMutated = targetBody?._rotationMutated ?? false;
+        if (samplesTargetMotion)
+            targetBody!.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+        LSMeshCollider? mesh = Collider as LSMeshCollider ?? target as LSMeshCollider;
+        LSConeCollider? cone = Collider as LSConeCollider ?? target as LSConeCollider;
+        bool deferConeContact = mesh != null && cone != null && mesh.StaticSurface == null
+            && (mesh.Mode == MeshColliderMode.Concave || !mesh.IsClosedSurface);
+
+        try
+        {
+        Span<ContinuousCollisionMath.RotationalInterval> intervals =
+            stackalloc ContinuousCollisionMath.RotationalInterval[
+                ContinuousCollisionMath.RotationalIntervalMaxDepth + 2];
+        int intervalCount = 1;
+        int processedNodeCount = 0;
+        bool hasKnownContact = false;
+        bool knownContactIsClosing = false;
+        Fixed64 knownContactTime = Fixed64.One;
+        ManifoldContact knownContact = default;
+        intervals[0] = new ContinuousCollisionMath.RotationalInterval(
+            Fixed64.Zero,
+            Fixed64.One,
+            depth: 0);
+
+        while (intervalCount > 0)
+        {
+            ContinuousCollisionMath.RotationalInterval interval = intervals[--intervalCount];
+            Fixed64 midpoint = (interval.LowerTime + interval.UpperTime) * Fixed64.Half;
+            Fixed64 intervalSpan = interval.UpperTime - interval.LowerTime;
+            Fixed64 midpointFrameFraction = SampleRotationalContinuousPairPose(startPosition, displacement,
+                startRotation, targetRotation, midpoint, elapsedTime, remainingTime, isKinematic,
+                targetBody, samplesTargetMotion);
+
+            processedNodeCount++;
+            bool hasMotionBound = ContinuousCollisionMath.TryResolveRotationalIntervalMotionBound(
+                displacement,
+                angularDistance,
+                pivotRadius,
+                intervalSpan,
+                out Fixed64 motionBound);
+            if (hasMotionBound && samplesTargetMotion)
+            {
+                Fixed64 lowerFrameFraction = ResolveRotationalFrameFraction(
+                    elapsedTime,
+                    remainingTime,
+                    interval.LowerTime);
+                Fixed64 upperFrameFraction = ResolveRotationalFrameFraction(
+                    elapsedTime,
+                    remainingTime,
+                    interval.UpperTime);
+                Fixed64 targetRadius = targetBody!.ResolveContinuousCollisionProxyRadius();
+                bool targetBoundResolved = targetBody.TryResolveContinuousCollisionMotionBound(
+                    lowerFrameFraction,
+                    upperFrameFraction,
+                    targetRadius,
+                    out Fixed64 targetMotionBound);
+                bool combinedBoundResolved = Fixed64.TryAdd(
+                    motionBound,
+                    targetMotionBound,
+                    out motionBound);
+                hasMotionBound = targetBoundResolved & combinedBoundResolved;
+            }
+            ManifoldContact sampleContact = default;
+            bool sampleContactIsClosing = false;
+            bool sampleHasContact = deferConeContact
+                ? CollisionDetection.IntersectsMeshConeSurface(mesh!, cone!, Context.CollisionScratch)
+                : TrySampleRotationalContinuousCollision(target, midpointFrameFraction,
+                    out sampleContact, out sampleContactIsClosing);
+            if (sampleHasContact
+                && (!hasKnownContact || midpoint < knownContactTime))
+            {
+                hasKnownContact = true;
+                knownContactTime = midpoint;
+                knownContact = sampleContact;
+                knownContactIsClosing = sampleContactIsClosing;
+            }
+
+            if (!sampleHasContact
+                && hasMotionBound
+                && IsRotationalIntervalSeparated(target, motionBound))
+            {
+                continue;
+            }
+
+            if (ContinuousCollisionMath.TryResolveRotationalSearchLimit(
+                    interval,
+                    processedNodeCount,
+                    hasKnownContact,
+                    knownContactTime,
+                    out safeTime,
+                    out contactTime,
+                    out hasContact))
+            {
+                if (hasContact && deferConeContact && contactTime == safeTime)
+                {
+                    // Closing admission needs the complete manifold at the retained witness, not the safe frontier.
+                    Fixed64 witnessFraction = SampleRotationalContinuousPairPose(startPosition, displacement,
+                        startRotation, targetRotation, contactTime, elapsedTime, remainingTime, isKinematic,
+                        targetBody, samplesTargetMotion);
+                    _ = TrySampleRotationalContinuousCollision(target, witnessFraction,
+                        out knownContact, out knownContactIsClosing);
+                }
+                // Geometric overlap remains the interval's certified upper
+                // bound. Only its closing witness can authorize a response;
+                // absence of one does not prove the intervening path separated.
+                hasContact &= knownContactIsClosing;
+                contact = knownContact;
+                return true;
+            }
+
+            int childDepth = interval.Depth + 1;
+            if (sampleHasContact)
+            {
+                // A real midpoint contact is already an upper bound. Only the
+                // earlier half can contain an earlier first contact.
+                intervals[intervalCount++] = new ContinuousCollisionMath.RotationalInterval(
+                    interval.LowerTime,
+                    midpoint,
+                    childDepth);
+                continue;
+            }
+
+            intervals[intervalCount++] = new ContinuousCollisionMath.RotationalInterval(
+                midpoint,
+                interval.UpperTime,
+                childDepth);
+            intervals[intervalCount++] = new ContinuousCollisionMath.RotationalInterval(
+                interval.LowerTime,
+                midpoint,
+                childDepth);
+        }
+
+        return false;
+        }
+        finally
+        {
+            if (samplesTargetMotion)
+            {
+                targetBody!.Position3d = originalTargetPosition;
+                targetBody.Rotation = originalTargetRotation;
+                targetBody.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+                targetBody._positionMutated = originalTargetPositionMutated;
+                targetBody._rotationMutated = originalTargetRotationMutated;
+            }
+        }
+    }
+
+
+    private Fixed64 SampleRotationalContinuousPairPose(Vector3d startPosition, Vector3d displacement,
+        FixedQuaternion startRotation, FixedQuaternion targetRotation, Fixed64 time, Fixed64 elapsedTime,
+        Fixed64 remainingTime, bool isKinematic, SolidBody? targetBody, bool samplesTargetMotion)
+    {
+        if (isKinematic)
+            SampleKinematicRotationalContinuousPose(startPosition, displacement, startRotation, targetRotation, time);
+        else
+            SampleDynamicRotationalContinuousPose(startPosition, displacement, startRotation, remainingTime, time);
+        Fixed64 frameFraction = ResolveRotationalFrameFraction(elapsedTime, remainingTime, time);
+        if (samplesTargetMotion)
+        {
+            targetBody!.Position3d = targetBody.SampleContinuousCollisionPosition(frameFraction);
+            targetBody.Rotation = targetBody.SampleContinuousCollisionRotation(frameFraction);
+            targetBody.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+        }
+        return frameFraction;
+    }
+
 }

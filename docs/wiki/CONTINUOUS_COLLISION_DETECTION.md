@@ -230,12 +230,18 @@ before translation retain the unresolved result. An overlapping enclosure is
 not a contact witness and may still require conservative bounded refinement.
 
 Mixed mesh/slab interval probes reuse exact finite-triangle admission without
-constructing contact rows. The retained witness is resampled at its own time
-before building the ordinary complete manifold and selecting closing contacts;
-an earlier unresolved safe frontier does not replace that witness pose.
-Rotating kinematic sources against targets without solver mobility clamp from
-exact geometry and time alone. Dynamic response and translational fallback hit
-reporting retain complete contact rows.
+constructing contact rows. Standalone open or concave mesh/cone probes use the
+same split: exact finite admission during refinement, then the ordinary complete
+manifold at the accepted response pose. Declared mesh continuity and closed
+convex containment keep their existing complete-contact path.
+
+A retained witness can lie after an earlier unresolved safe frontier. Complete
+response rows are built when the witness time equals that frontier; both source
+and moving target are resampled at the exact witness time before closing
+selection. Later geometric witnesses remain upper bounds and cannot authorize
+response at an earlier frontier. Mixed rotating kinematic sources against
+targets without solver mobility clamp from exact geometry and time alone.
+Dynamic response and translational fallback hit reporting retain complete rows.
 Conservative pure-rotation restarts reuse body-owned candidate buffers while
 the pivot and proxy bounds stay unchanged. Any translation or response gathers
 fresh candidates; target validity, prepared trajectories and earliest-hit ordering

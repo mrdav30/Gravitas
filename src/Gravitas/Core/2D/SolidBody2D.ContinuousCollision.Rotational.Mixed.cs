@@ -455,10 +455,10 @@ public sealed partial class SolidBody2D
                         out contactTime,
                         out hasContact))
                 {
-                    if (hasContact && needsResponseContact)
+                    // A later witness cannot authorize response at an earlier unresolved frontier.
+                    if (hasContact && needsResponseContact && contactTime == safeTime)
                     {
-                        // A budget-limited safe frontier can precede the retained witness.
-                        // Rebuild at contactTime, preserving its complete matched manifold.
+                        // Reconstruct complete matched rows at the admitted response pose.
                         SampleMixedRotationalContinuousPairPose(startPosition, displacement, startRotation, angularDelta, contactTime,
                             elapsedTime, remainingTime, targetBody, samplesTargetMotion);
                         BuildMixedRotationalContinuousContact(target,
