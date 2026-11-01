@@ -19,6 +19,9 @@ internal sealed class CollisionSatScratch
     internal Vector3d[] PolyhedronVertices = Array.Empty<Vector3d>();
     internal int[] PolyhedronTriangles = Array.Empty<int>(), PolyhedronEdges = Array.Empty<int>();
     internal SwiftList<MeshTriangleContactGenerator.HullSample> HullSamples { get; } = new(8);
+    internal SwiftList<Vector3d> ConvexPatchVertices { get; } = new();
+    internal SwiftList<int> ConvexPatchTriangles { get; } = new();
+    internal SwiftList<int> ConvexPatchEdges { get; } = new();
 
     public SwiftList<int> MeshCylinderTriangles { get; } = new(8);
 

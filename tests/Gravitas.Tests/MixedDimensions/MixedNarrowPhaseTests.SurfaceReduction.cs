@@ -644,16 +644,19 @@ public sealed partial class MixedNarrowPhaseTests
 
             CollisionDetectionMixed.TryBuildManifold(mesh, slab.Collider, manifold).Should().BeTrue();
 
-            // A finite owner clears the tall extrusion sideways at X=+/-2.5;
+            // A finite owner clears the tall extrusion sideways at X or Z=+/-2.5;
             // the large owner reaches the real oblique cap support instead.
             Fixed64 expected = finite ? Fixed64.FromFraction(5, 2)
                 : Fixed64.FromFraction(201, 2) / FixedMath.Sqrt(Fixed64.Two);
             (manifold.PrimaryContact.Depth - expected).Abs().Should().BeLessThanOrEqualTo(Fixed64.FromRaw(4));
             if (finite)
             {
-                manifold.PrimaryContact.Normal.X.Abs().Should().Be(Fixed64.One);
+                // X/Z exits tie: prism SAT retains its first Z face; curved
+                // surface owners retain their canonical X feature family.
+                bool prism = shape is ColliderType2D.AABox or ColliderType2D.ConvexPolygon;
+                manifold.PrimaryContact.Normal.X.Abs().Should().Be(prism ? Fixed64.Zero : Fixed64.One);
                 manifold.PrimaryContact.Normal.Y.Should().Be(Fixed64.Zero);
-                manifold.PrimaryContact.Normal.Z.Should().Be(Fixed64.Zero);
+                manifold.PrimaryContact.Normal.Z.Abs().Should().Be(prism ? Fixed64.One : Fixed64.Zero);
             }
             ManifoldContact[] rows = manifold.OrderBy(row => row.ContactId).ToArray();
             reference ??= rows;

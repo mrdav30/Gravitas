@@ -270,10 +270,19 @@ distinct features; the shape is not a rounded 3D capsule or just two end
 cylinders. The selected paired anchors can lie in the middle of the core.
 
 Closed convex mesh contacts against a finite convex mesh patch or an embedded
-polygonal prism select the solid separating-axis exit once. Finite support
+polygonal prism select the convex-pair separating-axis exit once. Finite support
 faces and edges then supply paired anchors for that exit. The existing plane
 sample reducer retains up to four spread-out points, or two extreme points for
 a support line. Untrusted or nonconvex patches retain triangle-level contacts.
+
+Ordinary mixed contact uses that same owner when the entire mesh is one
+certified convex coplanar patch and the other shape is a finite AABB or polygon
+prism. Its strict corner ring and genuine perimeter define the finite fill;
+the patch gains no solid interior. One minimum exit supplies a contact family,
+with the original collider materials, compound namespaces and surface identity.
+Other meshes and curved slabs retain their finite-surface contact owners.
+This selection can change contact groups, identities and replay hashes across
+versions; repeated execution within one version remains deterministic.
 
 Mesh collision and query consumers retain the same exact authored affine map.
 Recentering and separately rounded collider centers do not move their shared

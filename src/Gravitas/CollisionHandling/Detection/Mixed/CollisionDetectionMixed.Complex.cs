@@ -105,10 +105,12 @@ public static partial class CollisionDetectionMixed
     {
         PhysicsMesh mesh = collider.Mesh;
         CollisionSatScratch scratch = collider.Context.CollisionScratch;
-        if (mesh.Mode == MeshColliderMode.Convex && mesh.IsClosedSurface && !prismOffsets.IsEmpty
+        bool closedHull = mesh.Mode == MeshColliderMode.Convex && mesh.IsClosedSurface;
+        if (!prismOffsets.IsEmpty && (closedHull || mesh.HasSingleConvexCoplanarPatch)
             && TryAppendConvexMeshPrismContacts(collider, embedded!, center, rotation, halfThickness,
-                prismOffsets, manifold, namespace3D, namespace2D)) return;
-        if (mesh.Mode == MeshColliderMode.Convex && mesh.IsClosedSurface && prismOffsets.IsEmpty
+                prismOffsets, closedHull ? default : mesh.GetConvexCoplanarPatchCornerVertexIndices(0),
+                manifold, namespace3D, namespace2D)) return;
+        if (closedHull && prismOffsets.IsEmpty
             && ConvexHullCylinderContact.TryGetContactWithContainedCenter(mesh.GeometryFrame,
                 mesh.GeometryVertices, mesh.Triangles, center, rotation, halfThickness * Fixed64.Two, radius,
                 out FixedContactAnchors contact, Vector2d.Forward, length))
@@ -136,6 +138,7 @@ public static partial class CollisionDetectionMixed
 
     private static bool TryAppendConvexMeshPrismContacts(LSMeshCollider collider, LSCollider2D embedded,
         Vector3d center, FixedQuaternion rotation, Fixed64 halfThickness, ReadOnlySpan<Vector2d> offsets,
+        ReadOnlySpan<int> patchCorners,
         ContactManifold manifold, int namespace3D, int namespace2D)
     {
         CollisionSatScratch scratch = collider.Context.CollisionScratch;
@@ -146,8 +149,22 @@ public static partial class CollisionDetectionMixed
         Span<Vector3d> vertices = scratch.PolyhedronVertices.AsSpan(0, 2 * count);
         Span<int> triangles = scratch.PolyhedronTriangles.AsSpan(0, triangleCount), edges = scratch.PolyhedronEdges.AsSpan(0, edgeCount);
         FillPrismGeometry(offsets, halfThickness, vertices, triangles, edges);
-        return MeshTriangleContactGenerator.TryAppendHullContacts(collider, ScaledRigidFrame3d.Rigid(center, rotation), center, vertices,
-            triangles, edges, edges[..(2 * count + 2)], embedded.Material, manifold, false, namespace3D, namespace2D);
+        ReadOnlySpan<Vector3d> hullVertices = collider.Mesh.GeometryVertices;
+        ReadOnlySpan<int> hullTriangles = collider.Mesh.Triangles, hullEdges = collider.Mesh.ConvexSatEdgeVertexPairs;
+        ContactGroupKey group = default;
+        if (!patchCorners.IsEmpty)
+        {
+            // Certified corners preserve the finite fill and omit artificial diagonals.
+            MeshHullSurfaceContacts.FillPatch(collider.Mesh, patchCorners, scratch.ConvexPatchVertices,
+                scratch.ConvexPatchTriangles, scratch.ConvexPatchEdges);
+            hullVertices = scratch.ConvexPatchVertices.AsReadOnlySpan();
+            hullTriangles = scratch.ConvexPatchTriangles.AsReadOnlySpan();
+            hullEdges = scratch.ConvexPatchEdges.AsReadOnlySpan();
+            group = new ContactGroupKey(namespace3D, namespace2D, collider.Mesh.GetCanonicalSurfaceOrdinal(0), 0);
+        }
+        return MeshTriangleContactGenerator.TryAppendHullContacts(collider, hullVertices, hullTriangles, hullEdges,
+            ScaledRigidFrame3d.Rigid(center, rotation), center, vertices,
+            triangles, edges, edges[..(2 * count + 2)], embedded.Material, manifold, false, namespace3D, namespace2D, group);
     }
 
     internal static void FillPrismGeometry(ReadOnlySpan<Vector2d> offsets, Fixed64 halfThickness,

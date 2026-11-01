@@ -37,32 +37,33 @@ internal static class MeshTriangleContactGenerator
     });
 
     // True means the convex pair was handled, including separation; false requests finite triangle fallback.
-    internal static bool TryAppendHullContacts(LSMeshCollider hull, in ScaledRigidFrame3d frame, Vector3d origin,
+    internal static bool TryAppendHullContacts(LSMeshCollider hull, ReadOnlySpan<Vector3d> hullVertices,
+        ReadOnlySpan<int> hullTriangles, ReadOnlySpan<int> hullEdges, in ScaledRigidFrame3d frame, Vector3d origin,
         ReadOnlySpan<Vector3d> vertices, ReadOnlySpan<int> triangles, ReadOnlySpan<int> edges,
         ReadOnlySpan<int> satEdges, PhysicsMaterial material, ContactManifold manifold, bool reverse,
         int namespaceA = 0, int namespaceB = 0, ContactGroupKey group = default)
     {
         PhysicsMesh mesh = hull.Mesh;
-        // Select the solid exit once; finite witnesses must belong to that support.
+        // Select the convex-pair exit once; finite witnesses must belong to that support.
         SwiftList<HullSample> samples = hull.Context.CollisionScratch.HullSamples;
         samples.FastClear();
         bool exact = !mesh.GeometryFrame.IsRigid || !frame.IsRigid;
         if (exact)
         {
-            if (!WideOrientedBox.TryGetConvexHullPenetration(mesh.GeometryFrame, mesh.GeometryVertices,
-                    mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, frame, vertices, triangles, satEdges,
+            if (!WideOrientedBox.TryGetConvexHullPenetration(mesh.GeometryFrame, hullVertices,
+                    hullTriangles, hullEdges, frame, vertices, triangles, satEdges,
                     out WideScaledHullPenetration penetration, skipParallelDirections: true)) return true;
-            WideOrientedBox.VisitConvexHullContacts(mesh.GeometryFrame, mesh.Origin, mesh.GeometryVertices,
-                mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, frame, origin, vertices, triangles, edges,
+            WideOrientedBox.VisitConvexHullContacts(mesh.GeometryFrame, mesh.Origin, hullVertices,
+                hullTriangles, hullEdges, frame, origin, vertices, triangles, edges,
                 penetration, samples, static (pool, contact) => pool.Add(new HullSample(contact)));
         }
         else
         {
-            if (!WideOrientedBox.TryGetConvexHullPenetration(mesh.Origin, mesh.Rotation, mesh.GeometryVertices,
-                    mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, origin, frame.Rotation, vertices, triangles, satEdges,
+            if (!WideOrientedBox.TryGetConvexHullPenetration(mesh.Origin, mesh.Rotation, hullVertices,
+                    hullTriangles, hullEdges, origin, frame.Rotation, vertices, triangles, satEdges,
                     out WidePointSpanPenetration penetration, skipParallelDirections: true)) return true;
-            WideOrientedBox.VisitConvexHullContacts(mesh.Origin, mesh.Rotation, mesh.GeometryVertices,
-                mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, origin, frame.Rotation, vertices, triangles, edges,
+            WideOrientedBox.VisitConvexHullContacts(mesh.Origin, mesh.Rotation, hullVertices,
+                hullTriangles, hullEdges, origin, frame.Rotation, vertices, triangles, edges,
                 penetration, samples, static (pool, contact) => pool.Add(new HullSample(contact)));
         }
         if (samples.Count == 0) return false;
@@ -371,7 +372,8 @@ internal static class MeshTriangleContactGenerator
                         triangles[face] = 0; triangles[face + 1] = index - 1; triangles[face + 2] = index;
                     }
                     // Use the trusted finite patch once, not its artificial triangle diagonals.
-                    if (TryAppendHullContacts(hull, surface.Mesh.GeometryFrame, surface.Mesh.Origin,
+                    if (TryAppendHullContacts(hull, hull.Mesh.GeometryVertices, hull.Mesh.Triangles,
+                        hull.Mesh.ConvexSatEdgeVertexPairs, surface.Mesh.GeometryFrame, surface.Mesh.Origin,
                         vertices, triangles, edges, edges, surface.Material, pair.Manifold, hull == meshB, group: group))
                         continue;
                 }

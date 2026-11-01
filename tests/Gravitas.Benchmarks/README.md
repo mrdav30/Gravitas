@@ -52,8 +52,11 @@ seam crossings; setup and every frame verify preserved tangential velocity.
 floor alone would not exercise a 2D participant's planar mixed response.
 
 `joined-static-solid-mixed-simulation` covers the reverse direction: one moving
-3D box or closed convex hull against a continuous embedded 2D wall or 2/16/64
-declared pieces of the same wall. It uses the same 64-frame, 16 Hz host loop,
+3D primitive, closed convex hull, open convex patch or nonconvex mesh against a
+continuous embedded 2D wall or 2/16/64 declared pieces of the same wall.
+`Shape=OpenMesh, Layout=Continuous` isolates ordinary certified patch/prism
+contact; `ConcaveMesh` retains the general nonconvex surface path. It uses the
+same 64-frame, 16 Hz host loop,
 inward impulses and tangential-velocity guard. Values are per complete frame;
 these fixtures measure contact lifecycle cost rather than game capacity.
 

@@ -404,9 +404,11 @@ Mixed collision embeds 2D colliders into 3D as finite slabs/prisms.
 `CollisionDetectionMixed` supports 3D primitive, compound, and mesh colliders
 against embedded 2D circle, capsule, AABB, convex polygon, and compound slabs.
 
-Compound mixed contacts scan owned parts in stable order and return one external
-contact surface on either side. Mesh mixed contacts gather local-BVH triangle
-candidates and test triangles against the embedded 2D slab volume.
+Compound mixed contacts scan owned parts in stable order and retain each leaf's
+namespace and material. A mesh consisting entirely of one certified convex
+coplanar patch uses its finite corner/perimeter geometry against AABB and convex
+polygon prisms. Other mesh mixed contacts use local-BVH candidates and the
+finite surface/slab owners; holes and disconnected surfaces remain distinct.
 
 Mixed shape-pair support belongs to the explicit mixed service. 2D and 3D
 collision dispatch should not fall through to accidental mixed response.

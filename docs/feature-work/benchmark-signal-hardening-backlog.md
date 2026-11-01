@@ -65,56 +65,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost
-
-**Discovered:** 2026-10-28 during static-continuity Phase 12 validation.
-**Status:** Measured on the committed pre-phase runtime; attribution open.
-**Owner:** Gravitas ordinary mixed mesh/prism contact generation and response;
-involve FixedMathSharp after profiling the executed contribution.
-
-`JoinedStaticSolidMixedSimulationBenchmarks`, `Shape=OpenMesh`,
-`Layout=Continuous`, costs about **4.7 ms per complete host step at 0 B/frame**
-on Windows x64/i7-9700K, .NET 10 Release with `UseLocalLsfStack=true`. The
-frozen Gravitas `5e60c61` and Phase 12 candidate use the same benchmark driver
-and FixedMathSharp `8fd9ea7`; both preserve the same position, velocity and
-rotation witnesses before/after 24 alternating paired timing windows. This
-establishes a pre-existing workload cost, not an introduced joined-surface
-regression or a scene-capacity measurement.
-
-Normal/reversed paired means are **4.682/4.736 ms** before/after, and a fresh
-process gives **4.717/4.754 ms**. An identical-baseline A/A control measures
-**4.721/4.782 ms (+1.29%)**, comparable to the 0.74%/1.60%/0.79% contrasts. This
-exposes load-context/code-placement uncertainty; it proves neither new runtime
-overhead nor exact zero overhead. The joined selection branch is not executed in
-this row, and review found no additional ordinary collision work.
-
-The workload is one mass-one, frictionless, open two-triangle X/Z quad with
-local coordinates `X/Z=+-0.5`, concave mode and surface-approximation inertia.
-It starts at `(-2,0,0.5)` against one bodyless rectangle `X=[-8,8], Z=[-2,0]`,
-mixed half-thickness `2`, without continuity membership. Use Mixed mode at 16
-Hz, zero gravity/air/damping/minimum speed, frozen Y and rotation, manual
-grounding and sleep disabled. Settle 32 full host frames, then advance 64 frames
-per invocation: X velocity alternates `+1/-1` at `X=+-2`, with inward Z impulse
-`-1/16` before every `Simulate`/`LateSimulate` step. Initialization and settling
-are outside the warmed window.
-
-The maintained fixture includes the ordinary row and native joined controls:
-
-```powershell
-$env:UseLocalLsfStack = 'true'
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -m:1
-dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll --filter '*JoinedStaticSolidMixedSimulationBenchmarks*' --job short --warmupCount 3 --iterationCount 5
-```
-
-**Next isolation:** Profile the ordinary `AppendMeshEmbedded2D` path, separating
-native patch selection, finite witnesses and response. Check whether existing
-trusted convex-patch inventory removes repeated triangle work without changing
-finite suppliers, nonconvex holes, exposed edges, per-member query/event
-identity or deterministic ordering. Check 3D parity through its existing owner;
-do not add a second contact solver or infer identical response from timing.
-Supplemental paired windows and loaded-module hashes are retained in ignored
-`artifacts/static-surface/phase12/ordinary-openmesh*.json`; the inputs above and
-maintained fixture are sufficient to reproduce the workload.
+No active ordered signals. Experimental signals below retain their separate evidence gaps.
 
 ## Experimental Signals
 
@@ -343,6 +294,7 @@ Existing signal anchors remain on the rows below.
 
 | Signal | Closed | Outcome | Evidence |
 | --- | --- | --- | --- |
+| <a id="grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost"></a>GRV-Benchmark-031 — Ordinary open-mesh mixed full step | 2026-11-01 | Certified patch/prism contacts reduce the ordinary step from 4.52 ms to 115 us at zero warm allocation; exit/group selection and small-control limits retained. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost) |
 | <a id="grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost"></a>GRV-Benchmark-030 — Pure 2D static population refresh | 2026-11-01 | Exact unit-basis sampling cuts 64-static 2D full-step time by 46–52% at zero warm allocation; transform freshness and small-control limits retained. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost) |
 | <a id="grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening"></a>GRV-Benchmark-029 — Dense mesh sweep cost | 2026-10-31 | Certified patches/carriers and duplicate reuse cut query time by 96.6–99.9% at 2,048 triangles, with zero warm allocation; finite geometry and small-control limits retained. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening) |
 | <a id="grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension"></a>GRV-Benchmark-028 — Mixed broad phase with an empty opposite dimension | 2026-10-31 | Skipped impossible distribution while preserving index refresh and cleanup; measured empty-population steps improve 30–42% at zero warm allocation. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension) |
