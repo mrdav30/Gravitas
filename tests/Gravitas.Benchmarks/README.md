@@ -33,6 +33,16 @@ Each `ChangeMass` invocation assigns `0`, `2`, then `1` kilogram, including
 inertia refresh, cache/CCD invalidation, and awake membership synchronization.
 These timings represent the complete three-assignment mutation cycle.
 
+`static-population-refresh` isolates unchanged static population from local
+contact density. One frictionless circle or sphere crosses a 16-unit floor;
+the 64-static rows add 63 remote loaded two-unit pieces in the same world
+bounds as the one-static rows. Bodyless and explicit-static owners are compared
+in pure 2D, pure 3D and mixed mode (a spatial sphere against planar slabs).
+`FullStep` reports one complete frame from a 64-frame invocation at 16 Hz,
+including the drive, `Simulate`, `LateSimulate` and physical assertions.
+`RefreshStaticShapes` reports one pass over all static colliders, without the
+moving-body step. No static surface membership is declared.
+
 `joined-static-surface-mixed-simulation` measures one moving circle, stadium or
 polygon against a vertical 3D wall represented by one continuous mesh or
 2/16/64 joined pieces. All layouts cover the same 16-unit wall. Each invocation

@@ -65,51 +65,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost
-
-**Discovered:** 2026-10-19 during static-continuity Phase 6 density controls.
-**Status:** Confirmed on the frozen pre-Phase-6 stack; not an introduced
-continuity regression. Detailed cost attribution remains open. **Owner:**
-Gravitas pure 2D bodyless service refresh; involve GridForge or math owners only
-after profiling their executed contribution.
-
-One frictionless circle runs over one unchanged 16-unit floor at 16 Hz. Add 63
-remote bodyless two-unit static pieces, all loaded and outside its local contact
-neighborhood. Both counts use the same loaded world bounds, manual grounding,
-drive, 32 settling frames and 64 full host steps per invocation. No surface
-membership is declared in this control. Windows x64/.NET 8.0.29 Release
-measurements, 24 warmed windows with zero allocation:
-
-| Stack              | 1 static piece | 64 static pieces |
-| ------------------ | -------------: | ---------------: |
-| Frozen pre-Phase-6 | 21.57 us/frame |   77.09 us/frame |
-| Phase 6 final      | 22.13 us/frame |   79.92 us/frame |
-
-Physical position/velocity/rotation witnesses match all four rows. This is a
-population-scaling signal, not a universal throughput or frame-tail claim. The
-original `PrepareCollisionPartitions` bodyless refresh loop and
-`LSCollider2D.Simulate` -> `Rebuild` path are unchanged by Phase 6.
-Loaded-module hashes identify the frozen pre-phase Gravitas payload
-(`B500F130...`), matching source `071b25ac2b758f6c1992a769e0713ed27b2c34dc`.
-
-Ignored `artifacts/static-surface/phase6/population/` holds the unchanged public
-consumer fixture; `population-{baseline,final}.json` contains the windows and
-module hashes. Capture command after building that consumer and copying it
-beside the appropriate frozen dependencies:
-
-```powershell
-$env:UseLocalLsfStack = 'true'
-dotnet artifacts/static-surface/phase6/host/bin/Release/net8.0/Host.dll single artifacts/static-surface/phase6/population-baseline artifacts/static-surface/phase6/population-baseline.json FullStepPopulation1,FullStepPopulation64
-```
-
-**Next isolation:** Promote the bounded population fixture into maintained
-benchmarks, profile refresh/rebuild separately from contact response, and
-compare bodyless with explicit-static owners in pure 2D, 3D and mixed mode.
-Preserve host-transform freshness, mutation/filter invalidation, deterministic
-order and zero warm allocation before changing refresh policy. Do not add
-another index or infer that an entire static rebuild can be skipped without that
-evidence.
-
 ### GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost
 
 **Discovered:** 2026-10-28 during static-continuity Phase 12 validation.
@@ -388,6 +343,7 @@ Existing signal anchors remain on the rows below.
 
 | Signal | Closed | Outcome | Evidence |
 | --- | --- | --- | --- |
+| <a id="grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost"></a>GRV-Benchmark-030 — Pure 2D static population refresh | 2026-11-01 | Exact unit-basis sampling cuts 64-static 2D full-step time by 46–52% at zero warm allocation; transform freshness and small-control limits retained. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost) |
 | <a id="grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening"></a>GRV-Benchmark-029 — Dense mesh sweep cost | 2026-10-31 | Certified patches/carriers and duplicate reuse cut query time by 96.6–99.9% at 2,048 triangles, with zero warm allocation; finite geometry and small-control limits retained. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening) |
 | <a id="grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension"></a>GRV-Benchmark-028 — Mixed broad phase with an empty opposite dimension | 2026-10-31 | Skipped impossible distribution while preserving index refresh and cleanup; measured empty-population steps improve 30–42% at zero warm allocation. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension) |
 | <a id="grv-benchmark-027--nonconvex-rotational-ccd-step-cost"></a>GRV-Benchmark-027 — Nonconvex rotational CCD step cost | 2026-10-31 | Deferred exact contact materialization cuts measured cone steps by 59–64% and the pressed-capsule episode by 65%, at zero warm allocation; conservative progress limits remain documented. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-027--nonconvex-rotational-ccd-step-cost) |

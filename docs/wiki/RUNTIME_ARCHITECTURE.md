@@ -213,6 +213,13 @@ kinematic colliders, so fixed-step partition preparation only visits colliders
 whose bounds can change through that ownership path. Freeze axes constrain
 solver degrees of freedom and never determine service or partition ownership.
 
+Planar transform sampling still validates authored X/Z ancestry and strictly
+composes the current world matrix on every refresh. An exact unit X/Z basis
+directly yields unit scale and zero yaw; other bases retain decomposition and
+its fixed-point rounding and admission checks. This introduces no transform
+cache: host, hierarchy, shape and mixed-slab changes retain their existing
+sampling and publication boundaries.
+
 3D joints use context-local IDs allocated by `GravitasConstraint3DService`.
 Removing a joint releases solver cache and linked-collider suppression state,
 but does not reuse that joint ID in the same context. 2D joints follow the same

@@ -15,6 +15,7 @@ experimental signals and compact [closed index](../benchmark-signal-hardening-ba
 
 | Signal                                                                                                                                               | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost](#grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost) | Closed | 2026-11-01 | Exact unit-basis planar sampling removes redundant decomposition while preserving transform freshness and fixed-point rounding; matched host/refresh controls and limits follow. |
 | [GRV-Benchmark-029 — Dense mesh sweeps](#grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening) | Closed | 2026-10-31 | Certified patch/carrier sweeps and query-local duplicate reuse reduce query costs by 96.6–99.9% at 2,048 triangles and zero warm allocation; finite geometry and small-control limits are explicit. |
 | [GRV-Benchmark-028 — Mixed broad phase with an empty opposite dimension](#grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension) | Closed | 2026-10-31 | Skipped impossible mixed distribution; 30–42% lower measured empty-population step time, zero warm allocation and preserved query/lifetime behavior. |
 | [GRV-Benchmark-027 — Nonconvex rotational CCD step cost](#grv-benchmark-027--nonconvex-rotational-ccd-step-cost) | Closed | 2026-10-31 | Deferred exact contact materialization reduces measured cone steps by 59–64% and the pressed-capsule episode by 65%, at zero warm allocation; residual conservative progress limits and reopening criteria are explicit. |
@@ -43,6 +44,291 @@ experimental signals and compact [closed index](../benchmark-signal-hardening-ba
 | GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                                                                                     | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
 | GRV-Benchmark-003 — 3D full-runtime CCD allocation                                                                                                   | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
 | GRV-Benchmark-004 — Grounding raycast probe allocation                                                                                               | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+### GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost
+
+**Status:** Closed 2026-11-01. The executed transform-sampling cost is attributed
+and reduced for an exact unit X/Z basis. Static populations still require a
+linear freshness pass; this is not a constant-time refresh or capacity claim.
+
+The 64-bodyless pure 2D baseline profile attributes **47.27%** of sampled
+full-step thread time to `PrepareCollisionPartitions`, including **22.13%** in
+`ColliderScalePolicy.TryExtractPlanarTransform`. These inclusive weights overlap;
+they are not additive CPU percentages. A 12-second `dotnet-trace` 10.0.750501
+`dotnet-sampled-thread-time` capture, filtered to the maintained fixture's
+`FullStep`, includes its setup calls to that same method. No profile timings
+are used in the acceptance table.
+
+Nine added runtime lines in the existing `ColliderScalePolicy` return unit scale
+and zero yaw only for the **exact** X/Z identity basis, after rejecting Y/XZ
+coupling. Every call still checks positive authored X/Z ancestry and strictly
+composes the current world matrix. Other bases retain the same decomposition,
+rounding and admission checks. Direct arbitrary diagonal extraction was rejected:
+`One + MinIncrement` can decompose to exactly `One`, so returning the raw matrix
+coefficient would change physical scale. No cache, index, lifecycle change,
+public API, new runtime file or persistent state is introduced. 3D extraction is
+untouched; mixed consumers of the existing planar owner receive the same benefit.
+
+#### Workload and matched results
+
+`StaticPopulationRefreshBenchmarks` maintains the bounded population control.
+All rows use the same loaded grid bounds `(-16,-4,-16)` to `(288,4,16)`, a
+16 Hz host, no continuity declaration, no damping/air drag/minimum speed, a
+frictionless floor, radius-1/2 mover, disabled sleep and frozen rotation.
+The local floor is 16 units wide; each extra remote piece is two units wide at
+`X = 32 + 4*(i-1)`, for `i=1..63`. Pure 2D uses a two-unit-deep planar box at
+Z=-1 and a circle starting at `(-2,1/2)`. Pure 3D uses a box of size
+`(width,2,4)` at Y=-1 and a sphere at `(-2,1/2,0)`, with Z frozen. Mixed uses
+the planar boxes with half-thickness two and a sphere at `(-2,0,1/2)`, with
+Y frozen, zero gravity and a 1/16 inward Z impulse each frame. Pure modes use
+unit gravity. Owners are either bodyless or explicitly static bodies.
+
+Setup settles 32 frames and runs four 64-frame batches. Each measured full-step
+invocation drives X velocity to +/-1, reverses at X=+/-2, and runs 64 complete
+`Simulate` / `LateSimulate` frames, asserting preserved tangential speed and
+positive support height every frame. Values below are **microseconds per full
+frame**. The 1/64-static rows isolate remote population, not local contact density.
+
+| Mode | Static owner | 1 before | 1 after | 64 before | 64 after | 64 change |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| TwoD | Bodyless | 20.66 | 18.59 | 71.25 | 34.00 | -52.28% |
+| TwoD | Explicit static | 21.09 | 19.31 | 60.35 | 32.34 | -46.41% |
+| ThreeD | Bodyless | 33.02 | 33.35 | 75.28 | 75.87 | +0.78% |
+| ThreeD | Explicit static | 33.53 | 33.27 | 102.60 | 103.51 | +0.89% |
+| Mixed | Bodyless | 165.78 | 167.72 | 224.57 | 185.68 | -17.32% |
+| Mixed | Explicit static | 165.65 | 167.45 | 209.03 | 182.48 | -12.70% |
+
+The matching refresh-only pass calls each static collider's existing `Simulate`
+without advancing the moving body. Values are **microseconds per 64-collider
+pass**, not per collider or per frame:
+
+| Mode | Static owner | Before | After | Change |
+| --- | --- | ---: | ---: | ---: |
+| TwoD | Bodyless | 50.20 | 14.16 | -71.79% |
+| TwoD | Explicit static | 38.44 | 11.51 | -70.06% |
+| ThreeD | Bodyless | 42.58 | 42.09 | -1.15% |
+| ThreeD | Explicit static | 66.44 | 66.13 | -0.46% |
+| Mixed | Bodyless | 51.03 | 14.21 | -72.16% |
+| Mixed | Explicit static | 38.88 | 11.46 | -70.54% |
+
+Nonidentity/mutation controls run one pass over 64 bodyless radius-1/2 circles
+at X=4*i in a grid bounded by `(-16,0,-16)` to `(288,0,16)`:
+yaw Pi/4, scale `(2,1,3)`, identity children of
+parents scaled `(2,1,2)`, and moving hosts alternating Z=0/1 each pass. These
+exercise retained fallback, hierarchy composition and changed-shape publication.
+They are disposable RCA controls, not tests of benchmark machinery.
+
+| Refresh control | Before us | After us | Change |
+| --- | ---: | ---: | ---: |
+| Yaw | 59.69 | 60.26 | +0.96% |
+| Scale | 54.27 | 54.96 | +1.27% |
+| Hierarchy | 85.56 | 85.77 | +0.26% |
+| Moving | 167.40 | 128.39 | -23.30% |
+
+All 1,792 measured windows allocate **zero current-thread bytes**. Fixed setup
+observations and eight 64-frame continuation snapshots per case match exactly
+between payloads, including position, linear/angular velocity, rotation and
+authoritative replay hash. Fixture assertions remain active during timing.
+These are local steady-state observations, not cross-platform proof or frame
+tail latency. Small control differences must not be read as equivalence or
+universal speedups; process-level estimates and limits follow below.
+
+The 63 additional bodyless pieces add **50.59 us/frame before and
+15.41 us/frame after** in pure 2D, derived from the matched 64-minus-one-static
+full steps. The remaining population cost is retained freshness work.
+
+Small-control process means follow (each entry is an independent process mean;
+units follow the named method). Positive estimates remain **inconclusive**,
+not proven noise or established zero overhead. In particular, one-static mixed
+steps estimate +1.94/+1.80 us/frame despite cheaper planar sampling; no
+universal full-step speedup is claimed.
+
+| Control | Baseline process A / B (us) | Final process A / B (us) | Mean difference (us) |
+| --- | ---: | ---: | ---: |
+| ('ThreeD', False, 1) step | 32.521 / 33.511 | 33.331 / 33.361 | +0.330 |
+| ('ThreeD', False, 64) step | 74.859 / 75.701 | 76.009 / 75.722 | +0.585 |
+| ('ThreeD', True, 1) step | 33.210 / 33.852 | 32.998 / 33.544 | -0.260 |
+| ('ThreeD', True, 64) step | 101.373 / 103.828 | 104.224 / 102.800 | +0.911 |
+| ('Mixed', False, 1) step | 164.971 / 166.583 | 166.955 / 168.486 | +1.943 |
+| ('Mixed', True, 1) step | 165.674 / 165.621 | 167.242 / 167.649 | +1.798 |
+| Yaw timing | 59.704 / 59.666 | 59.872 / 60.641 | +0.571 |
+| Scale timing | 54.814 / 53.720 | 54.577 / 55.337 | +0.690 |
+| Hierarchy timing | 86.329 / 84.784 | 86.163 / 85.386 | +0.219 |
+
+An additional A/A control runs the identical baseline payload and its byte-for-
+byte clone in two fresh processes per method group, with the same protocol and
+bindings/state checks. Its 896 windows also allocate zero bytes. This exposes
+process/environment sensitivity; it does not isolate its cause or establish
+that the positive A/B estimates are regression-free. A/A process contrasts:
+
+| Control | Original process (us) | Identical clone process (us) | Sham change |
+| --- | ---: | ---: | ---: |
+| ('ThreeD', False, 1) step | 32.621 | 35.898 | +10.05% |
+| ('ThreeD', False, 64) step | 74.937 | 77.511 | +3.44% |
+| ('ThreeD', True, 1) step | 32.634 | 35.458 | +8.65% |
+| ('ThreeD', True, 64) step | 101.358 | 105.868 | +4.45% |
+| ('Mixed', False, 1) step | 166.315 | 167.397 | +0.65% |
+| ('Mixed', True, 1) step | 166.475 | 166.903 | +0.26% |
+| Yaw timing | 60.258 | 59.908 | -0.58% |
+| Scale timing | 54.163 | 54.188 | +0.05% |
+| Hierarchy timing | 85.324 | 85.844 | +0.61% |
+
+Across all 28 A/A row metrics, sham changes range from -0.58% to +13.33%.
+The largest is the unchanged 64-explicit-static 3D refresh pass,
+64.624 to 73.238 us. That adverse control is retained; the single A/A pair
+cannot identify its cause or provide an equivalence bound for another row.
+
+These small estimates are unresolved/inconclusive, not an accepted measured
+regression or a guarantee of no overhead. Reopen on a longer, reproducible
+host-relevant fallback/small-population regression. The bounded large-population
+improvement and exact behavioral equivalence support this closeout without
+speculative tuning of unrelated code.
+
+#### Protocol, bindings and validation
+
+Windows x64 10.0.26300, Intel i7-9700K, SDK 10.0.302, runtime 10.0.10,
+Release net10.0, workstation blocking GC, high process priority, affinity mask
+192 (CPUs 6/7), `DOTNET_PROCESSOR_COUNT=2`. Builds/tests/profiles and acceptance
+timings were serialized. Four fresh-process rounds use baseline, final, final,
+baseline order. Each round runs separate population and fallback-control
+processes (eight launches total). Each row warms for two seconds, calibrates for
+at least 200 ms, then records sixteen windows targeting 50 ms, with 1..65,536
+invocations per window. Full-step values divide each 64-frame invocation by 64.
+Means weight the two process means equally. A preliminary baseline-only run and
+the sampling profile are excluded from matched acceptance means.
+
+Gravitas baseline is `d6b9c0d53c89a9856afd1f8eb89c0124cddbf8bd` plus the new
+unchanged benchmark fixture; final adds only the nine-line runtime change for
+timing. Committed sibling sources:
+
+- FixedMathSharp: `c3fcd6bd035afdb4aeea776d2a6a6ca35723585f`.
+- SwiftCollections: `ec9da58c93a7752fccde627e821f3fa5ae130849`.
+- GridForge: `54164f0aa197f050b7263f37373d4a55ff7c81fa`.
+- Chronicler: `c45f9ab53913e5b1692f0717733425e0f4defeb2`.
+
+Actual loaded LSF/host payloads are SHA256-checked on every launch. All payload
+DLLs are byte-identical except `Gravitas.dll`; loaded CoreLib is from 10.0.10.
+
+| Loaded assembly | SHA256 (baseline / final if changed) |
+| --- | --- |
+| Gravitas.dll | `b62f6337255764576e0d7af6ef15f066c2a411fae7fceb90abf58a951ae44a0c` / `9510dd92ee654e12837f0b83708ec886a416da86f374445a60f6d4c0b0c830a2` |
+| Gravitas.Benchmarks.dll | `41148a48bfdb3703dfec4ece97e3024c0a06b894f1a3db5252b15ba98bc33779` |
+| Driver.dll | `1c5ec54065929278112e243998f12e413df2a7f17c4eb0f46f3343518b966aa3` |
+| FixedMathSharp.dll | `d82ad7953feb4d01d4da2dc9c8f7fdfaba4226fc33ef88cd4d2382ed5db34743` |
+| FixedMathSharp.Chronicler.dll | `a39af9f53e4249b280abac2bda2e923a4e3874f6fe067ac9755e7f55e7e2793a` |
+| SwiftCollections.dll | `b87da81aaf0d551f347249c0a73bd7e67ead993f9c47636b6c4cb92703d0a8f2` |
+| SwiftCollections.FixedMathSharp.dll | `9ca70b0f4ebad43b1f61bbbfe29d49c0ea69c6341a79838f29f29e3ed95f3d85` |
+| GridForge.dll | `5aa8934a285545a0bcce6af8a6b2ddf7eee45a9ec91a81d6bef7388565fd0a39` |
+| Chronicler.dll | `4de2015a0e6a977db42506e01737c1151a70398cbd395451ff563eb267a78d92` |
+| Chronicler.Diagnostics.dll | `bbe0d019808bdfaa3c122fab97235b3f18d1da3b66277e48f6d8dd21e4e97432` |
+
+The eleven new source-behavior cases cover exact unit bases, hierarchical
+cancellation, retained Y-scale policy, both yaw-capture modes, near-unit rounding,
+nonunit/yawed fallbacks, canceled negative ancestry, tiny nonplanar coupling,
+unchanged runtime versions and live scale/pose/offset/query freshness for
+bodyless/explicit-static owners in pure 2D/mixed. Existing full-suite replay,
+serialization, shape admission, contact, query and allocation regressions remain
+active. This is an optimization with a passing compatibility baseline, not a
+newly reproduced correctness defect.
+
+Release passes **8,338 tests** and ReleaseLean **8,267**, with zero failures or
+skips. One fresh unmerged OpenCover capture per configuration retains raw
+reachable coverage: Release **53,545/53,545 sequence points,
+21,768/21,768 branches, 5,602/5,602 methods**; Lean **53,543/53,543 sequence
+points, 21,768/21,768 branches, 5,601/5,601 methods**. No coverage exclusions
+were added. Both `netstandard2.1` and `net10.0` library targets build in both
+configurations with zero errors/warnings. Independent read-only source, caller,
+fixture and test review found no actionable findings; the coordinator ran the
+reported checks. The ordinary Release test DLL matches the final timed runtime
+SHA256. New tests exercise library source; no tests of benchmark/test projects
+or launchers were added.
+
+All 24 maintained BenchmarkDotNet rows also complete in-process `Dry` mode
+with a successful launcher exit. Those cold smoke measurements validate the
+fixture, not the warmed acceptance timings or allocations above.
+
+Reproduce maintained rows using the source graph with `UseLocalLsfStack=true`
+propagated into child builds, without editing project references:
+
+```powershell
+$env:DOTNET_PROCESSOR_COUNT = '2'
+$env:UseLocalLsfStack = 'true'
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll static-population-refresh --filter '*' --job Short
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true --collect:'XPlat Code Coverage' --settings tests/Gravitas.Tests/coverlet.runsettings
+# Repeat test/coverage with -c ReleaseLean; build src/Gravitas in both configurations and target frameworks.
+```
+
+Ignored `artifacts/grv-benchmark-030/` retains `heads.json`, frozen
+`baseline/`/`final/` payloads, loaded bindings, driver source, A/A clone/captures/summary, profile, full raw
+coverage and the eight `N-variant-{measure,controls}.json` launch captures.
+`validated-summary.json` and `verified.log` check DLL parity, fixed trajectories,
+bindings, launch/row/window completeness and allocation. The maintained fixture,
+inputs, source revisions, protocol, results and limitations above retain the
+conclusion independently of those disposable artifacts.
+
+#### Remaining scope and reopening
+
+The retained O(population * hierarchy-depth) sampling pass is intentional:
+`FixedTransform` has mutable local components and ancestry with no revision or
+dirty-propagation contract. A static label cannot prove a bodyless host transform
+unchanged. The existing snapshot still avoids republishing identical geometry;
+introducing a transform cache or another collider index is not justified by this
+bounded signal. General-scale/rotated transforms retain their existing costs.
+A matching final 12-second sampled full-step profile attributes 13.43% to
+partition preparation and 62.29% to discrete response solving. These overlapping,
+call-site-sensitive sample weights confirm the remaining dominant work is
+ordinary contact response; they are not additional acceptance timings.
+Reopen with a reproducible host budget exceeded by the retained sampling work,
+an actionable fallback regression, changed admission/witnesses/replay, or warm
+allocation. #031 remains separate ordinary open-mesh mixed full-step work.
+Native cross-platform and released-package validation were not rerun; all
+results here use the recorded coordinated local source stack.
+
+#### Historical intake (2026-10-19; prior stack)
+
+**Discovered:** 2026-10-19 during static-continuity Phase 6 density controls.
+**Status:** Confirmed on the frozen pre-Phase-6 stack; not an introduced
+continuity regression. Detailed cost attribution remains open. **Owner:**
+Gravitas pure 2D bodyless service refresh; involve GridForge or math owners only
+after profiling their executed contribution.
+
+One frictionless circle runs over one unchanged 16-unit floor at 16 Hz. Add 63
+remote bodyless two-unit static pieces, all loaded and outside its local contact
+neighborhood. Both counts use the same loaded world bounds, manual grounding,
+drive, 32 settling frames and 64 full host steps per invocation. No surface
+membership is declared in this control. Windows x64/.NET 8.0.29 Release
+measurements, 24 warmed windows with zero allocation:
+
+| Stack              | 1 static piece | 64 static pieces |
+| ------------------ | -------------: | ---------------: |
+| Frozen pre-Phase-6 | 21.57 us/frame |   77.09 us/frame |
+| Phase 6 final      | 22.13 us/frame |   79.92 us/frame |
+
+Physical position/velocity/rotation witnesses match all four rows. This is a
+population-scaling signal, not a universal throughput or frame-tail claim. The
+original `PrepareCollisionPartitions` bodyless refresh loop and
+`LSCollider2D.Simulate` -> `Rebuild` path are unchanged by Phase 6.
+Loaded-module hashes identify the frozen pre-phase Gravitas payload
+(`B500F130...`), matching source `071b25ac2b758f6c1992a769e0713ed27b2c34dc`.
+
+Ignored `artifacts/static-surface/phase6/population/` holds the unchanged public
+consumer fixture; `population-{baseline,final}.json` contains the windows and
+module hashes. Capture command after building that consumer and copying it
+beside the appropriate frozen dependencies:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+dotnet artifacts/static-surface/phase6/host/bin/Release/net8.0/Host.dll single artifacts/static-surface/phase6/population-baseline artifacts/static-surface/phase6/population-baseline.json FullStepPopulation1,FullStepPopulation64
+```
+
+**Next isolation:** Promote the bounded population fixture into maintained
+benchmarks, profile refresh/rebuild separately from contact response, and
+compare bodyless with explicit-static owners in pure 2D, 3D and mixed mode.
+Preserve host-transform freshness, mutation/filter invalidation, deterministic
+order and zero warm allocation before changing refresh policy. Do not add
+another index or infer that an entire static rebuild can be skipped without that
+evidence.
 
 ### GRV-Benchmark-029 — Dense Mesh Sweep Cost After Exact Contact Hardening
 

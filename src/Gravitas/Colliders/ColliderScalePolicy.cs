@@ -121,6 +121,15 @@ internal static class ColliderScalePolicy
             return false;
         }
 
+        // The exact unit basis needs neither decomposition nor yaw materialization.
+        if ((matrix.M11 == Fixed64.One) & (matrix.M13 == Fixed64.Zero)
+            & (matrix.M31 == Fixed64.Zero) & (matrix.M33 == Fixed64.One))
+        {
+            scale = Vector2d.One;
+            rotation = Fixed64.Zero;
+            return true;
+        }
+
         Fixed4x4 planarMatrix = Fixed4x4.Identity;
         planarMatrix.M11 = matrix.M11;
         planarMatrix.M13 = matrix.M13;
