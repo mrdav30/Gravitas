@@ -65,70 +65,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-029 — Dense Mesh Sweep Cost After Exact Contact Hardening
-
-**Discovered:** 2026-10-18 during #141 ordinary-consumer validation. **Status:**
-Confirmed on the complete frozen pre-#141 stack; ownership requires profiling.
-This is separate from #026's initially overlapping sources and #006's completed
-benchmark instrumentation. **Owner:** Gravitas 3D/mixed mesh sweeps and the
-executed FixedMathSharp finite query operations.
-
-Existing `MeshQuery3DTriangleScalingBenchmarks` and
-`MixedMeshTriangleScalingBenchmarks` keep the physical quad fixed while changing
-subdivision from 8 to 32 (128 to 2,048 triangles). The sources travel from X=-3
-to X=3; sphere/circle radius is 0.5, and the mixed circle has half-thickness
-0.5. The convex source is the maintained cube fixture. These are ordinary
-impacts, not initial overlap.
-
-Frozen-stack Release controls on Windows x64/.NET 8.0.29 measure approximately:
-
-| Public all-hit query                   | 128 triangles | 2,048 triangles |
-| -------------------------------------- | ------------: | --------------: |
-| Sphere against dense mesh              |    2.1–2.3 ms |    28.8–30.2 ms |
-| Convex mesh against dense concave mesh |    5.5–5.7 ms |    88.6–92.0 ms |
-| Mixed circle against dense mesh        |    3.0–3.2 ms |    46.1–47.3 ms |
-
-All warmed windows allocate 0 B. Matched #141 controls reproduce the same
-millisecond-scale cost; this entry does not defer an introduced regression. The
-ranges are independent run means, not frame-tail latency or capacity claims.
-Captures and complete loaded-module hashes are under
-`artifacts/grv-issue-141/consumer-{refined,final,witness}-*.json`.
-
-Reproduce the maintained fixtures with `UseLocalLsfStack=true`:
-
-```powershell
-$env:UseLocalLsfStack = 'true'
-dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -- --filter '*MeshQuery3DTriangleScalingBenchmarks*' '*MixedMeshTriangleScalingBenchmarks*' --job short
-```
-
-**2026-10-30 shared-worker refinement:** GRV-Benchmark-026 defers GJK witness
-construction. Frozen-source Release ABBA controls use the same maintained
-`MeshQuery3DTriangleScalingBenchmarks`, with 24 warmed windows per launch and
-two launches per payload. The convex-source path improves; the unchanged
-analytic-sphere path provides an approximate timing control:
-
-| Ordinary all-hit query | Triangles | Baseline ms | Candidate ms | Change |
-| ---------------------- | --------: | ----------: | -----------: | -----: |
-| Sphere control         |       128 |       2.020 |        1.997 | -1.16% |
-| Convex mesh            |       128 |       5.518 |        5.085 | -7.84% |
-| Sphere control         |      2048 |      26.989 |       27.099 | +0.41% |
-| Convex mesh            |      2048 |      89.657 |       81.539 | -9.05% |
-
-All windows allocate 0 bytes and exact hit snapshots match. At 2,048 triangles
-the convex row still costs about 81.5 ms. This is a partial reduction of the
-shared worker cost, not closure of the signal, evidence about mixed reducers, or
-a game-capacity guarantee. Sphere contrasts change direction across orders at
-128 triangles and remain small; no sphere-path improvement is claimed. See the
-closed #026 record for source identities and comparison limits.
-
-**Next isolation:** Capture the existing collider/triangle candidate counters
-and profile ordinary query work separately from finite initial-contact recovery.
-Compare filled coplanar controls, genuine rims and false-positive candidates
-before proposing pruning or arithmetic changes. Preserve earliest distance,
-authored tie order, finite witnesses and zero warm allocation. Check the current
-math throughput owners directly before assigning the cost to an index or
-reopening the already-closed upstream signal.
-
 ### GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost
 
 **Discovered:** 2026-10-19 during static-continuity Phase 6 density controls.
@@ -452,6 +388,7 @@ Existing signal anchors remain on the rows below.
 
 | Signal | Closed | Outcome | Evidence |
 | --- | --- | --- | --- |
+| <a id="grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening"></a>GRV-Benchmark-029 — Dense mesh sweep cost | 2026-10-31 | Certified patches/carriers and duplicate reuse cut query time by 96.6–99.9% at 2,048 triangles, with zero warm allocation; finite geometry and small-control limits retained. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening) |
 | <a id="grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension"></a>GRV-Benchmark-028 — Mixed broad phase with an empty opposite dimension | 2026-10-31 | Skipped impossible distribution while preserving index refresh and cleanup; measured empty-population steps improve 30–42% at zero warm allocation. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension) |
 | <a id="grv-benchmark-027--nonconvex-rotational-ccd-step-cost"></a>GRV-Benchmark-027 — Nonconvex rotational CCD step cost | 2026-10-31 | Deferred exact contact materialization cuts measured cone steps by 59–64% and the pressed-capsule episode by 65%, at zero warm allocation; conservative progress limits remain documented. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-027--nonconvex-rotational-ccd-step-cost) |
 | <a id="grv-benchmark-032--first-isolated-2d-pair-owner-deactivation-allocation"></a>GRV-Benchmark-032 — First isolated 2D pair-owner deactivation allocation | 2026-10-30 | Removed first-lookup boxing in SwiftCollections; cold collection queries and unchanged 2D teardown allocate zero bytes. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-032--first-isolated-2d-pair-owner-deactivation-allocation) |

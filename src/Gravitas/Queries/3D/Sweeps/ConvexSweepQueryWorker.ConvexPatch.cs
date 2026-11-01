@@ -12,7 +12,7 @@ using System;
 
 namespace Gravitas.Queries;
 
-/// <content>Sweeps a certified whole-mesh convex patch when a finite center crossing proves an ordinary impact.</content>
+/// <content>Attempts a certified whole-mesh convex patch selected by a finite reference-center crossing.</content>
 internal sealed partial class ConvexSweepQueryWorker
 {
     private bool TrySweepCertifiedConvexPatch(in ConvexShape source, LSMeshCollider target,
@@ -21,7 +21,7 @@ internal sealed partial class ConvexSweepQueryWorker
         hit = default;
         numerator = default;
         PhysicsMesh mesh = target.Mesh;
-        if (_admitTriangle != null || !source.ContainsCenter
+        if (_admitTriangle != null
             || _triangleCandidates.Count != mesh.TriangleCount || _triangleCandidates.Count < 2)
             return false;
 
@@ -43,8 +43,8 @@ internal sealed partial class ConvexSweepQueryWorker
         if (WideDirection3d.Dot(plane, motion).IsZero)
             return false;
 
-        // Prepare has already admitted both center endpoints. A finite center
-        // crossing avoids an extra GJK pass for perimeter-only and miss cases.
+        // Prepare has admitted both reference-center endpoints. Their crossing
+        // selects an attempt; GJK still tests the actual hull, not its inspection center.
         _ = source.GetCenterAnchor().TryGetPoint(out Vector3d start);
         _ = Vector3d.TryAdd(start, _displacement, out Vector3d end);
         var segment = new FixedSegment(start, end);

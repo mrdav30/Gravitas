@@ -356,39 +356,115 @@ public sealed partial class GravitasQueryMixedService
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out min, out max);
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleCandidates);
         LastMeshTriangleCandidateCount += _meshTriangleCandidates.Count;
+        bool usePatch = false;
+        FixedTriangle patchTriangle = default;
+        Vector3d patchPoint = default, patchNormal = default;
+        if (!requireClosingContact && _meshTriangleCandidates.Count > 2
+            && _meshTriangleCandidates.Count == mesh.Mesh.TriangleCount && mesh.Mesh.HasSingleConvexCoplanarPatch)
+        {
+            CreateCircleSlabSweepBounds(start, start, radius, slabCenterY, halfThickness, out min, out max);
+            if (!SweepBoundsUtility.OverlapsInclusive(min, max, mesh.Bounds.Min, mesh.Bounds.Max))
+            {
+                ReadOnlySpan<int> corners = mesh.Mesh.GetConvexCoplanarPatchCornerVertexIndices(0);
+                ReadOnlySpan<Vector3d> vertices = mesh.Mesh.GeometryVertices;
+                var planeTriangle = new FixedTriangle(vertices[corners[0]], vertices[corners[1]], vertices[corners[2]]);
+                WideDirection3d plane = WideTriangleRelations.GetScaledTriangleLocalNormal(planeTriangle, mesh.Mesh.GeometryFrame)
+                    .Transform(mesh.Mesh.GeometryFrame.GeometryBasis);
+                Vector2d displacement = end - start;
+                var motion = new WideAxis3(Signed320.ExtendValue(Signed192.Raw(displacement.X)), default,
+                    Signed320.ExtendValue(Signed192.Raw(displacement.Y)));
+                var tangent = new WideAxis3(motion.Z, default, WideArithmetic.SubtractSigned320(default, motion.X));
+                int approach = WideDirection3d.Dot(plane, motion).Sign;
+                // An aligned radial support follows the cap-center chord; finite crossing proves plane entry is attained.
+                if (approach != 0 && WideDirection3d.Dot(plane, tangent).IsZero)
+                {
+                    patchNormal = plane.GetNormal(false) * (Fixed64)(-approach);
+                    if (patchNormal.X != Fixed64.Zero || patchNormal.Z != Fixed64.Zero)
+                    {
+                        int cap = approach * plane.Y.Sign;
+                        Fixed64 y = cap > 0 ? max.Y : cap < 0 ? min.Y : slabCenterY;
+                        var chord = new FixedSegment(new Vector3d(start.X, y, start.Y), new Vector3d(end.X, y, end.Y));
+                        for (int corner = 1; corner < corners.Length - 1; corner++)
+                        {
+                            var carrier = new FixedTriangle(vertices[corners[0]], vertices[corners[corner]], vertices[corners[corner + 1]]);
+                            if (!WideTriangleRelations.TryGetSegmentIntersection(carrier, mesh.Mesh.GeometryFrame, chord,
+                                    out patchPoint, out _)) continue;
+                            patchTriangle = carrier;
+                            usePatch = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         bool found = false;
         Fixed64 bestDistance = Fixed64.MaxValue;
         int bestTriangleIndex = int.MaxValue;
         PhysicsMixedHit best = default;
 
-        for (int i = 0; i < _meshTriangleCandidates.Count; i++)
+        bool hasPreviousTriangle = false, previousSwept = false;
+        FixedTriangle previousTriangle = default;
+        Fixed64 previousDistance = default;
+        FixedPointAnchor previousContact = default;
+        // A declined carrier sweep falls through to the unchanged authored reduction.
+        for (int i = usePatch ? -1 : 0; i < _meshTriangleCandidates.Count; i++)
         {
-            int triangleIndex = _meshTriangleCandidates[i];
-            mesh.Mesh.GetGeometryTriangleVertices(
-                triangleIndex,
-                out Vector3d first,
-                out Vector3d second,
-                out Vector3d third);
+            int triangleIndex = i < 0 ? -1 : _meshTriangleCandidates[i];
+            Vector3d first, second, third;
+            if (i < 0)
+            {
+                first = patchTriangle.A; second = patchTriangle.B; third = patchTriangle.C;
+            }
+            else mesh.Mesh.GetGeometryTriangleVertices(triangleIndex, out first, out second, out third);
             bool rigid = mesh.Mesh.GeometryFrame.IsRigid;
             Vector3d triangleOrigin = rigid ? mesh.Mesh.GeometryFrame.RigidOrigin : mesh.Mesh.Origin;
             FixedQuaternion triangleRotation = rigid ? mesh.Mesh.GeometryFrame.Rotation : FixedQuaternion.Identity;
             var triangle = new FixedTriangle(first, second, third);
-            bool exactLattice = rigid;
-            if (!rigid && mesh.Mesh.GeometryFrame.GetPoint(first).TryGetExactLocalPointIn(triangleOrigin, triangleRotation, out Vector3d localFirst)
-                && mesh.Mesh.GeometryFrame.GetPoint(second).TryGetExactLocalPointIn(triangleOrigin, triangleRotation, out Vector3d localSecond)
-                && mesh.Mesh.GeometryFrame.GetPoint(third).TryGetExactLocalPointIn(triangleOrigin, triangleRotation, out Vector3d localThird))
+            bool swept;
+            Fixed64 distance;
+            FixedPointAnchor triangleContact;
+            if (!requireClosingContact && hasPreviousTriangle && triangle == previousTriangle)
             {
-                triangle = new FixedTriangle(localFirst, localSecond, localThird);
-                exactLattice = true;
+                // Reuse only the kernel result; every authored index still participates in tie reduction.
+                swept = previousSwept;
+                distance = previousDistance;
+                triangleContact = previousContact;
             }
-            bool swept = exactLattice
-                ? triangle.TryGetFiniteSlabProjectedCircleSweep(triangleOrigin, triangleRotation,
-                    new FixedSegment2d(start, end), length, radius, slabCenterY, halfThickness,
-                    out Fixed64 distance, out FixedPointAnchor triangleContact)
-                : WideOrientedBox.TryGetFiniteSlabProjectedCircleSweep(triangle, mesh.Mesh.GeometryFrame, triangleOrigin,
-                    new FixedSegment2d(start, end), length, radius, slabCenterY, halfThickness,
-                    out distance, out triangleContact);
+            else
+            {
+                FixedTriangle input = triangle;
+                bool exactLattice = rigid;
+                if (!rigid && mesh.Mesh.GeometryFrame.GetPoint(first).TryGetExactLocalPointIn(triangleOrigin, triangleRotation, out Vector3d localFirst)
+                    && mesh.Mesh.GeometryFrame.GetPoint(second).TryGetExactLocalPointIn(triangleOrigin, triangleRotation, out Vector3d localSecond)
+                    && mesh.Mesh.GeometryFrame.GetPoint(third).TryGetExactLocalPointIn(triangleOrigin, triangleRotation, out Vector3d localThird))
+                {
+                    triangle = new FixedTriangle(localFirst, localSecond, localThird);
+                    exactLattice = true;
+                }
+                swept = exactLattice
+                    ? triangle.TryGetFiniteSlabProjectedCircleSweep(triangleOrigin, triangleRotation,
+                        new FixedSegment2d(start, end), length, radius, slabCenterY, halfThickness,
+                        out distance, out triangleContact)
+                    : WideOrientedBox.TryGetFiniteSlabProjectedCircleSweep(triangle, mesh.Mesh.GeometryFrame, triangleOrigin,
+                        new FixedSegment2d(start, end), length, radius, slabCenterY, halfThickness,
+                        out distance, out triangleContact);
+                if (!requireClosingContact)
+                {
+                    previousTriangle = input;
+                    previousSwept = swept;
+                    previousDistance = distance;
+                    previousContact = triangleContact;
+                    hasPreviousTriangle = true;
+                }
+            }
             if (!swept) continue;
+            if (i < 0)
+            {
+                ContactAnchor point = ContactAnchor.FromWorldPoint(patchPoint);
+                hit = new PhysicsMixedHit(mesh, sourceCollider, point, point, patchNormal,
+                    PhysicsQueryReducerKind.Exact, distance, direction3D);
+                return true;
+            }
 
             if (found
                 && (distance > bestDistance

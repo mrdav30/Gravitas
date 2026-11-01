@@ -15,6 +15,7 @@ experimental signals and compact [closed index](../benchmark-signal-hardening-ba
 
 | Signal                                                                                                                                               | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-029 — Dense mesh sweeps](#grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening) | Closed | 2026-10-31 | Certified patch/carrier sweeps and query-local duplicate reuse reduce query costs by 96.6–99.9% at 2,048 triangles and zero warm allocation; finite geometry and small-control limits are explicit. |
 | [GRV-Benchmark-028 — Mixed broad phase with an empty opposite dimension](#grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension) | Closed | 2026-10-31 | Skipped impossible mixed distribution; 30–42% lower measured empty-population step time, zero warm allocation and preserved query/lifetime behavior. |
 | [GRV-Benchmark-027 — Nonconvex rotational CCD step cost](#grv-benchmark-027--nonconvex-rotational-ccd-step-cost) | Closed | 2026-10-31 | Deferred exact contact materialization reduces measured cone steps by 59–64% and the pressed-capsule episode by 65%, at zero warm allocation; residual conservative progress limits and reopening criteria are explicit. |
 | [GRV-Benchmark-032 — First isolated 2D pair-owner deactivation allocation](#grv-benchmark-032--first-isolated-2d-pair-owner-deactivation-allocation) | Closed | 2026-10-30 | Removed default-value boxing from SwiftCollections dictionary/set nullability initializers; cold collection regressions and unchanged 2D teardown now allocate 0 B, with full standard/Lean consumer passes and 100% reachable coverage.                                                        |
@@ -42,6 +43,381 @@ experimental signals and compact [closed index](../benchmark-signal-hardening-ba
 | GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                                                                                     | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
 | GRV-Benchmark-003 — 3D full-runtime CCD allocation                                                                                                   | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
 | GRV-Benchmark-004 — Grounding raycast probe allocation                                                                                               | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+### GRV-Benchmark-029 — Dense Mesh Sweep Cost After Exact Contact Hardening
+
+**Status:** Closed 2026-10-31. Ordinary whole-patch sweep work and repeated
+identical-triangle work are reduced without replacing finite surfaces with an
+infinite plane, changing tolerances or weakening identity-sensitive admission.
+This is a bounded optimization closeout, not a claim that arbitrary meshes or
+complete queries now have triangle-independent cost. #031 remains open: it
+measures a different, complete mixed simulation workload.
+
+#### Executed cause and retained changes
+
+The existing BVH admits all 128/2,048 triangles in the maintained dense quad
+fixtures, despite their identical physical surface. Managed stack-sampling
+controls include one second of warmup and a 12-second loop, excluding fixture
+setup. Baseline controls attribute 94.7% of sphere loop weight to triangle sweep
+work, including 74.8% in the wide sphere distance interval; 93.7% of the convex
+loop to GJK distance; and 99.3%/98.7% of the mixed dense/false-positive loops to
+finite triangle/circle-slab sweeps. These inclusive weights overlap; they are
+not additive CPU shares or acceptance timings.
+
+- The existing certified-patch GJK attempt now admits convex mesh sources.
+  Their reference-center chord only selects an attempt; GJK still tests the
+  actual hull. `ConvexShape.ContainsCenter` remains false for mesh sources.
+- Ordinary sphere sweeps use the certified patch's corner fan with the existing
+  analytic kernels when all triangles are candidates and initial source bounds
+  are disjoint. Initial contacts,
+  identity-sensitive CCD/supplier admission, partial candidate sets and
+  uncertified/nonconvex domains retain authored processing.
+- Replacement sphere fan faces use cached/robust mesh normals and the existing
+  exact-zero-degenerate wide projection predicate. This preserves admitted
+  micro faces when internal diagonals disappear. Authored fallback retains its
+  existing projection predicate, avoiding unrelated nonfan overhead.
+- Mixed circle-slab sweeps use **one analytic carrier triangle** only when exact
+  world-plane arithmetic certifies an aligned face hit. X/Z motion must be
+  parallel to the nonzero projected plane normal, with nonzero approach. The
+  exact approach/vertical signs choose the supporting cap, or axial midpoint
+  when the vertical coefficient is zero. Its center chord must cross the finite
+  fan, and the published normal must retain a nonzero radial component.
+  Before whole-plane entry the complete cylinder is separated. Its entering
+  radial extreme follows that cap-center line, so the finite crossing proves
+  the plane-entry lower bound is attained by the containing triangle. That
+  triangle's existing kernel supplies distance; the crossing supplies paired
+  final rounded physical witnesses and the geometric plane normal. TOI and
+  witness rounding can leave a small separation at the retained time. This
+  removes contact reconstruction entirely. Oblique/rim-only/tangent casts and
+  failed certificates stay authored; a declined carrier kernel falls through
+  to every original candidate without publishing its synthetic index.
+- Consecutive identical ordered triangles reuse only the analytic kernel result
+  inside one ordinary mixed query. The frame, chord and slab inputs are fixed
+  within that attempt, every authored index still participates in the authored
+  reduction, and new queries start with no memo. There is no persistent cache or
+  invalidation protocol.
+
+Runtime growth is **105 net lines across three existing query files**, with no new
+runtime files, public API, dependency or upstream math change. Counter semantics
+remain unchanged: triangle counters report BVH-admitted authored triangles,
+not the reduced number of narrow-phase kernel calls.
+
+#### Frozen source and process provenance
+
+Baseline Gravitas is `4e674b08eb7f2de4b036e5f717647fdbc4997251`. Both variants
+use committed source archives of these exact dependencies:
+
+| Repository | Revision |
+| --- | --- |
+| FixedMathSharp | `c3fcd6bd035afdb4aeea776d2a6a6ca35723585f` |
+| SwiftCollections | `0418123fa52f78cbff551e6ca291ef816493069b` |
+| GridForge | `76e2bd46380664cfa5403d3b57eca6a82cb6b88a` |
+| Chronicler | `c45f9ab53913e5b1692f0717733425e0f4defeb2` |
+
+Concurrent Chronicler dependency/migration edits in Gravitas, SwiftCollections
+and GridForge, including the separately recorded package blocker #149, are
+excluded from this frozen graph and preserved in the shared worktrees. The
+candidate graph changes only the three query files and focused source tests.
+These are source-stack results, not validation of those pending metadata edits
+or a released package combination.
+
+Windows x64, OS build `10.0.26300`, i7-9700K, SDK `10.0.302`, .NET `10.0.10`,
+Release, `UseLocalLsfStack=true`, `DisableTransitiveProjectReferences=true`,
+`DOTNET_PROCESSOR_COUNT=2`. The disposable direct driver uses blocking
+workstation GC, high priority and affinity mask 192 (logical CPUs 6/7).
+Builds, tests, profiles and timings run serially.
+
+All payload DLLs match except `Gravitas.dll`; actual loaded assembly names,
+paths and SHA-256 hashes are checked in every measured process. Loaded identities
+include Gravitas `0.0.0.0`, FixedMathSharp `7.1.0.0`, SwiftCollections `7.0.0.0`,
+SwiftCollections.FixedMathSharp `7.1.0.0`, GridForge `9.1.0.0`, and Chronicler /
+Chronicler.Diagnostics `1.0.0.0`. Package-looking versions alone do not identify
+these source-built assemblies.
+
+| Measured module | SHA-256 |
+| --- | --- |
+| Gravitas baseline | `C5C9E8F27C3E0DF38324EE58975A6335FD5B880F8645AABCD83C806CE0A2A5A9` |
+| System.Private.CoreLib | `76A49F17E83F613BC8A5B55FC98830B764E7838265AACBDBCC8F46707F80A3C9` |
+| FixedMathSharp | `E8002520AC021DA7AEBCFE5B790AA739E916A5AA761D0350136DEBA94CCE28E6` |
+| Gravitas final | `03A321425050490058A53DE31A852F6A26687689AEAED67F06ED91C915B8EB2D` |
+| Chronicler | `F2D894CB20F5C734510DE9E0B08CAB04A45D05BAAEF20F04D2B1CEFEB1CB9A88` |
+| SwiftCollections | `3BE058EDBDDFBE5E0A26A55DA4295741A4AF1FE357D34E75AD5A9D32F30EE610` |
+| GridForge | `743CC1BCDF4FE7E2E5E6248ED1B487053B74EE9E1F689C2EB2AACB2327264324` |
+| Gravitas.Benchmarks | `8B6C2EF6371DB43D70BA38BF4DCBEA2DFE57B4733674E279D26AAA94501DE2F5` |
+| Chronicler.Diagnostics | `B401C40A2E669F7F214DB60AF7C09A0AACB006C83E6C313BF6462DC65727E020` |
+| SwiftCollections.FixedMathSharp | `6D2CBD38F41874322530011C8117273BC72233B8FDA85DC151E1EE7C2FE844B2` |
+| FixedMathSharp.Chronicler | `61D49349E5D1D7A7C0A05CB140F53E3EA9D7A1C3500953745383F5DEA2755ED7` |
+
+The Release coverage/test DLL and final measured DLL have the same SHA-256.
+No instrumented assembly is used for timing.
+
+#### Matched public-query measurements
+
+The direct driver invokes the existing maintained benchmark methods after their
+normal `Setup`, and runs `Cleanup` outside measurement. Each row warms for four
+seconds, calibrates for at least 200 ms, and records 16 windows targeting 50 ms
+each (one to 4,096 invocations/window). The independent process order is
+**baseline, final, final, baseline**, with both dense rows and nonfan controls
+in each round. Tables give equally weighted means of the two process means;
+the ranges retain both process means. Allocation is the current-thread byte
+delta around every window. These are synthetic warm operation means, not
+gameplay frame-tail latency, cold-start cost or scene-capacity evidence.
+
+The maintained dense geometry is the vertical quad `X=0, Y/Z=+-0.5`, subdivided
+8/32 times into 128/2,048 triangles. Probes travel `(-3,0,0)` to `(3,0,0)`;
+sphere/circle radius and mixed half-thickness are 0.5. The convex source is the
+unit closed cube with half-extents 0.5; its target is concave. The false-positive
+fixture repeats the ordered triangle `(0,-1,0.49),(0,1,0.71),(0,-1,1)` 128/2,048
+times with separate vertex slots, without changing physical geometry.
+
+| Public all-hit query / triangles | Baseline mean ms [launch range] | Final mean ms [launch range] | Change |
+| --- | ---: | ---: | ---: |
+| Sphere / 128 | 1.945 [1.923–1.967] | 0.0940 [0.0937–0.0943] | -95.17% |
+| Convex mesh / 128 | 4.911 [4.882–4.940] | 0.0353 [0.0351–0.0354] | -99.28% |
+| Mixed circle / 128 | 2.582 [2.563–2.601] | 0.0526 [0.0522–0.0531] | -97.96% |
+| Mixed false-positive / 128 | 3.338 [3.319–3.356] | 0.0457 [0.0451–0.0464] | -98.63% |
+| Sphere / 2,048 | 26.174 [25.941–26.406] | 0.8897 [0.8890–0.8904] | -96.60% |
+| Convex mesh / 2,048 | 79.237 [78.215–80.260] | 0.0700 [0.0698–0.0702] | -99.91% |
+| Mixed circle / 2,048 | 38.389 [38.044–38.734] | 0.0897 [0.0894–0.0900] | -99.77% |
+| Mixed false-positive / 2,048 | 53.523 [53.516–53.529] | 0.1572 [0.1545–0.1600] | -99.71% |
+
+All windows allocate **0 bytes**. Collider count remains one and authored triangle
+candidate counts remain 128/2,048. Dense hits keep raw distance `10737418240`
+(2.5); false-positive rows remain misses. Sphere fields match exactly. Convex
+and mixed paths may change finite physical witnesses; convex points remain on
+both the cube's leading face and target patch, and mixed paired witnesses retain
+the physical supporting-face normal. Legacy dense mixed output uses an invalid
+center-to-witness diagonal normal; the final face normal is world -X. Repeated
+same-version queries retain exact outputs and collider ordering. Cross-version
+query/replay result hashes need not match when these fields change.
+
+Nonfan controls use two explicit finite layouts: a bent four-triangle strip with
+vertices `(0,-1,-1),(0,1,-1),(0,-1,0),(0,1,0),(0.5,-1,1),(0.5,1,1)` and indices
+`0,1,2;2,1,3;2,3,4;4,3,5`; and an eight-triangle coplanar square ring, outer
+Y/Z corners `+-1`, inner corners `+-0.25`, with the center left empty. They use
+the same chord/radius/slab and closed cube source. The full-step control is
+`JoinedStaticSolidMixedSimulationBenchmarks`, `Shape=OpenMesh`,
+`Layout=Continuous`; invoke its existing 64-step operation, divide time by 64,
+and retain its per-step tangential-motion/nonpenetration assertions. Fixed
+post-setup observations agree before timing; all nonfan query fields agree.
+
+Small-patch mixed controls use the same fixed dense quad with subdivisions
+1/2/4 (2/8/32 triangles). The five four-triangle controls use corners
+`(0,-1,-1),(0,1,-1),(0,1,1),(0,-1,1)` plus center `(0,0,0)`, indexed
+`0,1,4;1,2,4;2,3,4;3,0,4`, with radius/half-thickness 0.5. Their chords are:
+
+| Four-triangle layout | Start | End |
+| --- | --- | --- |
+| Face | `(-3,0,0)` | `(3,0,0)` |
+| Oblique rim | `(-3,0,-0.2)` | `(3,0,2.8)` |
+| Tangent | `(-0.5,0,-3)` | `(-0.5,0,3)` |
+| Partial-height slab | `(-3,1.25,0)` | `(3,1.25,0)` |
+| Tilted face | `(-3,0,0)` | `(3,0,0)` |
+
+The tilted layout instead uses `(1,-1,-1),(-1,1,-1),(-1,1,1),(1,-1,1)`
+plus center zero with the same indices, giving plane X+Y=0.
+
+| Control | Baseline us [launch range] | Final us [launch range] | Change |
+| --- | ---: | ---: | ---: |
+| Certified mixed quad / 2 triangles | 73.088 [73.087–73.088] | 71.778 [71.574–71.982] | -1.79% |
+| Certified mixed quad / 8 triangles | 208.071 [207.260–208.882] | 49.379 [49.325–49.433] | -76.27% |
+| Certified mixed quad / 32 triangles | 744.821 [742.227–747.414] | 49.776 [49.622–49.929] | -93.32% |
+| Four-triangle face | 155.333 [153.402–157.264] | 49.612 [49.410–49.814] | -68.06% |
+| Four-triangle oblique rim | 136.348 [135.897–136.799] | 137.969 [137.269–138.669] | +1.19% |
+| Four-triangle tangent | 116.185 [116.019–116.351] | 117.051 [116.552–117.551] | +0.75% |
+| Four-triangle partial-height slab | 74.484 [74.387–74.581] | 73.840 [73.810–73.871] | -0.86% |
+| Four-triangle tilted face | 219.554 [218.532–220.576] | 68.892 [67.824–69.960] | -68.62% |
+| Bent strip / sphere | 67.909 [67.734–68.083] | 67.367 [66.971–67.762] | -0.80% |
+| Bent strip / convex mesh | 173.955 [172.954–174.955] | 172.514 [172.175–172.854] | -0.83% |
+| Bent strip / mixed circle | 139.903 [136.984–142.821] | 143.748 [142.256–145.240] | +2.75% |
+| Square ring / sphere | 164.516 [164.316–164.717] | 164.214 [163.757–164.671] | -0.18% |
+| Square ring / convex mesh | 240.590 [239.965–241.214] | 238.740 [237.850–239.631] | -0.77% |
+| Square ring / mixed circle | 321.082 [319.067–323.097] | 323.245 [321.152–325.338] | +0.67% |
+| Open-mesh host step (one step) | 4641.734 [4595.663–4687.806] | 4569.367 [4563.603–4575.131] | -1.56% |
+
+The dense gains hold in both launch orders. Small controls do not establish
+an equivalence result: the bent mixed mean is +2.75% (+3.85 us), with overlapping
+launch ranges; the oblique rim is +1.19% (+1.62 us), tangent +0.75% (+0.87 us),
+and ring mixed +0.67% (+2.16 us). Preserve these positive estimates rather than
+calling them zero overhead. The remaining control point contrasts range down to
+-1.79%; no speedup is claimed for unchanged paths or the full-step control.
+
+A subsequent identical-binary baseline/clone comparison uses the same driver,
+affinity, warmup/windows and actual binding checks in four fresh processes
+(controls and rims in each variant). Across the control set, sham contrasts
+range from -2.85% to +2.13%, while the original baseline bent-mixed process means
+span 136.98–142.82 us. These expose process/environmental uncertainty, not an
+isolated cause or proof that each positive contrast is noise. These runs do not
+settle the small positive estimates; do not infer exact zero cost or a control
+speedup. Reopen small-control attribution if longer matched runs establish a reproducible
+cost that matters to the host's query budget.
+
+| Identical-binary control | Baseline us | Clone us | Sham contrast |
+| --- | ---: | ---: | ---: |
+| Bent2 | 142.302 | 143.843 | +1.08% |
+| Ring2 | 321.266 | 328.094 | +2.13% |
+| OpenMeshFullStep64 | 4564.768 | 4606.623 | +0.92% |
+| PatchRim | 134.634 | 134.341 | -0.22% |
+| PatchTangent | 115.989 | 116.974 | +0.85% |
+
+Earlier, rejected controls are retained. Full finite-face reconstruction costs
+about 23 ms at 2,048 triangles. A corner-face build costs 3.20–3.28 ms at 128
+triangles versus 2.613–2.646 ms baseline. Its plane-support replacement still
+costs 349–351 us at eight triangles versus 211–212 us baseline. A scalar-support
+replacement reduces that face cost but raises the four-triangle rim control
+from about 136 to 241 us and tangent control from 116 to 191 us before authored
+retry. All reconstruction helpers and temporary scratch state are removed by
+the retained face certificate. An unconditional wide sphere projection adds
+about 10–15% in bent/ring controls; the predicate is now confined to replacement
+fans. These adverse results are not folded into final acceptance averages.
+
+#### Correctness, coverage and reproduction
+
+`CertifiedMeshSweepTests` adds 34 maintained production-behavior cases: three
+source families, both windings, common yaw, affine half-raw placement, near-limit
+translation, exact repeat/order checks, finite rims and misses, tilted/horizontal
+faces, tangential entry, offset slabs, partial candidates, conservative initial
+bounds, duplicate hits/misses, changed radius, reversed sides, nearly aligned
+casts and endpoint radius hits without a center crossing. A tetrahedral source whose
+inspection center lies outside its hull verifies that the new GJK attempt does
+not invent a center contact.
+
+The micro regression uses a quad with Y/Z half-extents 0.005, sphere radius
+0.00025 and chord X=-0.01 to +0.01 at Y=+0.0002, Z=-0.0002. The prototype
+misses after removing the internal diagonals because the public triangle normal
+and projection use a squared-area epsilon; baseline and final hit. A vertical
+quad with Y/Z half-extents 0.5 and a slab centered at Y=-0.5 reproduces the
+prototype's invalid diagonal normal; final publishes -X. Centered/+0.5 slab
+variants also expose the legacy normal issue. These regressions were verified
+before accepting the corrections; no claim is made about every legacy fallback
+normal or every small authored triangle predicate.
+
+Both library TFMs (`netstandard2.1`, `net10.0`) build in Release and ReleaseLean
+with zero errors. Full suites pass **8,327 Release / 8,256 ReleaseLean tests**,
+without failures or skips. Each final configuration uses one fresh full-suite
+coverage capture, with no merged partial or historical acceptance coverage:
+
+| Configuration | Raw sequence points | Raw branches | Raw methods |
+| --- | ---: | ---: | ---: |
+| Release | 53,540 / 53,540 | 21,766 / 21,766 | 5,602 / 5,602 |
+| ReleaseLean | 53,538 / 53,538 | 21,766 / 21,766 | 5,601 / 5,601 |
+
+Recreate the source graph at the revisions above, retain committed project files,
+and apply this change. Build/test with `-p:UseLocalLsfStack=true
+-p:DisableTransitiveProjectReferences=true`; source mode expects all siblings.
+The maintained workloads can be reproduced through BenchmarkDotNet as follows;
+the direct ABBA protocol above, rather than a BDN short-job mean, supplies this
+record's acceptance numbers:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+$env:DisableTransitiveProjectReferences = 'true'
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll --filter '*MeshQuery3DTriangleScalingBenchmarks.SweepSphereAll_DenseTriangleMeshTarget' '*MeshQuery3DTriangleScalingBenchmarks.SweepConvexMeshAll_DenseConcaveTriangleMeshTarget' '*MixedMeshTriangleScalingBenchmarks.SweepCircleAgainst3DAll_DenseTriangleMeshTarget' '*MixedMeshTriangleScalingBenchmarks.SweepCircleAgainst3DAll_FalsePositiveTriangleMeshTarget' --job short
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true --collect:'XPlat Code Coverage' --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/coverage-release
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c ReleaseLean -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true --collect:'XPlat Code Coverage' --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/coverage-lean
+```
+
+Captures under `artifacts/grv-benchmark-029/` contain source archives/`heads.json`,
+raw baseline/final profiles, rejected `accept-*`, `final-*`, `small-*` and
+`rims-*` controls, accepted `carrier-*` timings and actual bindings, identical-
+binary `aa-*` controls, focused regressions, full-suite logs and the separate
+`coverage-{release,lean}-carrier` reports. Disposable probes stay outside maintained
+tests/benchmarks; the inputs, revisions, protocol, results and limits above remain
+tracked if those artifacts are deleted. Independent connected-source review
+found no unresolved correctness/complexity findings after the revisions.
+
+#### Remaining cost and reopening criteria
+
+Final managed stack samples put 95.8% of the dense sphere loop under hit
+publication and 90.4% under swept-sphere contact resolution, including 64.5% in
+per-triangle closest-point reduction; only 5.4% remains in the mesh sweep worker.
+Mixed attribution now includes 32.8% finite chord intersection, 30.6% in the
+single analytic carrier and 21.9% in mesh triangle gathering. These inclusive
+weights overlap and include the same one-second warmup plus 12-second loop;
+they are attribution, not operation-time fractions to add together.
+
+BVH gathering and candidate scans remain proportional to admitted triangles.
+Sphere publication still resolves the globally closest finite feature through
+`ContinuousCollisionContactPolicy` / `LSMeshCollider.FindClosestPointAnchor`;
+the impact worker returns only center/distance. Reusing its winning analytic
+triangle alone is insufficient after rounded TOI. A future exact closest-point
+fan scan needs explicit witness/normal ranking, tie, compound and anchor tests;
+it is not an omitted one-line reuse.
+
+Reopen for a maintained complete-query or representative host workload where
+that residual exceeds the host's query budget, for expensive uncertified mesh
+domains outside this certificate, or for a finite-witness/ordering/allocation
+regression. Keep #031's ordinary mixed full-step attribution separate. This
+closeout establishes these measured workloads on the frozen Windows source
+stack, not released-package compatibility or all OS/architecture behavior.
+
+#### Historical intake and earlier refinement
+
+The following intake and #026 comparison retain their original dated status and
+runtime; they are historical evidence, not the final measurements above.
+
+**Discovered:** 2026-10-18 during #141 ordinary-consumer validation. **Status:**
+Confirmed on the complete frozen pre-#141 stack; ownership requires profiling.
+This is separate from #026's initially overlapping sources and #006's completed
+benchmark instrumentation. **Owner:** Gravitas 3D/mixed mesh sweeps and the
+executed FixedMathSharp finite query operations.
+
+Existing `MeshQuery3DTriangleScalingBenchmarks` and
+`MixedMeshTriangleScalingBenchmarks` keep the physical quad fixed while changing
+subdivision from 8 to 32 (128 to 2,048 triangles). The sources travel from X=-3
+to X=3; sphere/circle radius is 0.5, and the mixed circle has half-thickness
+0.5. The convex source is the maintained cube fixture. These are ordinary
+impacts, not initial overlap.
+
+Frozen-stack Release controls on Windows x64/.NET 8.0.29 measure approximately:
+
+| Public all-hit query                   | 128 triangles | 2,048 triangles |
+| -------------------------------------- | ------------: | --------------: |
+| Sphere against dense mesh              |    2.1–2.3 ms |    28.8–30.2 ms |
+| Convex mesh against dense concave mesh |    5.5–5.7 ms |    88.6–92.0 ms |
+| Mixed circle against dense mesh        |    3.0–3.2 ms |    46.1–47.3 ms |
+
+All warmed windows allocate 0 B. Matched #141 controls reproduce the same
+millisecond-scale cost; this entry does not defer an introduced regression. The
+ranges are independent run means, not frame-tail latency or capacity claims.
+Captures and complete loaded-module hashes are under
+`artifacts/grv-issue-141/consumer-{refined,final,witness}-*.json`.
+
+Reproduce the maintained fixtures with `UseLocalLsfStack=true`:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -- --filter '*MeshQuery3DTriangleScalingBenchmarks*' '*MixedMeshTriangleScalingBenchmarks*' --job short
+```
+
+**2026-10-30 shared-worker refinement:** GRV-Benchmark-026 defers GJK witness
+construction. Frozen-source Release ABBA controls use the same maintained
+`MeshQuery3DTriangleScalingBenchmarks`, with 24 warmed windows per launch and
+two launches per payload. The convex-source path improves; the unchanged
+analytic-sphere path provides an approximate timing control:
+
+| Ordinary all-hit query | Triangles | Baseline ms | Candidate ms | Change |
+| ---------------------- | --------: | ----------: | -----------: | -----: |
+| Sphere control         |       128 |       2.020 |        1.997 | -1.16% |
+| Convex mesh            |       128 |       5.518 |        5.085 | -7.84% |
+| Sphere control         |      2048 |      26.989 |       27.099 | +0.41% |
+| Convex mesh            |      2048 |      89.657 |       81.539 | -9.05% |
+
+All windows allocate 0 bytes and exact hit snapshots match. At 2,048 triangles
+the convex row still costs about 81.5 ms. This is a partial reduction of the
+shared worker cost, not closure of the signal, evidence about mixed reducers, or
+a game-capacity guarantee. Sphere contrasts change direction across orders at
+128 triangles and remain small; no sphere-path improvement is claimed. See the
+closed #026 record for source identities and comparison limits.
+
+**Next isolation:** Capture the existing collider/triangle candidate counters
+and profile ordinary query work separately from finite initial-contact recovery.
+Compare filled coplanar controls, genuine rims and false-positive candidates
+before proposing pruning or arithmetic changes. Preserve earliest distance,
+authored tie order, finite witnesses and zero warm allocation. Check the current
+math throughput owners directly before assigning the cost to an index or
+reopening the already-closed upstream signal.
 
 ### GRV-Benchmark-028 — Mixed Broad-Phase Work With An Empty Opposite Dimension
 

@@ -11,6 +11,7 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
 using SwiftCollections.Query;
+using System;
 
 namespace Gravitas.Queries;
 
@@ -297,16 +298,35 @@ public sealed class SweptSphereQueryWorker
             return false;
         }
 
-        bool found = false;
-        for (int i = 0; i < _meshTriangleBuffer.Count; i++)
+        ReadOnlySpan<int> corners = default;
+        if (admit == null && _meshTriangleBuffer.Count > 2
+            && _meshTriangleBuffer.Count == mesh.Mesh.TriangleCount && mesh.Mesh.HasSingleConvexCoplanarPatch)
         {
-            int triangleIndex = _meshTriangleBuffer[i];
-            mesh.Mesh.GetGeometryTriangleVertices(
-                triangleIndex,
-                out Vector3d first,
-                out Vector3d second,
-                out Vector3d third);
-            Vector3d normal = mesh.Mesh.GetScaledLocalFaceNormal(triangleIndex);
+            CreateSweepBounds(_start, _start, _radius, out Vector3d initialMin, out Vector3d initialMax);
+            if (!SweepBoundsUtility.OverlapsInclusive(initialMin, initialMax, mesh.Bounds.Min, mesh.Bounds.Max))
+                corners = mesh.Mesh.GetConvexCoplanarPatchCornerVertexIndices(0);
+        }
+
+        bool found = false;
+        int triangleCount = corners.IsEmpty ? _meshTriangleBuffer.Count : corners.Length - 2;
+        for (int i = 0; i < triangleCount; i++)
+        {
+            int triangleIndex = corners.IsEmpty ? _meshTriangleBuffer[i] : -1;
+            Vector3d first, second, third, normal;
+            if (corners.IsEmpty)
+            {
+                mesh.Mesh.GetGeometryTriangleVertices(triangleIndex, out first, out second, out third);
+                normal = mesh.Mesh.GetScaledLocalFaceNormal(triangleIndex);
+            }
+            else
+            {
+                // The certified corner fan covers the same finite surface; CCD keeps authored identities.
+                var vertices = mesh.Mesh.GeometryVertices;
+                first = vertices[corners[0]];
+                second = vertices[corners[i + 1]];
+                third = vertices[corners[i + 2]];
+                normal = mesh.Mesh.GetScaledLocalFaceNormal(0);
+            }
             bool triangleFound;
             Fixed64 triangleDistance;
             if (!rigid)
@@ -324,7 +344,8 @@ public sealed class SweptSphereQueryWorker
                         out triangleDistance);
                     goto SelectTriangle;
                 }
-                normal = new FixedTriangle(first, second, third).Normal;
+                normal = WideTriangleRelations.GetScaledTriangleLocalNormal(authoredTriangle, mesh.Mesh.GeometryFrame)
+                    .Transform(mesh.Mesh.GeometryFrame.GeometryBasis).GetNormal(false);
             }
             triangleFound = TrySweepTriangle(
                     first,
@@ -333,6 +354,7 @@ public sealed class SweptSphereQueryWorker
                     normal,
                     localStart,
                     localEnd,
+                    exactFaceProjection: !corners.IsEmpty,
                     out _, out triangleDistance);
         SelectTriangle:
             if (!triangleFound || triangleDistance >= impactDistance) continue;
@@ -412,6 +434,7 @@ public sealed class SweptSphereQueryWorker
         Vector3d normal,
         Vector3d start,
         Vector3d end,
+        bool exactFaceProjection,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
@@ -429,13 +452,13 @@ public sealed class SweptSphereQueryWorker
 
         bool found = false;
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleFace(triangle, normal, _radius, start, end, out Vector3d frontHit, out Fixed64 frontDistance),
+            TrySweepTriangleFace(triangle, normal, _radius, start, end, exactFaceProjection, out Vector3d frontHit, out Fixed64 frontDistance),
             frontHit,
             frontDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleFace(triangle, normal, -_radius, start, end, out Vector3d backHit, out Fixed64 backDistance),
+            TrySweepTriangleFace(triangle, normal, -_radius, start, end, exactFaceProjection, out Vector3d backHit, out Fixed64 backDistance),
             backHit,
             backDistance,
             ref sphereCenterAtImpact,
@@ -486,6 +509,7 @@ public sealed class SweptSphereQueryWorker
         Fixed64 signedRadius,
         Vector3d start,
         Vector3d end,
+        bool exactFaceProjection,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
@@ -506,7 +530,12 @@ public sealed class SweptSphereQueryWorker
 
         Vector3d center = new FixedSegment(start, end).GetPointAtDistance(distance, _length);
         Vector3d pointOnPlane = center - normal * signedRadius;
-        if (!triangle.ContainsProjection(pointOnPlane))
+        // Retriangulation must retain admitted micro faces; authored fallback keeps its original predicate.
+        bool contains = exactFaceProjection
+            ? WideTriangleRelations.ContainsProjection(triangle, Vector3d.Zero, FixedQuaternion.Identity,
+                new FixedPointAnchor(pointOnPlane, FixedQuaternion.Identity, Vector3d.Zero))
+            : triangle.ContainsProjection(pointOnPlane);
+        if (!contains)
             return false;
 
         sphereCenterAtImpact = center;

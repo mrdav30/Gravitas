@@ -211,12 +211,38 @@ that contact.
 
 An ordinary, initially separated convex-source sweep may treat a whole concave
 mesh as one support-mapped surface when its existing topology certificate proves
-a filled convex coplanar patch. This requires a finite center-chord crossing
-and all mesh triangles in the BVH candidate set. Initial contacts, declared
-surface admission, source meshes, local triangle subsets and uncertified domains
-retain triangle selection. The patch uses the authored geometry frame and finite
-boundary, with the existing query tolerances and raw-distance hit ordering;
-equivalent triangulations need not select identical physical witnesses.
+a filled convex coplanar patch. This requires a finite reference-center chord
+crossing and all mesh triangles in the BVH candidate set. Mesh sources are
+eligible, but the crossing only selects an attempt: GJK still tests their actual
+hull, without assuming its inspection center lies inside. Initial contacts,
+declared surface admission, local triangle subsets and uncertified domains retain
+triangle selection. The patch uses the authored geometry frame and finite
+boundary, with the existing query tolerances and raw-distance hit ordering.
+
+Ordinary sphere sweeps can likewise replace a whole certified convex coplanar
+patch with its finite corner fan, retaining their analytic kernels. Replacement
+fan faces accept admitted nonzero geometry without the generic triangle helper's
+squared-area epsilon; authored fallback keeps its existing predicate.
+
+An ordinary mixed circle-slab cast can use one carrier triangle when its motion
+is exactly aligned with the plane's X/Z normal and its supporting-cap center
+chord crosses the finite patch. This certifies that the first whole-plane
+contact belongs to the target. The existing analytic carrier sweep supplies the
+distance; the finite chord crossing supplies paired final rounded witnesses and
+the geometric plane normal. Cap selection uses the exact vertical sign before
+normal rounding. TOI rounding can leave a small separation at the stored time.
+Oblique, rim-only and tangential casts retain authored selection; a declined
+carrier kernel also falls through to it.
+
+Both paths retain the authored geometry frame and scale, require disjoint
+initial bounds and all triangles admitted by the BVH, and preserve candidate
+counts as admitted authored triangles. Identity-sensitive CCD/supplier admission
+retains authored triangles. Repeated identical ordered triangles may reuse the
+immediately preceding analytic result within one ordinary query; every authored index still
+participates in distance/index reduction. Equivalent triangulations and these
+patch paths need not select identical valid physical witnesses; mixed face
+normals can also differ from the legacy center-to-witness direction. Replay
+comparisons across versions must account for these result-field changes.
 
 A 2D circle sweep that starts touching or overlapping a target reports zero
 travel distance but still retains the **target's surface witness**, not the
