@@ -455,8 +455,10 @@ dotnet test Gravitas.slnx --configuration Release -p:UseLocalLsfStack=true -p:Di
 
 This mode expects the sibling LSF repositories, including Chronicler, at the
 relative locations declared in `src/Gravitas/Gravitas.csproj`. Core, tests, and
-benchmarks explicitly select source Chronicler and its Lean shim. Their local
-1.0.0 identities coordinate the existing graph; they are not release versions.
+benchmarks explicitly select source Chronicler and its Lean shim.
+`Directory.Build.props` centralizes evergreen per-library identities; Gravitas
+uses `0.0.0-grv-local-lsf`, and all local assembly/file versions are `0.0.0.0`.
+These coordinate source builds and do not change for releases.
 Tests also select the source `FixedMathSharp.FluentAssertions` helper in this
 mode. Set `$env:UseLocalLsfStack = 'true'` to carry local selection into child
 builds, including benchmark-generated projects. Package-based restore remains

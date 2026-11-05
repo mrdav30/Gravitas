@@ -38,6 +38,16 @@ dotnet tool run docfx docs/api/docfx.json --warningsAsErrors
 See [AGENTS.md](AGENTS.md) for the full architecture, determinism, testing,
 serialization, benchmark, and local LSF stack guidance.
 
+## Coordinated source identities
+
+Use `-p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true` for
+coordinated sibling builds and serialize builds with `-m:1`.
+`Directory.Build.props` owns the shared runtime version selection and local
+reference identities. Gravitas uses `0.0.0-grv-local-lsf`; siblings use their
+corresponding evergreen labels. Assembly/file versions are `0.0.0.0`, even when
+GitVersion values are present. These identities do not change for releases.
+Package mode remains the release-validation path.
+
 ## Pull Request Process
 
 1. Keep the change focused and preserve deterministic behavior, stable ordering,

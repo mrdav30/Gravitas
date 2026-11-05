@@ -110,11 +110,12 @@ compatibility guarantees.
 ## Chronicler v1.0.0
 
 Core, Lean, and shim package references now use Chronicler v1.0.0. Coordinated
-source references use `SemVer=1.0.0;AssemblySemVer=1.0.0.0` across the library,
-tests, and benchmarks. Keep sibling references aligned to prevent runtime
-assembly-load failures. After the SwiftCollections and GridForge alignments are
-committed and pushed, refresh their immutable CI pins together with
-FixedMathSharp and Chronicler. Validate both configurations against released
+source references use the evergreen identities centralized in
+`Directory.Build.props` across the library, tests, and benchmarks. Keep sibling
+references aligned to prevent runtime assembly-load failures. After the
+SwiftCollections and GridForge alignments are committed and pushed, refresh
+their immutable CI pins together with FixedMathSharp and Chronicler. Validate
+both configurations against released
 upstream packages before publishing; source-mode packages remain development
 artifacts.
 
