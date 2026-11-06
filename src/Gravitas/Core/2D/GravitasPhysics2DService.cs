@@ -23,7 +23,7 @@ public sealed partial class GravitasPhysics2DService
     private static readonly DiscreteIslandConstraint2DComparer IslandConstraintComparer = new();
 
     private readonly GravitasWorldContext _context;
-    private readonly SwiftBucket<SolidBody2D> _dynamicBodies = new();
+    private readonly SwiftSlotMap<SolidBody2D> _dynamicBodies = new();
     private readonly ColliderRegistry<LSCollider2D> _colliders = new();
     private readonly SwiftList<LSCollider2D> _serviceRefreshColliders = new();
     private readonly SwiftList<StaticSurface2D> _staticSurfaces = new();

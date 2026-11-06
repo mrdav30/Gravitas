@@ -184,14 +184,14 @@ contexts cannot reactivate their coroutine service.
 
 ## Registration Model
 
-Simulated 3D bodies are stored in a `SwiftBucket<SolidBody>`. Dynamic and
+Simulated 3D bodies are stored in a `SwiftSlotMap<SolidBody>`. Dynamic and
 kinematic roles receive a `DynamicId`, which is the ephemeral bucket index
 returned by `GravitasPhysicsService.AssimilateBody(...)`; static bodies remain
 registered through their collider but are excluded from this per-frame body
 collection. The 2D service follows the same ownership contract.
 
 3D and 2D colliders use a shared context-local registry shape: reusable
-`SwiftBucket` slots provide stable live IDs, while compact live lists provide
+`SwiftSlotMap` slots provide stable live IDs, while compact live lists provide
 cache-friendly service iteration. Collider ID `0` is valid; `-1` is the
 unregistered sentinel. Removing a collider releases its slot for reuse and
 compacts service iteration. Because IDs are context-local, two different

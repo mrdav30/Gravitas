@@ -15,14 +15,14 @@ namespace Gravitas;
 internal sealed class ColliderRegistry<TCollider>
     where TCollider : class, IPhysicsColliderRegistryItem
 {
-    private readonly SwiftBucket<TCollider> _byId;
+    private readonly SwiftSlotMap<TCollider> _byId;
     private readonly SwiftList<TCollider> _liveColliders;
     private readonly SwiftList<TCollider> _replayColliders;
     private int _nextReplayOrder;
 
-    public ColliderRegistry(int capacity = SwiftBucket<TCollider>.DefaultCapacity)
+    public ColliderRegistry(int capacity = SwiftSlotMap<TCollider>.DefaultCapacity)
     {
-        _byId = new SwiftBucket<TCollider>(capacity);
+        _byId = new SwiftSlotMap<TCollider>(capacity);
         _liveColliders = new SwiftList<TCollider>(capacity);
         _replayColliders = new SwiftList<TCollider>(capacity);
     }

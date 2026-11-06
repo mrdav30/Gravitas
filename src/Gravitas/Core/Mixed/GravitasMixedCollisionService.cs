@@ -28,7 +28,7 @@ internal sealed partial class GravitasMixedCollisionService
     private static readonly Collider3DIdComparer Collider3DIdOrderComparer = new();
 
     private readonly GravitasWorldContext _context;
-    private readonly SwiftBucket<PhysicsMixedPartition> _activePartitions = new(DefaultPartitionPoolCapacity);
+    private readonly SwiftSlotMap<PhysicsMixedPartition> _activePartitions = new(DefaultPartitionPoolCapacity);
     private readonly SwiftStack<PhysicsMixedPartition> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftStack<SwiftHashSet<int>> _inactivePartitionMembershipPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftHashSet<ulong> _processedPairKeys = new();

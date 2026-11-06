@@ -365,7 +365,7 @@ The main external packages shape how this project should be changed:
   especially `FixedBoundBox`, `FixedBoundArea`, `BoundingSphere`,
   `BoundingFrustum`, `FixedRay`, `FixedPlane`, `ContainmentType`, and
   `FixedPlaneIntersectionType`.
-- `SwiftCollections`: prefer `SwiftBucket`, `SwiftList`, `SwiftQueue`,
+- `SwiftCollections`: prefer `SwiftSlotMap`, `SwiftList`, `SwiftQueue`,
   `SwiftStack`, `SwiftHashSet`, object pools, and related low-allocation types
   in runtime or hot-path code. For broad-phase or spatial-query experiments,
   review `SwiftCollections.FixedMathSharp` first: `SwiftFixedBVH<T>`,

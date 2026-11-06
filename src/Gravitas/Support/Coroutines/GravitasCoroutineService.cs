@@ -19,7 +19,7 @@ namespace Gravitas.Support;
 public sealed class GravitasCoroutineService
 {
     private readonly GravitasWorldContext _context;
-    private readonly SwiftBucket<LSCoroutine> _coroutines = new();
+    private readonly SwiftSlotMap<LSCoroutine> _coroutines = new();
     private readonly SwiftList<LSCoroutine> _simulationSnapshot = new();
     private bool _simulating;
     private bool _resetting;
@@ -153,7 +153,7 @@ public sealed class GravitasCoroutineService
         if (!coroutine.Active)
             return;
 
-        // Clear while the final slot is still live so SwiftBucket also resets its peak/free-slot state.
+        // Clear while the final slot is still live so SwiftSlotMap also resets its peak/free-slot state.
         if (_coroutines.Count == 1)
             _coroutines.Clear();
         else
@@ -181,7 +181,7 @@ public sealed class GravitasCoroutineService
                     continue;
 
                 // End marks the handle inactive before callbacks. Retaining its slot ensures the
-                // final Clear resets SwiftBucket high-water state even if callbacks stop later handles.
+                // final Clear resets SwiftSlotMap high-water state even if callbacks stop later handles.
                 try
                 {
                     coroutine.End();

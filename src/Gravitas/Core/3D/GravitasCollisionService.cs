@@ -27,7 +27,7 @@ public sealed class GravitasCollisionService
     private static readonly PhysicsPartitionOrderComparer PartitionOrderComparer = new();
 
     private readonly GravitasWorldContext _context;
-    private readonly SwiftBucket<PhysicsPartition> _activePartitions = new();
+    private readonly SwiftSlotMap<PhysicsPartition> _activePartitions = new();
     private readonly SwiftStack<PhysicsPartition> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftList<Voxel> _coveredVoxels = new();
     private readonly SwiftHashSet<WorldVoxelIndex> _nextCoveredCoordinates = new();

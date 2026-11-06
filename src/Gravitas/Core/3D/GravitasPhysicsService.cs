@@ -27,7 +27,7 @@ public sealed partial class GravitasPhysicsService
 
     private readonly GravitasWorldContext _context;
 
-    private SwiftBucket<SolidBody> _dynamicBodies = new(DefaultBodySize);
+    private SwiftSlotMap<SolidBody> _dynamicBodies = new(DefaultBodySize);
     private readonly ColliderRegistry<LSCollider> _colliders = new(DefaultColliderSize);
     private SwiftList<LSCollider> _serviceRefreshColliders = new(DefaultColliderIdSize);
     private SwiftStack<CollisionPair> _cachedCollisionPairs = new();
