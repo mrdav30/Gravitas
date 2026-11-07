@@ -1,5 +1,5 @@
 //=======================================================================
-// ResponseBody.cs
+// ResponseBody3D.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -13,9 +13,9 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Represents a body involved in a collision response, containing necessary information for collision resolution.
 /// </summary>
-internal readonly struct ResponseBody
+internal readonly struct ResponseBody3D
 {
-    private ResponseBody(SolidBody body, Fixed64 inverseMass)
+    private ResponseBody3D(SolidBody body, Fixed64 inverseMass)
     {
         Body = body;
         InverseMass = inverseMass;
@@ -30,9 +30,9 @@ internal readonly struct ResponseBody
     public Fixed64 GetConstrainedInverseMass(Vector3d axis) =>
         Body?.GetConstrainedInverseMass(axis) ?? Fixed64.Zero;
 
-    public static ResponseBody Create(LSCollider collider)
+    public static ResponseBody3D Create(LSCollider collider)
     {
         SolidBody? body = collider.Body;
-        return body == null ? default : new ResponseBody(body, body.EffectiveInverseMass);
+        return body == null ? default : new ResponseBody3D(body, body.EffectiveInverseMass);
     }
 }

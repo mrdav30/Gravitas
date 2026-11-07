@@ -15,7 +15,7 @@ public static partial class CollisionResponse
 {
     private static bool TrySolveFrictionImpulse(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB,
         Fixed64 normalImpulseScalar,
@@ -59,7 +59,7 @@ public static partial class CollisionResponse
     }
 
     private static bool TryGetCompactFrictionResponse(
-        SolverContact contact,
+        SolverContact3D contact,
         Fixed64 normalImpulseScalar,
         out Fixed64 tangentImpulse,
         out Fixed64 secondaryTangentImpulse,
@@ -179,7 +179,7 @@ public static partial class CollisionResponse
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool TrySolveFrictionImpulseExact(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB,
         Fixed64 normalImpulseScalar,
@@ -258,7 +258,7 @@ public static partial class CollisionResponse
     }
 
     private static bool TryGetCompactTangentImpulseDelta(
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d relativeVelocity,
         Vector3d tangent,
         out Fixed64 impulseDelta)
@@ -322,7 +322,7 @@ public static partial class CollisionResponse
     }
 
     private static bool TryGetCompactConstrainedInverseMass(
-        ResponseBody body,
+        ResponseBody3D body,
         Vector3d axis,
         out Fixed64 inverseMass)
     {

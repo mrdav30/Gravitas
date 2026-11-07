@@ -803,7 +803,7 @@ public sealed class CollisionResponseExactLeverTests
             Fixed64.One,
             Fixed64.FromRaw(23),
             Fixed64.Zero).Normalized;
-        Vector3d tangent = SolverContact.CreateTangent(normal);
+        Vector3d tangent = SolverContact3D.CreateTangent(normal);
         driver.Body.Agent.Transform.LocalPosition =
             tangent * scenario.Context.DeltaTime;
         scenario.Context.AdvanceLateSimulateToken();
@@ -940,7 +940,7 @@ public sealed class CollisionResponseExactLeverTests
             (moverIsA ? contact.AnchorA : contact.AnchorB).GetLeverFrom(
                 mover.Body.GetCenterOfMassAnchor());
         Vector3d moverImpulse =
-            SolverContact.CreateTangent(contact.Normal)
+            SolverContact3D.CreateTangent(contact.Normal)
             * -Fixed64.FromFraction(1, 4);
         if (moverIsA)
             moverImpulse = -moverImpulse;
@@ -1705,7 +1705,7 @@ public sealed class CollisionResponseExactLeverTests
             scenario.CreatePair(left.Collider, right.Collider);
         Vector3d normal =
             (pair.ColliderB.Center - pair.ColliderA.Center).Normalized;
-        Vector3d tangent = SolverContact.CreateTangent(normal);
+        Vector3d tangent = SolverContact3D.CreateTangent(normal);
         pair.ColliderA.Body!.ApplyCollisionLinearVelocityDelta(tangent);
         pair.Manifold.SetContact(
             pair.ColliderA.Body.WorldCenterOfMass,
@@ -1807,7 +1807,7 @@ public sealed class CollisionResponseExactLeverTests
             scenario.CreatePair(wall.Collider, mover.Collider);
         Vector3d normal =
             (pair.ColliderB.Center - pair.ColliderA.Center).Normalized;
-        Vector3d tangent = SolverContact.CreateTangent(normal);
+        Vector3d tangent = SolverContact3D.CreateTangent(normal);
         mover.Body.ApplyCollisionLinearVelocityDelta(
             tangent * Fixed64.MaxValue);
         Vector3d velocity = mover.Body.LinearVelocity;
@@ -1859,7 +1859,7 @@ public sealed class CollisionResponseExactLeverTests
             scenario.CreatePair(wall.Collider, mover.Collider);
         Vector3d normal =
             (pair.ColliderB.Center - pair.ColliderA.Center).Normalized;
-        Vector3d tangent = SolverContact.CreateTangent(normal);
+        Vector3d tangent = SolverContact3D.CreateTangent(normal);
         mover.Body.ApplyCollisionLinearVelocityDelta(tangent);
         pair.Manifold.SetContact(
             wall.Body.WorldCenterOfMass,

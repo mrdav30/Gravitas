@@ -300,13 +300,13 @@ When changing serialized fields, defaults, or load behavior:
 
 ## Source Map
 
-| Area                            | Source                                                                                                                                                         |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3D body serialization           | [`src/Gravitas/Core/3D/SolidBody.Serialization.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/SolidBody.Serialization.cs)             |
-| 2D body serialization           | [`src/Gravitas/Core/2D/SolidBody2D.Serialization.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/SolidBody2D.Serialization.cs)         |
-| 3D collider replay/record state | [`src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs)       |
-| 2D collider replay/record state | [`src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs)   |
-| Settings saver                  | [`src/Gravitas/Settings/PhysicsSettingsSaver.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsSettingsSaver.cs)                 |
-| Replay hash service             | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Determinism/GravitasReplayHashService.cs) |
-| Serialization tests             | [`tests/Gravitas.Tests/Serialization`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Serialization)                                       |
-| Replay conformance tests        | [`tests/Gravitas.Tests/Determinism`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Determinism)                                           |
+| Area                            | Source                                                                                                                                                               |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3D body serialization           | [`src/Gravitas/Core/3D/Bodies/SolidBody.Serialization.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.Serialization.cs)     |
+| 2D body serialization           | [`src/Gravitas/Core/2D/Bodies/SolidBody2D.Serialization.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.Serialization.cs) |
+| 3D collider replay/record state | [`src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs)             |
+| 2D collider replay/record state | [`src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs)         |
+| Settings saver                  | [`src/Gravitas/Settings/PhysicsSettingsSaver.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsSettingsSaver.cs)                       |
+| Replay hash service             | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Determinism/GravitasReplayHashService.cs)       |
+| Serialization tests             | [`tests/Gravitas.Tests/Serialization`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Serialization)                                             |
+| Replay conformance tests        | [`tests/Gravitas.Tests/Determinism`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Determinism)                                                 |

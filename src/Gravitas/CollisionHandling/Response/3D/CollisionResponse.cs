@@ -52,7 +52,7 @@ public static partial class CollisionResponse
         pair.ResponseSnapshot = default;
         // Also cover callers that author the public manifold without narrow phase.
         pair.RetainWarmStarts();
-        if (TryCreateBodyPair(pair, out ResponseBody first, out ResponseBody second))
+        if (TryCreateBodyPair(pair, out ResponseBody3D first, out ResponseBody3D second))
             pair.ResponseSnapshot = new ContactResponseSnapshot(first.Body, second.Body,
                 ResolveLinearVelocity(first.Body), ResolveAngularVelocity(first.Body),
                 ResolveLinearVelocity(second.Body), ResolveAngularVelocity(second.Body));
@@ -63,7 +63,7 @@ public static partial class CollisionResponse
         bool applyCachedImpulse,
         bool applyPositionCorrection)
     {
-        if (!TryCreateBodyPair(pair, out ResponseBody bodyA, out ResponseBody bodyB))
+        if (!TryCreateBodyPair(pair, out ResponseBody3D bodyA, out ResponseBody3D bodyB))
             return;
 
         if (!pair.ResponseSnapshot.IsValid) PrepareSolve(pair);
@@ -82,7 +82,7 @@ public static partial class CollisionResponse
                 for (int point = 0; point < pair.Manifold.GetGroup(group).Count; point++)
                 {
                     if (!TryCreateContact(pair, bodyA, bodyB, responseCenterA,
-                            responseCenterB, group, point, out SolverContact contact))
+                            responseCenterB, group, point, out SolverContact3D contact))
                         continue;
                     if (applyPositionCorrection && IsCorrectionOwner(pair, contact))
                         ApplyPositionCorrection(contact, Fixed64.One);
@@ -100,7 +100,7 @@ public static partial class CollisionResponse
             for (int point = 0; point < pair.Manifold.GetGroup(group).Count; point++)
             {
                 if (!TryCreateContact(pair, bodyA, bodyB, responseCenterA,
-                        responseCenterB, group, point, out SolverContact contact))
+                        responseCenterB, group, point, out SolverContact3D contact))
                     continue;
                 ContactNormalImpulseResult3D normalResult = default;
                 bool resolved = !contact.RelativeA.IsExact && !contact.RelativeB.IsExact
@@ -131,7 +131,7 @@ public static partial class CollisionResponse
         }
     }
 
-    private static bool IsCorrectionOwner(CollisionPair pair, SolverContact contact)
+    private static bool IsCorrectionOwner(CollisionPair pair, SolverContact3D contact)
     {
         // Position correction is translational: repeated samples of the same
         // direction must not multiply it. Velocity rows keep their own levers.
@@ -152,7 +152,7 @@ public static partial class CollisionResponse
         return true;
     }
 
-    private static bool TryCreateBodyPair(CollisionPair pair, out ResponseBody bodyA, out ResponseBody bodyB)
+    private static bool TryCreateBodyPair(CollisionPair pair, out ResponseBody3D bodyA, out ResponseBody3D bodyB)
     {
         bodyA = default;
         bodyB = default;
@@ -163,20 +163,20 @@ public static partial class CollisionResponse
         if (!pair.Manifold.HasContact)
             return false;
 
-        bodyA = ResponseBody.Create(pair.ColliderA);
-        bodyB = ResponseBody.Create(pair.ColliderB);
+        bodyA = ResponseBody3D.Create(pair.ColliderA);
+        bodyB = ResponseBody3D.Create(pair.ColliderB);
         return bodyA.HasSolverMobility || bodyB.HasSolverMobility;
     }
 
     private static bool TryCreateContact(
         CollisionPair pair,
-        ResponseBody bodyA,
-        ResponseBody bodyB,
+        ResponseBody3D bodyA,
+        ResponseBody3D bodyB,
         in ContactAnchor responseCenterA,
         in ContactAnchor responseCenterB,
         int groupIndex,
         int pointIndex,
-        out SolverContact contact)
+        out SolverContact3D contact)
     {
         contact = default;
         ref ContactGroup group = ref pair.Manifold.GetGroup(groupIndex);
@@ -211,7 +211,7 @@ public static partial class CollisionResponse
             }
         }
 
-        contact = new SolverContact(
+        contact = new SolverContact3D(
             groupIndex,
             pointIndex,
             manifoldContact.ContactId,
@@ -232,7 +232,7 @@ public static partial class CollisionResponse
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool TryCalculateExactNormalResult(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB,
         Fixed64 restitutionVelocityThreshold,
@@ -265,7 +265,7 @@ public static partial class CollisionResponse
             out result, pair.ResponseSnapshot);
     }
 
-    private static void ApplyPositionCorrection(SolverContact contact, Fixed64 contactShare)
+    private static void ApplyPositionCorrection(SolverContact3D contact, Fixed64 contactShare)
     {
         Fixed64 correctionDepth = contact.Depth - PenetrationSlop;
         if (correctionDepth <= Fixed64.Zero)
@@ -302,7 +302,7 @@ public static partial class CollisionResponse
 
     private static bool TryApplyCachedImpulse(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB)
     {
@@ -328,7 +328,7 @@ public static partial class CollisionResponse
 
     private static bool TryApplyContactImpulseCombination(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB,
         Vector3d firstAxis,
@@ -371,7 +371,7 @@ public static partial class CollisionResponse
 
     private static bool TryApplyContactImpulse(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB,
         Vector3d impulse)
@@ -394,7 +394,7 @@ public static partial class CollisionResponse
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool TryApplyContactImpulseExact(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB,
         Vector3d impulse)
@@ -416,7 +416,7 @@ public static partial class CollisionResponse
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool TryApplyContactImpulseCombinationExact(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB,
         Vector3d firstAxis,
@@ -463,7 +463,7 @@ public static partial class CollisionResponse
 
     private static bool TryApplyNormalImpulse(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         ContactNormalImpulseResult3D result)
     {
         if (result.LinearVelocityDeltaA == Vector3d.Zero
@@ -523,7 +523,7 @@ public static partial class CollisionResponse
                 : body.AngularVelocity);
 
     private static bool TryApplyExactImpulse(
-        SolverContact contact,
+        SolverContact3D contact,
         in ExactLever3D exactA,
         in ExactLever3D exactB,
         Vector3d impulseB)
@@ -566,7 +566,7 @@ public static partial class CollisionResponse
     }
 
     private static bool TryApplyCompactImpulse(
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d impulseB)
     {
         Vector3d impulseA = -impulseB;
@@ -611,7 +611,7 @@ public static partial class CollisionResponse
         && value.Z != Fixed64.MinValue;
 
     private static bool TryGetLinearVelocityDelta(
-        ResponseBody body,
+        ResponseBody3D body,
         Vector3d impulse,
         out Vector3d velocityDelta)
     {
@@ -630,7 +630,7 @@ public static partial class CollisionResponse
     }
 
     private static bool TryGetAngularVelocityDelta(
-        ResponseBody body,
+        ResponseBody3D body,
         Vector3d relativeContactPoint,
         Vector3d impulse,
         out Vector3d velocityDelta)
@@ -678,7 +678,7 @@ public static partial class CollisionResponse
     }
 
     private static bool TryPrepareVelocityStates(
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d linearA,
         Vector3d angularA,
         Vector3d linearB,
@@ -705,7 +705,7 @@ public static partial class CollisionResponse
     }
 
     private static bool TryApplyVelocityDeltas(
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d linearA,
         Vector3d angularA,
         Vector3d linearB,
@@ -735,7 +735,7 @@ public static partial class CollisionResponse
     }
 
     private static void ApplyVelocityStates(
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d linearA,
         Vector3d angularA,
         Vector3d linearB,
@@ -747,7 +747,7 @@ public static partial class CollisionResponse
 
     private static void GetExactLevers(
         CollisionPair pair,
-        SolverContact contact,
+        SolverContact3D contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB,
         out ExactLever3D exactA,
@@ -766,7 +766,7 @@ public static partial class CollisionResponse
                 contact.B.Body.Rotation, contact.B.Body.LocalCenterOfMassOffset));
     }
 
-    private static void RejectResponse(CollisionPair pair, SolverContact contact)
+    private static void RejectResponse(CollisionPair pair, SolverContact3D contact)
     {
         ClearWarmStartImpulse(pair, contact);
         GravitasLogger.Channel.Error($"Contact response is outside the representable velocity domain.");
@@ -774,7 +774,7 @@ public static partial class CollisionResponse
 
     private static void ClearWarmStartImpulse(
         CollisionPair pair,
-        SolverContact contact) =>
+        SolverContact3D contact) =>
         pair.RemoveWarmStartImpulse(pair.Manifold.GetGroup(contact.GroupIndex).Key, contact.ContactId);
 
     private static bool IsWarmStartCompatible(Vector3d cachedNormal, Vector3d normal) =>

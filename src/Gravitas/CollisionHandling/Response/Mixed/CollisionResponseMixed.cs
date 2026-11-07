@@ -615,7 +615,7 @@ public static partial class CollisionResponseMixed
             body2D,
             out ExactLever3D exact3D,
             out ExactLever3D exact2D);
-        Vector3d tangent = SolverContact.CreateTangent(normal);
+        Vector3d tangent = SolverContact3D.CreateTangent(normal);
         Vector3d secondaryTangent =
             Vector3d.Cross(normal, tangent).Normalized;
         SolidBody2D? responseBody2D =

@@ -243,9 +243,9 @@ services.
 
 | Area                     | Source                                                                                                                                                                                         |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3D partition service     | [`src/Gravitas/Core/3D/GravitasCollisionService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/GravitasCollisionService.cs)                                           |
-| 2D partition service     | [`src/Gravitas/Core/2D/GravitasCollision2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/GravitasCollision2DService.cs)                                       |
+| 3D partition service     | [`src/Gravitas/Core/3D/Services/GravitasCollisionService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasCollisionService.cs)                         |
+| 2D partition service     | [`src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs)                     |
 | Mixed partition service  | [`src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs) |
 | Partition payloads       | [`src/Gravitas/Partitions`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Partitions)                                                                                             |
 | Collider partition state | [`src/Gravitas/Colliders/State`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/State)                                                                                   |
-| Local filtering          | [`src/Gravitas/CollisionHandling/ColliderCollisionFilter.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/CollisionHandling/ColliderCollisionFilter.cs)                         |
+| Local filtering          | [`src/Gravitas/CollisionHandling/Filtering/ColliderCollisionFilter.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/CollisionHandling/Filtering/ColliderCollisionFilter.cs)     |

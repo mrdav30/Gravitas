@@ -158,7 +158,7 @@ public static partial class CollisionResponseMixed
         SolidBody? first = collider3D.Body;
         // Preserve the mixed embedding contract: vertical-only contact does not couple planar friction.
         SolidBody2D? second = normal.ToVector2d() == Vector2d.Zero ? null : collider2D.Body;
-        Vector3d tangent = SolverContact.CreateTangent(normal);
+        Vector3d tangent = SolverContact3D.CreateTangent(normal);
         Vector3d secondary = Vector3d.Cross(normal, tangent).Normalized;
         ExactLever3D leverA = contact.Anchor3D.GetLeverFrom(impact.CenterA);
         ExactLever3D leverB = contact.Anchor2D.GetLeverFrom(impact.CenterB);

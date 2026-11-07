@@ -1,5 +1,5 @@
 //=======================================================================
-// SolverContact.cs
+// SolverContact3D.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -15,14 +15,14 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Solver-ready 3D contact data, including the deterministic tangent frame and cached impulses.
 /// </summary>
-internal readonly struct SolverContact
+internal readonly struct SolverContact3D
 {
-    public SolverContact(
+    public SolverContact3D(
         int groupIndex,
         int pointIndex,
         ulong contactId,
-        ResponseBody bodyA,
-        ResponseBody bodyB,
+        ResponseBody3D bodyA,
+        ResponseBody3D bodyB,
         ContactLever3D relativeA,
         ContactLever3D relativeB,
         Fixed64 depth,
@@ -61,9 +61,9 @@ internal readonly struct SolverContact
 
     public ulong ContactId { get; }
 
-    public ResponseBody A { get; }
+    public ResponseBody3D A { get; }
 
-    public ResponseBody B { get; }
+    public ResponseBody3D B { get; }
 
     public ContactLever3D RelativeA { get; }
 

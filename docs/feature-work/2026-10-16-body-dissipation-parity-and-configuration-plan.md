@@ -144,7 +144,7 @@ part of this change.
 Reuse these owners; new files are justified by responsibility or an existing
 file approaching the repository's 1,000-line warning threshold, not by phase:
 
-- `src/Gravitas/Core/{3D,2D}/SolidBody*.cs`, `.Motion.cs` and
+- `src/Gravitas/Core/{3D,2D}/Bodies/SolidBody*.cs`, `.Motion.cs` and
   `.ContinuousCollision.cs`: properties, dimensional stepping and CCD ownership.
 - Corresponding `.Serialization.cs` and `.ReplayHash.cs`: validated backing
   state, explicit defaults and authoritative settings.
