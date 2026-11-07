@@ -11,6 +11,9 @@ using SwiftCollections;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Indexes planar bounds by minimum X for CCD and projected overlap queries.
+/// </summary>
 internal sealed class DynamicCcdCandidateIndex2D
 {
     private readonly SwiftList<Entry> _entries;

@@ -7,6 +7,9 @@
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Provides the shared operations for linking and resolving colliders within a context hierarchy.
+/// </summary>
 internal interface IColliderHierarchyNode
 {
     ColliderHierarchyKey HierarchyKey { get; }

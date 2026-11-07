@@ -9,6 +9,9 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
+/// <summary>
+/// Validates body mobility values from configuration and motion updates.
+/// </summary>
 internal static class PhysicsMobilityTypeSupport
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

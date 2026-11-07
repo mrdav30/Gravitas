@@ -181,7 +181,7 @@ public sealed partial class StaticSurface2D
                     bool exposed = false;
                     for (int band = 0; band < prism.BandCount; band++)
                         foreach (var span in prism.Bands[band].Boundary.Spans)
-                            if (span.First == face && span.Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Joined) exposed = true;
+                            if (span.First == face && span.Kind != SpanKind.Joined) exposed = true;
                     if (!exposed) continue;
                     Vector2d a = prism.Offsets[face], b = prism.Offsets[(face + 1) % prism.Offsets.Length];
                     Vector2d inside = prism.Offsets[(face + 2) % prism.Offsets.Length];
@@ -277,7 +277,7 @@ public sealed partial class StaticSurface2D
             MixedBand band = prism.Bands[bandIndex];
             foreach (var span in band.Boundary.Spans)
             {
-                if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined) continue;
+                if (span.Kind == SpanKind.Joined) continue;
                 Keep(span, band.Lower, band.Upper, 0, ref selection);
             }
         }
@@ -286,11 +286,11 @@ public sealed partial class StaticSurface2D
             Fixed64 y = cap == 0 ? -member.MixedHalfThickness : member.MixedHalfThickness;
             MixedBand band = prism.Bands[cap == 0 ? 0 : prism.BandCount - 1];
             foreach (var span in band.Boundary.Spans)
-                if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+                if (span.Kind == SpanKind.Joined)
                     Keep(span, y, y, cap == 0 ? 1 : -1, ref selection);
         }
 
-        void Keep(in MeshSurfaceBoundaryDomain2D.BoundarySpan span, Fixed64 lower, Fixed64 upper, int vertical,
+        void Keep(in BoundarySpan2D span, Fixed64 lower, Fixed64 upper, int vertical,
             ref CapsulePlaneRaySelection retained)
         {
             _mixedSphereFaceFootprint = new(new(span.Start.X, Fixed64.Zero, span.Start.Y), new(span.End.X, Fixed64.Zero, span.End.Y));
@@ -395,7 +395,7 @@ public sealed partial class StaticSurface2D
                 if (wall.Signs[0] > 0) continue;
                 foreach (var span in band.Boundary.Spans)
                 {
-                    if (span.Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Joined || _mixedFan.Contains(span.OtherMember)) continue;
+                    if (span.Kind != SpanKind.Joined || _mixedFan.Contains(span.OtherMember)) continue;
                     var edge = new FixedSegment(new(span.Start.X, Fixed64.Zero, span.Start.Y), new(span.End.X, Fixed64.Zero, span.End.Y));
                     if (WideTriangleRelations.LocateFrameEdgePoint(footprint, source.NativeFootFrame, n, d,
                         edge, prism.NativeFootFrame, span.Interval) >= 0) _mixedFan.Add(span.OtherMember);

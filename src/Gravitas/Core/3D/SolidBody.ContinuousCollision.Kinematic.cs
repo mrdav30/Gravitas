@@ -14,6 +14,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+/// <content>Clips kinematic spatial motion against static geometry and transfers pushes to dynamic targets.</content>
 public partial class SolidBody
 {
     private bool TryResolveKinematicContinuousCollision(Vector3d startPosition, ref Vector3d proposedPosition)
@@ -264,7 +265,7 @@ public partial class SolidBody
             target.EnsureContinuousCollisionFramePrepared(token);
             Fixed64 targetRadius =
                 target.ResolveMixedContinuousCollisionProxyRadius();
-            ContinuousCollisionMath.IntervalSearchStatus status =
+            IntervalSearchStatus status =
                 TryGetDynamicMixed2DContinuousCollisionHit(
                     target,
                     startPosition,
@@ -275,14 +276,14 @@ public partial class SolidBody
                     Fixed64.Zero,
                     out DynamicMixedIntervalHit candidate);
             if (status
-                    == ContinuousCollisionMath.IntervalSearchStatus.CertifiedNoHit
+                    == IntervalSearchStatus.CertifiedNoHit
                 || candidate.SafeDistance > maxDistance)
             {
                 continue;
             }
 
             if (status
-                == ContinuousCollisionMath.IntervalSearchStatus.Unresolved)
+                == IntervalSearchStatus.Unresolved)
             {
                 hasUnresolvedMixedLimit = true;
                 unresolvedMixedDistance = FixedMath.Min(

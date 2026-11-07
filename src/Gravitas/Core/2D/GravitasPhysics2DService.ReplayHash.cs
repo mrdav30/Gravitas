@@ -11,6 +11,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+/// <content>Writes planar collider, body, pair, and optional solver-cache state to the replay hash.</content>
 public sealed partial class GravitasPhysics2DService
 {
     internal void ContributeReplayHash(

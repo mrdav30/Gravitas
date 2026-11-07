@@ -11,6 +11,7 @@ using Gravitas.Materials;
 
 namespace Gravitas;
 
+/// <content>Applies planar rotational contact response and stops remaining motion when required.</content>
 public partial class SolidBody2D
 {
     internal bool TryApplyRotationalContinuousCollisionResponse(

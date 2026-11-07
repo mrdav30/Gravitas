@@ -27,8 +27,8 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
             if (span.First != 0 || span.Second != 1) continue;
             Assert.Equal(new Vector2d(-2, -1), span.Start);
             Assert.Equal(new Vector2d(2, -1), span.End);
-            if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined) { joined++; Assert.Equal(1, span.OtherMember); }
-            else { exposed++; Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Exposed, span.Kind); }
+            if (span.Kind == SpanKind.Joined) { joined++; Assert.Equal(1, span.OtherMember); }
+            else { exposed++; Assert.Equal(SpanKind.Exposed, span.Kind); }
         }
         Assert.Equal(1, joined);
         Assert.Equal(2, exposed);
@@ -47,7 +47,7 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         domain.Build(new[] { source, other, extra }, 0);
         int ambiguous = 0;
         foreach (var span in domain.Spans)
-            if (span.First == 0 && span.Second == 1) { Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Ambiguous, span.Kind); ambiguous++; }
+            if (span.First == 0 && span.Second == 1) { Assert.Equal(SpanKind.Ambiguous, span.Kind); ambiguous++; }
         Assert.True(ambiguous > 0);
     }
 
@@ -62,7 +62,7 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         domain.Build(new[] { source, left, right }, 0);
         int count = 0;
         foreach (var span in domain.Spans)
-            if (span.First == 0 && span.Second == 1) { Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Joined, span.Kind); count++; }
+            if (span.First == 0 && span.Second == 1) { Assert.Equal(SpanKind.Joined, span.Kind); count++; }
         Assert.Equal(2, count);
     }
 
@@ -86,7 +86,7 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         foreach (var span in domain.Spans)
         {
             if (span.First != 0 || span.Second != 1) continue;
-            Assert.Equal(mixed && mismatch != 0 ? MeshSurfaceBoundaryDomain2D.SpanKind.Exposed : MeshSurfaceBoundaryDomain2D.SpanKind.Joined, span.Kind);
+            Assert.Equal(mixed && mismatch != 0 ? SpanKind.Exposed : SpanKind.Joined, span.Kind);
             count++;
         }
         Assert.Equal(1, count);
@@ -109,8 +109,8 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         foreach (var span in domain.Spans)
             if (span.First == 0)
             {
-                if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined) { joined++; Assert.Equal(1, span.OtherMember); }
-                else { exposed++; Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Exposed, span.Kind); }
+                if (span.Kind == SpanKind.Joined) { joined++; Assert.Equal(1, span.OtherMember); }
+                else { exposed++; Assert.Equal(SpanKind.Exposed, span.Kind); }
             }
         Assert.Equal(1, joined);
         Assert.Equal(2, exposed);
@@ -128,7 +128,7 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         domain.Build(new[] { source, other }, 0, mixed);
         int joined = 0;
         foreach (var span in domain.Spans)
-            if (span.First == 0 && span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+            if (span.First == 0 && span.Kind == SpanKind.Joined)
             {
                 joined++;
                 Assert.Equal(new Vector2d(0, 0), span.Start);
@@ -170,8 +170,8 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         foreach (var span in domain.Spans)
             if (span.First == 0)
             {
-                if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined) joined++;
-                else { exposed++; Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Exposed, span.Kind); }
+                if (span.Kind == SpanKind.Joined) joined++;
+                else { exposed++; Assert.Equal(SpanKind.Exposed, span.Kind); }
             }
         Assert.Equal(1, joined);
         Assert.Equal(2, exposed);
@@ -189,7 +189,7 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         var domain = new MeshSurfaceBoundaryDomain2D();
         domain.Build(new[] { source, corner, gap }, 0, mixed);
         Assert.Equal(4, domain.Spans.Length);
-        foreach (var span in domain.Spans) Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Exposed, span.Kind);
+        foreach (var span in domain.Spans) Assert.Equal(SpanKind.Exposed, span.Kind);
     }
 
     [Fact]
@@ -202,7 +202,7 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         domain.Build(new[] { source, other }, 0);
         domain.Build(new[] { source }, 0);
         Assert.Equal(4, domain.Spans.Length);
-        foreach (var span in domain.Spans) Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Exposed, span.Kind);
+        foreach (var span in domain.Spans) Assert.Equal(SpanKind.Exposed, span.Kind);
     }
 
     [Fact]
@@ -223,8 +223,8 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
             Assert.Equal(new Vector2d(1, -4), span.Start);
             Assert.Equal(new Vector2d(1, 4), span.End);
             Assert.Equal(-1, span.OtherMember);
-            if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Exposed) exposed++;
-            else { Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Ambiguous, span.Kind); ambiguous++; }
+            if (span.Kind == SpanKind.Exposed) exposed++;
+            else { Assert.Equal(SpanKind.Ambiguous, span.Kind); ambiguous++; }
         }
         // The diamond overlaps x=0 for z in[-2,2]. Its transient fan diagonal
         // at z=0 must not split one continuous ambiguous covered interval.
@@ -260,14 +260,14 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
             if (span.First != 0) continue;
             Assert.Equal(Vector2d.Zero, span.Start);
             Assert.Equal(new Vector2d(4, 0), span.End);
-            if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+            if (span.Kind == SpanKind.Joined)
             {
                 Assert.Equal(0, span.OtherMember);
                 joined++;
             }
             else
             {
-                Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Exposed, span.Kind);
+                Assert.Equal(SpanKind.Exposed, span.Kind);
                 exposed++;
             }
         }
@@ -301,7 +301,7 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
             if (span.First != 0) continue;
             Assert.Equal(Vector2d.Zero, span.Start);
             Assert.Equal(Rotate(new(4, 0), otherAngle), span.End);
-            if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Exposed) exposed++;
+            if (span.Kind == SpanKind.Exposed) exposed++;
             else covered++;
         }
         Assert.Equal(2, exposed);
@@ -317,11 +317,11 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
             new(Fixed64.FromRaw(2), -Fixed64.One) }, Vector2d.Zero, Fixed64.Zero);
         var domain = new MeshSurfaceBoundaryDomain2D();
         domain.Build(new LSCollider2D[] { source, crossing }, 0);
-        Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Exposed, domain.Spans[0].Kind);
+        Assert.Equal(SpanKind.Exposed, domain.Spans[0].Kind);
         Assert.Equal(0, domain.Spans[0].First);
         Assert.Equal(new Vector2d(2, 0), domain.Spans[0].End);
         Assert.Equal(Vector2d.Zero, domain.Spans[0].Start);
-        Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Ambiguous, domain.Spans[1].Kind);
+        Assert.Equal(SpanKind.Ambiguous, domain.Spans[1].Kind);
         Assert.Equal(domain.Spans[0].First, domain.Spans[1].First);
         Assert.Equal(domain.Spans[0].Start, domain.Spans[1].Start);
         Assert.Equal(domain.Spans[0].End, domain.Spans[1].End);

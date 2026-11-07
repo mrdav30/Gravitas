@@ -12,6 +12,7 @@ using SwiftCollections.Query;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>Indexes swept 3D bounds by minimum X for broad-phase CCD candidate queries.</summary>
 internal sealed class DynamicCcdCandidateIndex
 {
     private readonly SwiftList<Entry> _entries;

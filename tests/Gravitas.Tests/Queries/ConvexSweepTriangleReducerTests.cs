@@ -14,7 +14,7 @@ public sealed class ConvexSweepTriangleReducerTests
         Vector3d second = new((Fixed64)2, Fixed64.One, Fixed64.Zero);
         Vector3d third = new((Fixed64)2, -Fixed64.One, Fixed64.Zero);
 
-        ConvexSweepQueryWorker.TriangleWeights weights =
+        TriangleWeights weights =
             ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin(first, second, third);
 
         weights.A.Should().Be(Fixed64.One);
@@ -30,7 +30,7 @@ public sealed class ConvexSweepTriangleReducerTests
         Vector3d second = Vector3d.Right;
         Vector3d third = new((Fixed64)2, -Fixed64.One, Fixed64.Zero);
 
-        ConvexSweepQueryWorker.TriangleWeights weights =
+        TriangleWeights weights =
             ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin(first, second, third);
 
         weights.A.Should().Be(Fixed64.Zero);
@@ -46,7 +46,7 @@ public sealed class ConvexSweepTriangleReducerTests
         Vector3d second = new((Fixed64)2, -Fixed64.One, Fixed64.Zero);
         Vector3d third = Vector3d.Right;
 
-        ConvexSweepQueryWorker.TriangleWeights weights =
+        TriangleWeights weights =
             ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin(first, second, third);
 
         weights.A.Should().Be(Fixed64.Zero);
@@ -62,7 +62,7 @@ public sealed class ConvexSweepTriangleReducerTests
         Vector3d second = new((Fixed64)2, Fixed64.Zero, Fixed64.Zero);
         Vector3d third = new((Fixed64)4, Fixed64.Zero, Fixed64.Zero);
 
-        ConvexSweepQueryWorker.TriangleWeights weights =
+        TriangleWeights weights =
             ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin(
                 first,
                 second,
@@ -90,7 +90,7 @@ public sealed class ConvexSweepTriangleReducerTests
 
         foreach (Vector3d[] points in permutations)
         {
-            ConvexSweepQueryWorker.TriangleWeights weights =
+            TriangleWeights weights =
                 ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin(
                     points[0],
                     points[1],
@@ -113,7 +113,7 @@ public sealed class ConvexSweepTriangleReducerTests
         Vector3d second = first - new Vector3d(step, step * (Fixed64)2, step * (Fixed64)3);
         Vector3d third = first - new Vector3d(step * (Fixed64)2, step * (Fixed64)4, step * (Fixed64)6);
 
-        ConvexSweepQueryWorker.TriangleWeights weights =
+        TriangleWeights weights =
             ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin(
                 first,
                 second,
@@ -146,12 +146,12 @@ public sealed class ConvexSweepTriangleReducerTests
 
         foreach (Vector3d[] triangle in triangles)
         {
-            ConvexSweepQueryWorker.TriangleWeights first =
+            TriangleWeights first =
                 ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin(
                     triangle[0],
                     triangle[1],
                     triangle[2]);
-            ConvexSweepQueryWorker.TriangleWeights repeated =
+            TriangleWeights repeated =
                 ConvexSweepQueryWorker.ClosestPointOnTriangleToOrigin(
                     triangle[0],
                     triangle[1],
@@ -196,7 +196,7 @@ public sealed class ConvexSweepTriangleReducerTests
         Vector3d first,
         Vector3d second,
         Vector3d third,
-        ConvexSweepQueryWorker.TriangleWeights weights) =>
+        TriangleWeights weights) =>
         first * weights.A + second * weights.B + third * weights.C;
 
     private static Vector3d FromRaw(long x, long y, long z) =>

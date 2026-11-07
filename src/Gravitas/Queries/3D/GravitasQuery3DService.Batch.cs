@@ -13,9 +13,9 @@ using SwiftCollections;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns batched 3D query behavior for one <see cref="GravitasWorldContext"/>.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQuery3DService
 {
     private readonly SwiftList<Physics3DHit> _batch3DHits = new();

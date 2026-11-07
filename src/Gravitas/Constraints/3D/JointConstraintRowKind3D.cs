@@ -7,6 +7,9 @@
 
 namespace Gravitas.Constraints;
 
+/// <summary>
+/// Distinguishes linear, angular, and motor rows in the spatial joint solver.
+/// </summary>
 internal enum JointConstraintRowKind3D : byte
 {
     Linear,

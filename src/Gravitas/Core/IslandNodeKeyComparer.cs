@@ -9,6 +9,9 @@ using System.Collections.Generic;
 
 namespace Gravitas;
 
+/// <summary>
+/// Orders collision island nodes by their body keys.
+/// </summary>
 internal sealed class IslandNodeKeyComparer<TNode> : IComparer<TNode>
     where TNode : struct, IIslandNodeState
 {

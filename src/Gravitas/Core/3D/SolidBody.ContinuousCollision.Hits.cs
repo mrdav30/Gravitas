@@ -15,6 +15,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+/// <content>Selects spatial sweep hits and refines contact geometry for stationary, moving, and mixed targets.</content>
 public partial class SolidBody
 {
     private ContinuousSurfaceTriangleAdmission? _admitContinuousSurfaceTriangle;
@@ -102,7 +103,7 @@ public partial class SolidBody
                 hitMixedDistance = dynamicMixed.SafeDistance;
                 foundMixed = true;
                 hitMixedKind = dynamicMixed.Status
-                    == ContinuousCollisionMath.IntervalSearchStatus.ExactHit
+                    == IntervalSearchStatus.ExactHit
                     ? ContinuousCollisionTargetKind.Dynamic2D
                     : ContinuousCollisionTargetKind.UnresolvedMixed;
             }
@@ -857,7 +858,7 @@ public partial class SolidBody
             target.EnsureContinuousCollisionFramePrepared(token);
             Fixed64 targetRadius =
                 target.ResolveMixedContinuousCollisionProxyRadius();
-            ContinuousCollisionMath.IntervalSearchStatus status =
+            IntervalSearchStatus status =
                 TryGetDynamicMixed2DContinuousCollisionHit(
                     target,
                     startPosition,
@@ -868,7 +869,7 @@ public partial class SolidBody
                     elapsedFrameFraction,
                     out DynamicMixedIntervalHit candidate);
             if (status
-                == ContinuousCollisionMath.IntervalSearchStatus.CertifiedNoHit)
+                == IntervalSearchStatus.CertifiedNoHit)
             {
                 continue;
             }
@@ -883,7 +884,7 @@ public partial class SolidBody
         return found;
     }
 
-    private ContinuousCollisionMath.IntervalSearchStatus
+    private IntervalSearchStatus
         TryGetDynamicMixed2DContinuousCollisionHit(
         SolidBody2D target,
         Vector3d sourceStart,
@@ -1048,12 +1049,12 @@ public partial class SolidBody
                     exactSourceDistance,
                     sourceDirection);
                 hit = new DynamicMixedIntervalHit(
-                    ContinuousCollisionMath.IntervalSearchStatus.ExactHit,
+                    IntervalSearchStatus.ExactHit,
                     analyticHit,
                     analyticHit.Distance,
                     exactClosingSpeed,
                     target.Collider.Id);
-                return ContinuousCollisionMath.IntervalSearchStatus.ExactHit;
+                return IntervalSearchStatus.ExactHit;
             }
             if (!requiresRotationalFallback)
                 continue;
@@ -1121,9 +1122,9 @@ public partial class SolidBody
                     sourceLength * safeSourceTime,
                     sourceDirection)
                 : default;
-            ContinuousCollisionMath.IntervalSearchStatus status = exactHit
-                ? ContinuousCollisionMath.IntervalSearchStatus.ExactHit
-                : ContinuousCollisionMath.IntervalSearchStatus.Unresolved;
+            IntervalSearchStatus status = exactHit
+                ? IntervalSearchStatus.ExactHit
+                : IntervalSearchStatus.Unresolved;
             hit = new DynamicMixedIntervalHit(
                 status,
                 exact,
@@ -1133,7 +1134,7 @@ public partial class SolidBody
             return status;
         }
 
-        return ContinuousCollisionMath.IntervalSearchStatus.CertifiedNoHit;
+        return IntervalSearchStatus.CertifiedNoHit;
     }
 
 }

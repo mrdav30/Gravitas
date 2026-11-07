@@ -23,7 +23,7 @@ internal partial class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
     internal readonly SwiftList<MeshSurfaceBoundaryDomain> PreparedBoundaries = new();
     internal readonly MeshSurfaceBoundaryFan Fan = new();
     internal readonly SwiftDictionary<(PhysicsMesh Mesh, int Owner), int> MemberBySurface = new();
-    internal readonly SwiftList<Member> Members = new();
+    internal readonly SwiftList<Member<TFrame>> Members = new();
     internal readonly SwiftList<int> Parents = new(), Roots = new(), RegionByRoot = new(), NodeMembers = new();
     private int[] _responseComponents = Array.Empty<int>(), _responseMembers = Array.Empty<int>();
     private readonly IComparer<(LSMeshCollider Collider, int Triangle)> _memberComparer =
@@ -50,7 +50,7 @@ internal partial class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
         bool reuse = PreparedCount == Inputs.Count;
         for (int index = 0; reuse && index < Inputs.Count; index++)
         {
-            Member member = Members[index]; var input = Inputs[index];
+            Member<TFrame> member = Members[index]; var input = Inputs[index];
             reuse = member.Collider == input.Collider && member.Owner == input.Triangle
                 && member.PreparedLifetime == input.Collider.LifetimeVersion
                 && member.PreparedVersion == input.Collider.RuntimeShapeVersion;
@@ -67,8 +67,8 @@ internal partial class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
         int meshIndex = -1;
         for (int index = 0; index < Inputs.Count; index++)
         {
-            if (index == Members.Count) Members.Add(new Member());
-            Member member = Members[index];
+            if (index == Members.Count) Members.Add(new Member<TFrame>());
+            Member<TFrame> member = Members[index];
             member.Collider = Inputs[index].Collider; member.Triangle = member.Owner = Inputs[index].Triangle;
             PhysicsMesh mesh = member.Collider.Mesh;
             MemberBySurface[(mesh, member.Owner)] = index;
@@ -85,7 +85,7 @@ internal partial class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
             {
                 member.BoundaryTrusted = true;
                 foreach (var span in member.Boundary.Spans)
-                    if (span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Ambiguous) member.BoundaryTrusted = false;
+                    if (span.Kind == SpanKind.Ambiguous) member.BoundaryTrusted = false;
             }
             PreparedBoundaries.Add(member.Boundary);
             if (member.JoinedSpans.Length < member.Boundary.Spans.Length)
@@ -110,13 +110,13 @@ internal partial class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
         // A covered rim stays covered even when its owner supplies no sample.
         for (int index = 0; index < Inputs.Count; index++)
         {
-            Member member = Members[index];
+            Member<TFrame> member = Members[index];
             for (int span = 0; span < member.Boundary.Spans.Length; span++)
             {
                 var edge = member.Boundary.Spans[span];
                 // Coverage certifies this span independently. An ambiguous or
                 // folded edge elsewhere still keeps its own native perimeter.
-                member.JoinedSpans[span] = edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined
+                member.JoinedSpans[span] = edge.Kind == SpanKind.Joined
                     && MemberBySurface.TryGetValue((Meshes[edge.OtherMember], edge.OtherSurface), out int other);
                 if (!member.JoinedSpans[span]) continue;
                 int a = FindResponseComponent(index), b = FindResponseComponent(MemberBySurface[(Meshes[edge.OtherMember], edge.OtherSurface)]);
@@ -143,7 +143,7 @@ internal partial class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
 
     internal void AddRegions(int index, int count)
     {
-        Member member = Members[index]; member.Offset = Parents.Count;
+        Member<TFrame> member = Members[index]; member.Offset = Parents.Count;
         for (int region = 0; region < count; region++)
         { Parents.Add(Parents.Count); RegionByRoot.Add(-1); NodeMembers.Add(index); }
     }
@@ -172,14 +172,14 @@ internal partial class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
 
     internal void Commit()
     {
-        foreach (Member member in Members.AsReadOnlySpan()[..Inputs.Count])
+        foreach (Member<TFrame> member in Members.AsReadOnlySpan()[..Inputs.Count])
         { member.PreparedVersion = member.Collider.RuntimeShapeVersion; member.PreparedLifetime = member.Collider.LifetimeVersion; }
         PreparedCount = Inputs.Count;
     }
 
     internal ReadOnlySpan<WideAxis3> GetEndpointFan(LSMeshCollider collider, int triangle, int span, bool upper, out bool suppress)
     {
-        Member member = Members[MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
+        Member<TFrame> member = Members[MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
         bool trusted = Fan.BuildEndpoint(Meshes.AsReadOnlySpan(), member.Boundary, span, upper, PreparedBoundaries.AsReadOnlySpan());
         suppress = trusted && !Fan.HasExposedBoundary;
         // A genuine shared corner supplies one physical row in stable collider/surface order.
@@ -194,7 +194,7 @@ internal partial class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
 
     internal ReadOnlySpan<WideAxis3> GetCornerFan(LSMeshCollider collider, int triangle, int vertex, out bool suppress)
     {
-        Member member = Members[MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
+        Member<TFrame> member = Members[MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
         Vector3d point = collider.Mesh.GeometryVertices[vertex];
         bool trusted = Fan.BuildAtPoint(Meshes.AsReadOnlySpan(), member.Boundary.SourceMember, member.Owner,
             point, PreparedBoundaries.AsReadOnlySpan());

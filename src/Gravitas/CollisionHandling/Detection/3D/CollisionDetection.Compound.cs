@@ -10,6 +10,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>
+/// Dispatches compound collider part pairs and assembles contacts in owner order.
+/// </content>
 public static partial class CollisionDetection
 {
     #region Compound

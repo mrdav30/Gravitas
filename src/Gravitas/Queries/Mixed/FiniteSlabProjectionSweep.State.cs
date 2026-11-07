@@ -9,6 +9,7 @@ using FixedMathSharp;
 
 namespace Gravitas.Queries;
 
+/// <content>Defines the support and closest-simplex results used by finite slab projection sweeps.</content>
 internal static partial class FiniteSlabProjectionSweep
 {
     private readonly struct PlanarSupportPoint

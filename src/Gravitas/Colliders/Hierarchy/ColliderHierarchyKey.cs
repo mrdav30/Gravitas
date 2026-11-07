@@ -10,6 +10,9 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Identifies a collider within its dimension for hierarchy links.
+/// </summary>
 internal readonly struct ColliderHierarchyKey : IEquatable<ColliderHierarchyKey>
 {
     private const byte NoneDimension = 0;

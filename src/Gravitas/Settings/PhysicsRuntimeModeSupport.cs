@@ -9,6 +9,9 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
+/// <summary>
+/// Validates runtime modes and identifies the physics paths each mode enables.
+/// </summary>
 internal static class PhysicsRuntimeModeSupport
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

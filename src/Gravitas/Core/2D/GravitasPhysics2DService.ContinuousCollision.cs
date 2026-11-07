@@ -13,6 +13,7 @@ using SwiftCollections.Query;
 
 namespace Gravitas;
 
+/// <content>Maintains planar sweep candidates and coordinates continuous collision handoffs and iteration limits.</content>
 public sealed partial class GravitasPhysics2DService
 {
     internal void PrepareContinuousCollisionFrame()

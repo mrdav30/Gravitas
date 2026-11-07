@@ -92,12 +92,12 @@ public sealed partial class MixedQueryCcdTests
         MethodInfo method = source.GetType().GetMethod(
             methodName,
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var status = (ContinuousCollisionMath.IntervalSearchStatus)
+        var status = (IntervalSearchStatus)
             method.Invoke(source, arguments)!;
         var hit = (DynamicMixedIntervalHit)arguments[^1]!;
 
-        status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.Unresolved);
-        hit.Status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.Unresolved);
+        status.Should().Be(IntervalSearchStatus.Unresolved);
+        hit.Status.Should().Be(IntervalSearchStatus.Unresolved);
         hit.SafeDistance.Should().BeGreaterThan(Fixed64.Zero);
         hit.SafeDistance.Should().BeLessThan(sourceLength);
     }
@@ -174,12 +174,12 @@ public sealed partial class MixedQueryCcdTests
         MethodInfo method = source.GetType().GetMethod(
             methodName,
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var status = (ContinuousCollisionMath.IntervalSearchStatus)
+        var status = (IntervalSearchStatus)
             method.Invoke(source, arguments)!;
         var hit = (DynamicMixedIntervalHit)arguments[^1]!;
 
         status.Should().NotBe(
-            ContinuousCollisionMath.IntervalSearchStatus.CertifiedNoHit);
+            IntervalSearchStatus.CertifiedNoHit);
         hit.ClosingSpeed.Should().Be((Fixed64)2);
         hit.ClosingSpeed.Should().BeLessThan(sourceLength);
     }

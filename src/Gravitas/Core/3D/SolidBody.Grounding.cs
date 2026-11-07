@@ -17,6 +17,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+/// <content>Maintains spatial ground probes, platform contacts, and grounded-state transitions.</content>
 public partial class SolidBody
 {
     #region Grounding

@@ -104,7 +104,7 @@ public sealed class PreparedConvexMeshInitialContactTests
         target.Mesh.GetGeometryTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
         var triangle = new ConvexShape(target, 0, a, b, c);
         var witness = new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero);
-        var result = new ConvexSweepQueryWorker.GjkResult(false, ConvexSweepQueryWorker.ContactTolerance,
+        var result = new GjkResult(false, ConvexSweepQueryWorker.ContactTolerance,
             witness, witness, Vector3d.Right);
         var anchor = new ContactAnchor(witness);
         Vector3d normal = Vector3d.Right;
@@ -298,7 +298,7 @@ public sealed class PreparedConvexMeshInitialContactTests
             coincidentWitnesses ? new Vector3d(2, 0, 0) : a);
         var sourceWitness = coincidentWitnesses ? targetWitness
             : sourceShape.GetSupportAnchor(Vector3d.One);
-        var result = ConvexSweepQueryWorker.GjkResult.CreateIntersection(sourceWitness, targetWitness);
+        var result = GjkResult.CreateIntersection(sourceWitness, targetWitness);
         var anchor = new ContactAnchor(targetWitness);
         Vector3d normal = Vector3d.Up;
         // GJK retains the preceding simplex's witnesses when its bounded

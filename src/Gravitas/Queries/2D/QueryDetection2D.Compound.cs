@@ -10,6 +10,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.Queries;
 
+/// <content>Reduces planar raycasts and sweeps over the authored parts of compound colliders.</content>
 internal static partial class QueryDetection2D
 {
     private static bool TryRaycastCompound(

@@ -9,6 +9,7 @@ using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>Exposes the point used to reduce candidate contacts in a plane.</summary>
 internal interface IPlaneContactSample
 {
     Vector3d Point { get; }

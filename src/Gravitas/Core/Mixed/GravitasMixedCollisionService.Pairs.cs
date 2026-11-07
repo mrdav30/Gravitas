@@ -13,8 +13,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
-
-
+/// <content>Finds and maintains pairs between spatial and planar colliders and clears invalid contacts.</content>
 internal sealed partial class GravitasMixedCollisionService
 {
     internal void RemovePairsFor3DCollider(LSCollider collider)

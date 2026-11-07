@@ -13,6 +13,7 @@ using Gravitas.Queries;
 
 namespace Gravitas;
 
+/// <content>Selects spatial sweep modes and proxy radii and filters eligible continuous collision hits.</content>
 public partial class SolidBody
 {
     private bool IsEligibleDynamicContinuousCollisionTarget(SolidBody target) =>

@@ -11,12 +11,13 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Provides motion bounds, interval clipping, and search limits for continuous collision detection.
+/// </summary>
 internal static partial class ContinuousCollisionMath
 {
     public const int RotationalIntervalMaxDepth = 12;
     public const int RotationalIntervalNodeBudget = 64;
-
-
 
     // Pose reconstruction uses normalized fixed-point rotations. Cover both
     // absolute operation rounding and its radius-scaled positional effect;
@@ -26,8 +27,6 @@ internal static partial class ContinuousCollisionMath
         FixedMath.CanonicalSinCosErrorBound * 16;
     private static readonly Fixed64 ClosestFeatureRelativeUncertainty =
         Fixed64.MinIncrement * 128;
-
-
 
     public static bool TryResolveRotationalSearchLimit(
         RotationalInterval interval,

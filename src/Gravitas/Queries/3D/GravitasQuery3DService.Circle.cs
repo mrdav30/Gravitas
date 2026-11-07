@@ -16,9 +16,9 @@ using SwiftCollections;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns 3D X/Z circle overlap query behavior for one <see cref="GravitasWorldContext"/>.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQuery3DService
 {
     /// <summary>

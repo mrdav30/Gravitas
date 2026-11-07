@@ -10,6 +10,7 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Finds contacts between sphere pairs.</content>
 public static partial class CollisionDetection
 {
     #region Sphere

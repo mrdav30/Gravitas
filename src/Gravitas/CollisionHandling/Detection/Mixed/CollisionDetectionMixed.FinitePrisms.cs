@@ -12,6 +12,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Finds contacts between 3D colliders and finite extrusions of planar shapes.</content>
 public static partial class CollisionDetectionMixed
 {
     private static bool TryCuboidEmbedded2D(

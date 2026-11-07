@@ -12,6 +12,7 @@ using Gravitas.Support;
 
 namespace Gravitas.Colliders;
 
+/// <content>Records authoritative collider state and applies loaded values to the existing collider.</content>
 public abstract partial class LSCollider
 {
     /// <inheritdoc/>

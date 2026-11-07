@@ -152,7 +152,7 @@ public sealed class MeshSurfaceBoundaryFanTests
     private static int JoinedSpan(MeshSurfaceBoundaryDomain domain)
     {
         for (int span = 0; span < domain.Spans.Length; span++)
-            if (domain.Spans[span].Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined) return span;
+            if (domain.Spans[span].Kind == SpanKind.Joined) return span;
         throw new Xunit.Sdk.XunitException("Fixture has no certified join.");
     }
 

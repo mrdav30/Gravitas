@@ -13,6 +13,7 @@ using SwiftCollections.Query;
 
 namespace Gravitas;
 
+/// <content>Tracks spatial motion segments and samples the body trajectory for continuous collision detection.</content>
 public partial class SolidBody
 {
     private LSCollider? _continuousCollisionHandoffIgnoredCollider3D;

@@ -12,6 +12,7 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
+/// <content>Maintains the planar center-of-mass offset and resolves it in world space.</content>
 public sealed partial class SolidBody2D
 {
     /// <summary>

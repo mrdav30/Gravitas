@@ -268,7 +268,7 @@ public sealed class MeshAuthoredLifecycleTests
         LSMeshCollider first = Floor((Fixed64)(-4), seam), second = Floor(seam + Fixed64.MinIncrement, (Fixed64)5);
         var domain = new MeshSurfaceBoundaryDomain();
         domain.Build(new[] { first.Mesh, second.Mesh }, 0, 0);
-        foreach (var span in domain.Spans) Assert.NotEqual(MeshSurfaceBoundaryDomain.SpanKind.Joined, span.Kind);
+        foreach (var span in domain.Spans) Assert.NotEqual(SpanKind.Joined, span.Kind);
 
         LSMeshCollider Floor(Fixed64 lower, Fixed64 upper)
         {

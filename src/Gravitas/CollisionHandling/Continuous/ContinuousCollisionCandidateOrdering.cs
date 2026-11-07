@@ -12,6 +12,9 @@ using Gravitas.Queries;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Ranks CCD hits deterministically and recognizes targets excluded by body or hierarchy.
+/// </summary>
 internal static class ContinuousCollisionCandidateOrdering
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

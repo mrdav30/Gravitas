@@ -11,6 +11,7 @@ using FixedMathSharp;
 
 namespace Gravitas;
 
+/// <content>Applies planar forces, impulses, and pose changes and updates motion, mobility, and sleep state.</content>
 public sealed partial class SolidBody2D
 {
     /// <summary>

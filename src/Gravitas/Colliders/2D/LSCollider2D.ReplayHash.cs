@@ -12,6 +12,7 @@ using Gravitas.Materials;
 
 namespace Gravitas.Colliders;
 
+/// <content>Writes authoritative planar collider state and hierarchy references in replay order.</content>
 public abstract partial class LSCollider2D
 {
     internal void ContributeReplayHash(

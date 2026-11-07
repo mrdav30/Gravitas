@@ -11,14 +11,13 @@ using Gravitas.Colliders;
 
 namespace Gravitas;
 
-/// <content>Defines the nested ReplayOrderComparer type.</content>
-internal sealed partial class ColliderRegistry<TCollider>
+/// <summary>
+/// Compares registered colliders by their recorded registration order.
+/// </summary>
+internal readonly struct ReplayOrderComparer<TCollider> : IComparer<TCollider>
     where TCollider : class, IPhysicsColliderRegistryItem
 {
-    internal readonly struct ReplayOrderComparer : IComparer<TCollider>
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Compare(TCollider? x, TCollider? y) =>
-            x!.ReplayOrder.CompareTo(y!.ReplayOrder);
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public int Compare(TCollider? x, TCollider? y) =>
+        x!.ReplayOrder.CompareTo(y!.ReplayOrder);
 }

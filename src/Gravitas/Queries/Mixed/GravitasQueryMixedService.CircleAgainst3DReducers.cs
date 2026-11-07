@@ -14,9 +14,9 @@ using SwiftCollections.Query;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns mixed swept-circle reducers against 3D collider targets.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQueryMixedService
 {
     internal bool TrySweepCircleAgainst3DCollider(

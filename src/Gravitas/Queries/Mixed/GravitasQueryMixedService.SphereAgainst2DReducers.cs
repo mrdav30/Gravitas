@@ -13,9 +13,9 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns mixed swept-sphere reducers against embedded 2D collider targets.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQueryMixedService
 {
     internal static bool TryResolveExactSphereSourceFor2D(LSCollider source, LSCollider2D target,

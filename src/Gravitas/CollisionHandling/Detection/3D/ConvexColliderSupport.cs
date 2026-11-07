@@ -13,6 +13,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Produces support witnesses and tests intersections for supported convex 3D colliders.
+/// </summary>
 internal static class ConvexColliderSupport
 {
     public static FixedPointAnchor GetSupportAnchor(

@@ -152,7 +152,7 @@ public sealed class MeshRuntimeMassPropertyTests
         collider.Mesh.CalculateInertiaTensor(Fixed64.Zero).Should().Be(Fixed3x3.Zero);
         collider.Mesh.CalculateInertiaTensor(-Fixed64.One).Should()
             .Be(BoxTensor(Vector3d.One, -Fixed64.One.m_rawValue, false, Vector3d.Zero, Vector3d.Zero));
-        Action invalidPolicy = () => collider.Mesh.CalculateInertiaTensor(Fixed64.Zero, (MeshInertiaPolicy)(-1));
+        Action invalidPolicy = () => collider.Mesh.CalculateInertiaTensor(Fixed64.Zero, (MeshInertiaPolicy)(255));
         invalidPolicy.Should().Throw<ArgumentOutOfRangeException>();
         PhysicsMesh open = MeshTestFixtures.CreateConvexQuadFloor().Mesh;
         Action invalidVolume = () => open.CalculateInertiaTensor(Fixed64.Zero);

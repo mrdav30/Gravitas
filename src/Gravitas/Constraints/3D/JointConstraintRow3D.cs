@@ -11,6 +11,9 @@ namespace Gravitas.Constraints;
 
 
 
+/// <summary>
+/// Stores a spatial joint row with its anchors, impulse limits, and warm-start state.
+/// </summary>
 internal struct JointConstraintRow3D
 {
     public JointConstraintRow3D(

@@ -10,6 +10,9 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
+/// <summary>
+/// Identifies a spatial collision pair lifetime and checks that both collider lifetimes still match.
+/// </summary>
 internal readonly struct CollisionPairLifetimeToken
 {
     internal CollisionPairLifetimeToken(CollisionPair pair)

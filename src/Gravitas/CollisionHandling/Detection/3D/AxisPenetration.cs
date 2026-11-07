@@ -9,6 +9,9 @@ using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Carries a penetration axis and depth, including whether the depth was clamped.
+/// </summary>
 internal readonly struct AxisPenetration
 {
     public AxisPenetration(Vector3d axis, Fixed64 depth, bool depthIsClamped = false)

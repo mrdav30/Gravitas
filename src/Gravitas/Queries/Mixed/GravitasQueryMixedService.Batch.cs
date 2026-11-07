@@ -12,9 +12,9 @@ using SwiftCollections;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns batched mixed 3D/2D query behavior for one <see cref="GravitasWorldContext"/>.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQueryMixedService
 {
     private readonly SwiftList<PhysicsMixedHit> _batchMixedHits = new();

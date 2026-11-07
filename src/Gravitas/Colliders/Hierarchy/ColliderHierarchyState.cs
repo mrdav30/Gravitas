@@ -10,6 +10,9 @@ using SwiftCollections;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Stores parent and child relationships used to filter collisions within a collider hierarchy.
+/// </summary>
 internal struct ColliderHierarchyState
 {
     private bool _configuredAsParent;

@@ -11,6 +11,9 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+/// <summary>
+/// Tracks live colliders by ID and prepares them in registration order for replay.
+/// </summary>
 internal sealed partial class ColliderRegistry<TCollider>
     where TCollider : class, IPhysicsColliderRegistryItem
 {
@@ -105,7 +108,7 @@ internal sealed partial class ColliderRegistry<TCollider>
         for (int i = 0; i < _liveColliders.Count; i++)
             _replayColliders.Add(_liveColliders[i]);
 
-        _replayColliders.SortInPlace(default(ReplayOrderComparer));
+        _replayColliders.SortInPlace(default(ReplayOrderComparer<TCollider>));
         for (int i = 0; i < _replayColliders.Count; i++)
             _replayColliders[i].SetRegistryReplayOrdinal(i);
 

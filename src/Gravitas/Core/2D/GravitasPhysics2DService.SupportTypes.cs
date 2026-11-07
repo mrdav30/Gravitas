@@ -13,6 +13,7 @@ using Gravitas.Support;
 
 namespace Gravitas;
 
+/// <content>Provides planar pair ordering, body mobility checks, and response-island records and comparers.</content>
 public sealed partial class GravitasPhysics2DService
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -10,6 +10,9 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+/// <summary>
+/// Builds and resolves collision island membership in deterministic body-key order.
+/// </summary>
 internal static class IslandGraphUtility
 {
     public static void SortAndDeduplicate<TNode>(SwiftList<TNode> nodes, IComparer<TNode> comparer)

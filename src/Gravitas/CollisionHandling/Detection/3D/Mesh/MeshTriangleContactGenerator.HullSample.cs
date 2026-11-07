@@ -13,6 +13,9 @@ namespace Gravitas.CollisionHandling;
 /// <content>Defines the nested HullSample type.</content>
 internal static partial class MeshTriangleContactGenerator
 {
+    /// <summary>
+    /// Pairs convex hull contact anchors with the local point used for planar reduction.
+    /// </summary>
     internal readonly struct HullSample : IPlaneContactSample
     {
         internal HullSample(FixedContactAnchors contact) => Contact = contact;

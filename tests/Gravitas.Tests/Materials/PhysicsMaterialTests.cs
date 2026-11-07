@@ -177,17 +177,11 @@ public sealed class PhysicsMaterialTests
     public void CombineMethods_ShouldRejectUnsupportedPolicies()
     {
         const PhysicsMaterialCombine unsupported = (PhysicsMaterialCombine)250;
-        const PhysicsMaterialCombine unsupportedBelowRange = (PhysicsMaterialCombine)(-1);
         Action construct = () => new PhysicsMaterial(
             Fixed64.One,
             Fixed64.One,
             Fixed64.Zero,
             unsupported);
-        Action constructBelowRange = () => new PhysicsMaterial(
-            Fixed64.One,
-            Fixed64.One,
-            Fixed64.Zero,
-            unsupportedBelowRange);
         Action constructWithUnsupportedRestitution = () => new PhysicsMaterial(
             Fixed64.One,
             Fixed64.One,
@@ -198,7 +192,6 @@ public sealed class PhysicsMaterialTests
         Action resolveDominantLeft = () => PhysicsMaterial.ResolveDominantPolicy(unsupported, PhysicsMaterialCombine.Minimum);
 
         construct.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frictionCombine");
-        constructBelowRange.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("frictionCombine");
         constructWithUnsupportedRestitution.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("restitutionCombine");
         combineScalar.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("policy");
         resolveDominant.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("right");

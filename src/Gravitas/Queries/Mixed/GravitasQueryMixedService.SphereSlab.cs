@@ -11,9 +11,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns mixed swept-sphere slab and prism helper reducers.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQueryMixedService
 {
     /// <summary>

@@ -597,11 +597,14 @@ Observed project conventions:
 
 Contributor expectations:
 
-- Add or improve XML `<summary>` tags for public and externally meaningful
-  internal APIs when touching them.
-- Put the type-level XML `<summary>` on the main declaration file. Secondary
-  partial declaration files use `<content>` to describe that file's
-  responsibility; do not repeat a `<summary>` that the SDK will ignore.
+- Give each file-level type or delegate in `src` an XML `<summary>` on its
+  primary declaration, including internal types. Also document public nested
+  types and nested types declared in their own companion files.
+- Give each secondary partial declaration a `<content>` tag that describes
+  the responsibility of that file. Keep the type summary on the primary
+  declaration.
+- Add or improve XML documentation for public and externally meaningful
+  internal members when touching them.
 - Add brief comments only where logic, invariants, or edge conditions are hard
   to infer from the code alone.
 - Preserve ASCII unless the file already requires otherwise.

@@ -11,6 +11,7 @@ using FixedMathSharp;
 
 namespace Gravitas;
 
+/// <content>Projects spatial motion, applies forces and impulses, and updates the body pose and sleep state.</content>
 public partial class SolidBody
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

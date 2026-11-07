@@ -11,6 +11,9 @@ using FixedMathSharp;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Captures the 3D pose and shape inputs used to track changes to committed geometry.
+/// </summary>
 internal readonly struct ColliderShapeSnapshot : IEquatable<ColliderShapeSnapshot>
 {
     public ColliderShapeSnapshot(

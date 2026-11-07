@@ -7,6 +7,9 @@
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Selects immediate 3D pair response or queues the pair for the discrete solver.
+/// </summary>
 internal enum CollisionResponseDispatchMode : byte
 {
     Immediate,

@@ -10,6 +10,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.Queries;
 
+/// <summary>
+/// Selects the reported sweep normal from available contact evidence and orients it against travel.
+/// </summary>
 internal static class ConvexSweepHitPolicy
 {
     internal static Vector3d ResolveHitNormal(

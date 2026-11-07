@@ -11,6 +11,9 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+/// <summary>
+/// Tracks retained partitions and releases empty payloads through expiry, reuse, or context teardown.
+/// </summary>
 internal static class RetainedPartitionLifecycle
 {
     internal static void DetachAll<TPartition, TOwner>(

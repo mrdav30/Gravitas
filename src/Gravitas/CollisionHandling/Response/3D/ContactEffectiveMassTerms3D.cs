@@ -9,6 +9,9 @@ using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Stores each body's linear and angular contributions to 3D contact effective mass.
+/// </summary>
 internal readonly struct ContactEffectiveMassTerms3D
 {
     internal ContactEffectiveMassTerms3D(

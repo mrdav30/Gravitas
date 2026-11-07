@@ -11,6 +11,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>
+/// Resolves embedded planar poses, axes, and fallback normals for mixed collision detection.
+/// </content>
 public static partial class CollisionDetectionMixed
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

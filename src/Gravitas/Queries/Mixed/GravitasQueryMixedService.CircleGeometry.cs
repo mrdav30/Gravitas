@@ -11,9 +11,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns shared projected-circle sweep geometry helpers for mixed query reducers.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQueryMixedService
 {
     internal static bool TrySweepCircleAgainstSphere(

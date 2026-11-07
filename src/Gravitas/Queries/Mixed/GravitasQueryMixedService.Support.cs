@@ -13,9 +13,9 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns mixed query hit construction, eligibility, bounds, and shared support helpers.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQueryMixedService
 {
     private static PhysicsMixedHit BuildSphereAgainst2DHit(

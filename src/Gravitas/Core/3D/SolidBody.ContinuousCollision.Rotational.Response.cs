@@ -11,6 +11,7 @@ using Gravitas.Materials;
 
 namespace Gravitas;
 
+/// <content>Calculates and applies spatial rotational contact impulses and handles remaining motion.</content>
 public partial class SolidBody
 {
     internal bool TryApplyRotationalContinuousCollisionResponse(

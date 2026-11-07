@@ -13,6 +13,7 @@ using Gravitas.Materials;
 
 namespace Gravitas;
 
+/// <content>Resolves dynamic spatial sweeps and applies spatial and mixed collision handoffs.</content>
 public partial class SolidBody
 {
     internal bool ApplyContinuousCollisionHandoff(

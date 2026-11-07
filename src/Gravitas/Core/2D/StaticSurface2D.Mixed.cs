@@ -180,7 +180,7 @@ public sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
         for (int member = 0; member < _mixedLocal.Count; member++)
             for (int band = 0; band < _mixedPrisms[member].BandCount; band++)
                 foreach (var span in _mixedPrisms[member].Bands[band].Boundary.Spans)
-                    if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+                    if (span.Kind == SpanKind.Joined)
                     {
                         _mixedPrisms[member].Joined = true;
                         int from = _mixedComponents[span.OtherMember], to = _mixedComponents[member];
@@ -493,7 +493,7 @@ public sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
                     foreach (var span in band.Boundary.Spans)
                     {
                         if (span.First != face - 2) continue;
-                        if (span.Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+                        if (span.Kind != SpanKind.Joined)
                             emitted += VisitMixedSide(frame, span, band.Lower, band.Upper, penetration, admissionOnly, bandIndex);
                         if (admissionOnly && emitted > 0) return emitted;
                     }
@@ -514,7 +514,7 @@ public sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
         return emitted;
     }
 
-    private int VisitMixedSide<TFrame>(in TFrame frame, in MeshSurfaceBoundaryDomain2D.BoundarySpan span,
+    private int VisitMixedSide<TFrame>(in TFrame frame, in BoundarySpan2D span,
         Fixed64 lower, Fixed64 upper, in WideScaledHullPenetration penetration, bool admissionOnly, int band)
         where TFrame : struct, IForwardHullFrame3d
     {
@@ -647,7 +647,7 @@ public sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
                 if (!MixedHeightContains(a.Y, b.Y, n, d, delta + band.Lower, delta + band.Upper)) continue;
                 foreach (var span in band.Boundary.Spans)
                 {
-                    if (span.Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Joined || _mixedFan.Contains(span.OtherMember)) continue;
+                    if (span.Kind != SpanKind.Joined || _mixedFan.Contains(span.OtherMember)) continue;
                     FixedSegment edge = new(new(span.Start.X, Fixed64.Zero, span.Start.Y), new(span.End.X, Fixed64.Zero, span.End.Y));
                     int location = _mixedQuaternion
                         ? WideTriangleRelations.LocateFrameEdgePoint(footprint, source.FootFrame, n, d, edge, prism.FootFrame, span.Interval)

@@ -10,6 +10,9 @@ using FixedMathSharp.Chronicler;
 
 namespace Gravitas;
 
+/// <summary>
+/// Computes a context replay hash from ordered authoritative state and the selected solver-cache data.
+/// </summary>
 internal static class GravitasReplayHashService
 {
     public static ChronicleHash Compute(

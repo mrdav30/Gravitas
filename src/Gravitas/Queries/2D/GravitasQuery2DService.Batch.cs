@@ -12,9 +12,9 @@ using SwiftCollections;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns batched pure 2D query behavior for one <see cref="GravitasWorldContext"/>.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQuery2DService
 {
     private readonly SwiftList<Physics2DHit> _batch2DHits = new();

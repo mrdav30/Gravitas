@@ -12,6 +12,10 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Updates the GJK simplex and search direction, using exact predicates
+/// when fixed-point products are unsafe.
+/// </summary>
 internal static class GjkSimplexPolicy
 {
     // Each vertex component <= 256 in magnitude bounds cubic crosses by 536,870,912; side dots stay exact.

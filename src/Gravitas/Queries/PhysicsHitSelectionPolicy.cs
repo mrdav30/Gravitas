@@ -10,6 +10,9 @@ using FixedMathSharp;
 
 namespace Gravitas.Queries;
 
+/// <summary>
+/// Selects the best accepted hit using the ordering rules for each query dimension.
+/// </summary>
 internal static class PhysicsHitSelectionPolicy
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

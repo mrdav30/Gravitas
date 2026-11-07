@@ -13,9 +13,9 @@ using SwiftCollections;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns pure 2D overlap query behavior for one <see cref="GravitasWorldContext"/>.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQuery2DService
 {
     /// <summary>

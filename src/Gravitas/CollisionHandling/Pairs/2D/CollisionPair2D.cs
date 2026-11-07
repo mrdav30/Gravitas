@@ -19,7 +19,7 @@ internal sealed partial class CollisionPair2D
 {
     private bool _isColliding;
     private ContactWarmStartCache2D _warmStart;
-    internal CollisionResponse2D.GroupedSolveState? ResponseState;
+    internal GroupedSolveState? ResponseState;
     private bool _notificationInProgress;
     private bool _separationPending;
     private bool _colliderANotified;

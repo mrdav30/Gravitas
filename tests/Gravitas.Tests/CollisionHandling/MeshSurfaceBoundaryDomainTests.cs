@@ -22,7 +22,7 @@ public sealed class MeshSurfaceBoundaryDomainTests
             if (span.First != 0 || span.Second != 1) continue;
             Assert.Equal(source.GeometryVertices[0], span.Start);
             Assert.Equal(source.GeometryVertices[1], span.End);
-            if (span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined)
+            if (span.Kind == SpanKind.Joined)
             {
                 Assert.Equal(1, span.OtherMember);
                 Assert.Equal(0, span.OtherSurface);
@@ -50,7 +50,7 @@ public sealed class MeshSurfaceBoundaryDomainTests
         foreach (var span in domain.Spans)
         {
             if (span.First != 0 || span.Second != 1) continue;
-            Assert.Equal(MeshSurfaceBoundaryDomain.SpanKind.Ambiguous, span.Kind);
+            Assert.Equal(SpanKind.Ambiguous, span.Kind);
             covered++;
         }
         Assert.True(covered > 0);
@@ -70,11 +70,11 @@ public sealed class MeshSurfaceBoundaryDomainTests
         foreach (var span in domain.Spans)
         {
             if (span.First != 0 || span.Second != 1) continue;
-            if (span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Ambiguous) ambiguous++;
+            if (span.Kind == SpanKind.Ambiguous) ambiguous++;
             else
             {
-                Assert.Equal(thirdSheet ? MeshSurfaceBoundaryDomain.SpanKind.Joined
-                    : MeshSurfaceBoundaryDomain.SpanKind.Exposed, span.Kind);
+                Assert.Equal(thirdSheet ? SpanKind.Joined
+                    : SpanKind.Exposed, span.Kind);
                 outside++;
             }
         }
@@ -96,7 +96,7 @@ public sealed class MeshSurfaceBoundaryDomainTests
         var domain = new MeshSurfaceBoundaryDomain();
         domain.Build(new[] { source, other }, 0, 0);
         Assert.Equal(3, domain.Spans.Length);
-        foreach (var span in domain.Spans) Assert.Equal(MeshSurfaceBoundaryDomain.SpanKind.Exposed, span.Kind);
+        foreach (var span in domain.Spans) Assert.Equal(SpanKind.Exposed, span.Kind);
     }
 
     [Theory]
@@ -126,8 +126,8 @@ public sealed class MeshSurfaceBoundaryDomainTests
         int joined = 0;
         foreach (var span in domain.Spans)
         {
-            Assert.NotEqual(MeshSurfaceBoundaryDomain.SpanKind.Ambiguous, span.Kind);
-            if (span.Kind != MeshSurfaceBoundaryDomain.SpanKind.Joined) continue;
+            Assert.NotEqual(SpanKind.Ambiguous, span.Kind);
+            if (span.Kind != SpanKind.Joined) continue;
             Assert.Equal(1, span.OtherMember);
             joined++;
         }
@@ -152,8 +152,8 @@ public sealed class MeshSurfaceBoundaryDomainTests
         foreach (var span in domain.Spans)
         {
             if (span.Start.Z != (Fixed64)(-1) || span.End.Z != (Fixed64)(-1)) continue;
-            Assert.Equal(opposite ? MeshSurfaceBoundaryDomain.SpanKind.Joined
-                : MeshSurfaceBoundaryDomain.SpanKind.Ambiguous, span.Kind);
+            Assert.Equal(opposite ? SpanKind.Joined
+                : SpanKind.Ambiguous, span.Kind);
             shared++;
         }
         Assert.Equal(1, shared);
@@ -174,7 +174,7 @@ public sealed class MeshSurfaceBoundaryDomainTests
         Assert.Equal(3, domain.Spans.Length);
         foreach (var span in domain.Spans)
         {
-            Assert.Equal(MeshSurfaceBoundaryDomain.SpanKind.Exposed, span.Kind);
+            Assert.Equal(SpanKind.Exposed, span.Kind);
             Assert.Equal(-1, span.OtherMember);
             Assert.Equal(-1, span.OtherSurface);
         }
@@ -195,8 +195,8 @@ public sealed class MeshSurfaceBoundaryDomainTests
         int ambiguous = 0;
         foreach (var span in domain.Spans)
         {
-            Assert.NotEqual(MeshSurfaceBoundaryDomain.SpanKind.Joined, span.Kind);
-            if (span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Ambiguous) ambiguous++;
+            Assert.NotEqual(SpanKind.Joined, span.Kind);
+            if (span.Kind == SpanKind.Ambiguous) ambiguous++;
         }
         Assert.Equal(2, ambiguous);
     }
@@ -229,8 +229,8 @@ public sealed class MeshSurfaceBoundaryDomainTests
         int joined = 0;
         foreach (var span in domain.Spans)
         {
-            Assert.NotEqual(MeshSurfaceBoundaryDomain.SpanKind.Ambiguous, span.Kind);
-            if (span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined) joined++;
+            Assert.NotEqual(SpanKind.Ambiguous, span.Kind);
+            if (span.Kind == SpanKind.Joined) joined++;
         }
         Assert.Equal(variant == 0 ? 1 : 2, joined);
     }

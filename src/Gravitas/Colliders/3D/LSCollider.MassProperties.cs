@@ -10,6 +10,7 @@ using FixedMathSharp;
 
 namespace Gravitas.Colliders;
 
+/// <content>Derives frontal area, center of mass, and inertia inputs from collider geometry.</content>
 public abstract partial class LSCollider
 {
     /// <summary>Gets the frontal-area estimate for a world-space direction; the base implementation returns <see cref="Area"/>.</summary>

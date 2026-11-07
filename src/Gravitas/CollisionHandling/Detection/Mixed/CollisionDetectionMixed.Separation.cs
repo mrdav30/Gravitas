@@ -12,6 +12,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>
+/// Computes separation gaps for supported mixed pairs during rotational CCD searches.
+/// </content>
 public static partial class CollisionDetectionMixed
 {
     internal static bool TryGetRotationalSeparationGap(

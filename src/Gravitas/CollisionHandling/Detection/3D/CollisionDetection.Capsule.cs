@@ -11,6 +11,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Finds contacts for capsule pairs and capsule-sphere pairs.</content>
 public static partial class CollisionDetection
 {
     #region Capsule

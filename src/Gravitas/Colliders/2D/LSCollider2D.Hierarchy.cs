@@ -9,6 +9,7 @@ using SwiftCollections;
 
 namespace Gravitas.Colliders;
 
+/// <content>Manages planar collider parent and child links used for hierarchy filtering.</content>
 public abstract partial class LSCollider2D
 {
     private void ClearChildParentReferences()

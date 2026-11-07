@@ -12,6 +12,7 @@ using Gravitas.Materials;
 
 namespace Gravitas;
 
+/// <content>Hashes 2D pair state, retained contact groups, and warm-start impulses.</content>
 internal sealed partial class CollisionPair2D
 {
     internal void ContributeReplayHash(

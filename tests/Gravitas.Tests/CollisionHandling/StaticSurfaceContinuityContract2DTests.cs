@@ -362,7 +362,7 @@ public sealed class StaticSurfaceContinuityContract2DTests
         domain.Build(members, 4);
         Assert.Equal(4, domain.Spans.Length);
         foreach (var span in domain.Spans)
-            Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Joined, span.Kind);
+            Assert.Equal(SpanKind.Joined, span.Kind);
 
         var hits = new SwiftList<Physics2DHit>();
         Assert.Equal(1, scene.Context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.Half, hits));

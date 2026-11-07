@@ -7,6 +7,9 @@
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Captures a planar collider registration lifetime so retained work can reject stale bindings.
+/// </summary>
 internal readonly struct ColliderLifetimeToken2D
 {
     internal ColliderLifetimeToken2D(LSCollider2D collider)

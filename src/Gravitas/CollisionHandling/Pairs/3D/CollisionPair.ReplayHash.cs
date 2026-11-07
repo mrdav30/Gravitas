@@ -11,6 +11,7 @@ using Gravitas.Materials;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Hashes 3D pair state, retained contacts, and warm-start impulses.</content>
 public partial class CollisionPair
 {
     internal void ContributeReplayHash(

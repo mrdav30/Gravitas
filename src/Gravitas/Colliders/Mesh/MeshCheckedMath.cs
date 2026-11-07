@@ -9,6 +9,9 @@ using FixedMathSharp;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Provides checked fixed-point arithmetic for mesh mass properties and inertia shifts.
+/// </summary>
 internal static class MeshCheckedMath
 {
     internal static bool TryCreateParallelAxisTensor(Vector3d offset, out Fixed3x3 tensor)

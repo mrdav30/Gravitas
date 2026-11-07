@@ -22,7 +22,7 @@ public sealed partial class StaticSurface2D
     private readonly SwiftList<MixedGroup> _mixedRegionResponses = new();
     private readonly MixedRegionSupport _mixedRegionSupport = new();
 
-    private void AddMixedRegion(int member, int face, in MeshSurfaceBoundaryDomain2D.BoundarySpan span,
+    private void AddMixedRegion(int member, int face, in BoundarySpan2D span,
         Fixed64 lower, Fixed64 upper, int firstSample, int band = -1, int edgeStart = -1, int edgeEnd = -1,
         RationalSegmentInterval edgeInterval = default)
     {
@@ -271,7 +271,7 @@ public sealed partial class StaticSurface2D
             if (lower > upper) return false;
             bool joined = false;
             foreach (var span in MixedRegionBoundary(a).Spans)
-                joined |= span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined && span.OtherMember == b.Member;
+                joined |= span.Kind == SpanKind.Joined && span.OtherMember == b.Member;
             if (!joined) return false;
         }
         else { lower = FixedMath.Max(lower, b.Lower); upper = FixedMath.Min(upper, b.Upper); }
@@ -279,7 +279,7 @@ public sealed partial class StaticSurface2D
         if (a.Face < 2)
         {
             foreach (var span in MixedRegionBoundary(a).Spans)
-                if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined && span.OtherMember == b.Member)
+                if (span.Kind == SpanKind.Joined && span.OtherMember == b.Member)
                 {
                     var segment = new FixedSegment(new(span.Start.X, lower, span.Start.Y), new(span.End.X, lower, span.End.Y));
                     MixedPrism prism = _mixedPrisms[a.Member];
@@ -370,7 +370,7 @@ public sealed partial class StaticSurface2D
 
     private bool IntersectsMixedRegionSegment(int member, in FixedSegment segment,
         in RationalSegmentInterval clip, int group, int other = -1,
-        MeshSurfaceBoundaryDomain2D.BoundarySpan otherSpan = default)
+        BoundarySpan2D otherSpan = default)
     {
         _mixedRegionSupport.Owner = this; _mixedRegionSupport.Member = member; _mixedRegionSupport.Other = other;
         _mixedRegionSupport.Segment = segment; _mixedRegionSupport.OtherSpan = otherSpan; _mixedRegionSupport.Intervals[0] = clip;
@@ -392,9 +392,9 @@ public sealed partial class StaticSurface2D
     {
         internal readonly int Group, Member, Face, Band, EdgeStart, EdgeEnd;
         internal readonly RationalSegmentInterval EdgeInterval;
-        internal readonly MeshSurfaceBoundaryDomain2D.BoundarySpan Span;
+        internal readonly BoundarySpan2D Span;
         internal readonly Fixed64 Lower, Upper;
-        internal MixedRegion(int group, int member, int face, int band, in MeshSurfaceBoundaryDomain2D.BoundarySpan span,
+        internal MixedRegion(int group, int member, int face, int band, in BoundarySpan2D span,
             Fixed64 lower, Fixed64 upper, int edgeStart, int edgeEnd, in RationalSegmentInterval edgeInterval)
         {
             Group = group; Member = member; Face = face; Band = band; Span = span; Lower = lower; Upper = upper;
@@ -407,7 +407,7 @@ public sealed partial class StaticSurface2D
         internal StaticSurface2D? Owner;
         internal int Member, Other;
         internal FixedSegment Segment;
-        internal MeshSurfaceBoundaryDomain2D.BoundarySpan OtherSpan;
+        internal BoundarySpan2D OtherSpan;
         internal readonly RationalSegmentInterval[] Intervals = new RationalSegmentInterval[1];
         public ReadOnlySpan<RationalSegmentInterval> GetEdgeIntervals(bool first, int start, int end, in WideDirection3d normal)
             => first ? MixedFullInterval : Intervals;

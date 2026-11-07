@@ -7,6 +7,9 @@
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Distinguishes valid scaled mass properties from unrepresentable volume or inertia data.
+/// </summary>
 internal enum MeshMassScaleResult : byte
 {
     Valid,

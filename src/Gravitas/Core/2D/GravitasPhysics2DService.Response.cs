@@ -10,6 +10,7 @@ using Gravitas.Constraints;
 
 namespace Gravitas;
 
+/// <content>Groups planar contacts and joints into islands and solves each island in deterministic order.</content>
 public sealed partial class GravitasPhysics2DService
 {
     private void SolveDiscreteResponsePairs()

@@ -7,6 +7,7 @@
 
 namespace Gravitas.Colliders;
 
+/// <content>Dispatches planar and mixed contact notifications to collider subscribers.</content>
 public abstract partial class LSCollider2D
 {
     internal void NotifyContact(LSCollider2D other, bool isColliding, bool isChanged) =>

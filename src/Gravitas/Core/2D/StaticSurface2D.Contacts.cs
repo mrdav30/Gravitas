@@ -101,7 +101,7 @@ public sealed partial class StaticSurface2D
         for (int i = 0; i < _local.Count; i++) _components.Add(i);
         for (int i = 0; i < _local.Count; i++)
             foreach (var span in _domains[i].Spans)
-                if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+                if (span.Kind == SpanKind.Joined)
                 {
                     int from = _components[span.OtherMember], to = _components[i];
                     for (int j = 0; j < _components.Count; j++) if (_components[j] == from) _components[j] = to;
@@ -117,10 +117,10 @@ public sealed partial class StaticSurface2D
         {
             LSCollider2D supplier = _local[member];
             if (_carrier == null && (supplier == knownOverlap || CollisionDetection2D.HasSurfaceOverlap(mover, supplier))) _carrier = supplier;
-            ReadOnlySpan<MeshSurfaceBoundaryDomain2D.BoundarySpan> spans = _domains[member].Spans;
+            ReadOnlySpan<BoundarySpan2D> spans = _domains[member].Spans;
             for (int s = 0; s < spans.Length; s++)
             {
-                if (spans[s].Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined) continue;
+                if (spans[s].Kind == SpanKind.Joined) continue;
                 int count = FaceContacts(mover, member, s, rows);
                 if (count == 0) continue;
                 _admitted.Add((member, s));
@@ -135,7 +135,7 @@ public sealed partial class StaticSurface2D
                 for (int s = 0; s < _domains[member].Spans.Length; s++)
                 {
                     var face = _domains[member].Spans[s];
-                    if (face.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined || _admitted.Contains((member, s)) || !PlaneAdmitted(member, s)) continue;
+                    if (face.Kind == SpanKind.Joined || _admitted.Contains((member, s)) || !PlaneAdmitted(member, s)) continue;
                     _admitted.Add((member, s));
                     int count = FaceContacts(mover, member, s, rows, planeAdmitted: true);
                     for (int p = 0; p < count; p++) Add(mover, member, s, rows[p]);
@@ -183,8 +183,8 @@ public sealed partial class StaticSurface2D
         return false;
     }
 
-    private static bool SpansMeet(LSCollider2D first, in MeshSurfaceBoundaryDomain2D.BoundarySpan a,
-        LSCollider2D second, in MeshSurfaceBoundaryDomain2D.BoundarySpan b)
+    private static bool SpansMeet(LSCollider2D first, in BoundarySpan2D a,
+        LSCollider2D second, in BoundarySpan2D b)
     {
         // Solid connectivity off this plane must not bridge a genuine boundary gap.
         Span<FixedPointAnchor2d> endpoints = stackalloc FixedPointAnchor2d[4]
@@ -228,7 +228,7 @@ public sealed partial class StaticSurface2D
             for (int v = 0; v < supplier.VertexCount; v++)
                 _fan.Add(new FixedPointAnchor2d(supplier.Center, supplier.ConvexRotation, supplier.GetScaledLocalVertexUnchecked(v)));
             foreach (var span in _domains[member].Spans)
-                if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined && !_fanMembers.Contains(span.OtherMember)
+                if (span.Kind == SpanKind.Joined && !_fanMembers.Contains(span.OtherMember)
                     && WideConvex2dRelations.LocateBoundaryPoint(vertex, supplier.Center, supplier.ConvexRotation,
                         new FixedSegment2d(span.Start, span.End), span.Interval) >= 0) _fanMembers.Add(span.OtherMember);
         }

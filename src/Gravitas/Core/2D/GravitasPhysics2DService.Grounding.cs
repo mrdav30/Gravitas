@@ -10,6 +10,7 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
+/// <content>Refreshes planar body grounding from current discrete contact manifolds.</content>
 public sealed partial class GravitasPhysics2DService
 {
     private readonly SwiftCollections.SwiftList<GroundingBodySnapshotEntry> _groundingBodySnapshot = new();

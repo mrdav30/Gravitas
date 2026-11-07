@@ -17,8 +17,6 @@ namespace Gravitas.Queries;
 /// <content>Owns shape views, source bounds and support feature selection.</content>
 internal readonly partial struct ConvexShape
 {
-
-
     private readonly ConvexShapeKind _kind;
     private readonly LSCollider? _collider;
     private readonly LSMeshCollider? _triangleOwner;

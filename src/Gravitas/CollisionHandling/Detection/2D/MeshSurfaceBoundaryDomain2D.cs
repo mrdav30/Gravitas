@@ -20,7 +20,7 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal sealed partial class MeshSurfaceBoundaryDomain2D
 {
-    private readonly SwiftList<BoundarySpan> _spans = new();
+    private readonly SwiftList<BoundarySpan2D> _spans = new();
     private readonly SwiftList<FixedBoundArea> _vertexBounds = new();
     private readonly SwiftList<Coverage> _coverage = new();
     private readonly SwiftList<Parameter> _cuts = new();
@@ -28,7 +28,7 @@ internal sealed partial class MeshSurfaceBoundaryDomain2D
 
 
 
-    internal ReadOnlySpan<BoundarySpan> Spans => _spans.AsReadOnlySpan();
+    internal ReadOnlySpan<BoundarySpan2D> Spans => _spans.AsReadOnlySpan();
     internal ReadOnlySpan<FixedBoundArea> VertexBounds => _vertexBounds.AsReadOnlySpan();
     internal Vector2d Origin { get; private set; }
     internal Fixed64 Rotation { get; private set; }
@@ -139,18 +139,18 @@ internal sealed partial class MeshSurfaceBoundaryDomain2D
             SpanKind kind = ClassifyInterval(lower, upper, sourceMember, out int otherMember);
             if (_spans.Count > edgeStart)
             {
-                BoundarySpan previous = _spans[_spans.Count - 1];
+                BoundarySpan2D previous = _spans[_spans.Count - 1];
                 if (previous.Kind == kind && previous.OtherMember == otherMember)
                 {
                     var merged = new RationalSegmentInterval(Parameter.Lower(previous.Interval).N,
                         Parameter.Lower(previous.Interval).D, upper.N, upper.D);
-                    _spans[_spans.Count - 1] = new BoundarySpan(first, second, start, end, merged, kind, otherMember, bounds);
+                    _spans[_spans.Count - 1] = new BoundarySpan2D(first, second, start, end, merged, kind, otherMember, bounds);
                     lower = upper;
                     continue;
                 }
             }
             var interval = new RationalSegmentInterval(lower.N, lower.D, upper.N, upper.D);
-            _spans.Add(new BoundarySpan(first, second, start, end, interval, kind, otherMember, bounds));
+            _spans.Add(new BoundarySpan2D(first, second, start, end, interval, kind, otherMember, bounds));
             lower = upper;
         }
     }

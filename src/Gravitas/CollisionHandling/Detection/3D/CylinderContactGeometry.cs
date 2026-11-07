@@ -10,6 +10,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>Derives the world-space tangent basis for a cylinder cap.</summary>
 internal static class CylinderContactGeometry
 {
     public static void GetCapBasis(LSCylinderCollider cylinder, out Vector3d tangentA, out Vector3d tangentB)

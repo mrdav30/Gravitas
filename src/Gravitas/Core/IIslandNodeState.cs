@@ -7,6 +7,9 @@
 
 namespace Gravitas;
 
+/// <summary>
+/// Exposes body identity, disjoint-set state, and wake behavior for a collision island node.
+/// </summary>
 internal interface IIslandNodeState
 {
     int BodyKey { get; }

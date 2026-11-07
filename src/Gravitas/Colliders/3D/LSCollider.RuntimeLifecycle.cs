@@ -12,6 +12,7 @@ using SwiftCollections;
 
 namespace Gravitas.Colliders;
 
+/// <content>Manages runtime binding, pair bookkeeping, compound part ownership, and deactivation.</content>
 public abstract partial class LSCollider
 {
     /// <summary>Records the current bounds and partition role for broad-phase refresh checks.</summary>

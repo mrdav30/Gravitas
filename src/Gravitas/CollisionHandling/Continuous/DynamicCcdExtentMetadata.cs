@@ -10,6 +10,9 @@ using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Checks whether a bounds update preserves the X extent tracked by the CCD indexes.
+/// </summary>
 internal static class DynamicCcdExtentMetadata
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

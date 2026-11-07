@@ -9,6 +9,9 @@ using GridForge.Spatial;
 
 namespace Gravitas;
 
+/// <summary>
+/// Exposes ownership and lifecycle state for retained partitions, including eligibility for empty-partition reuse.
+/// </summary>
 internal interface IRetainedPhysicsPartition<in TOwner> : IVoxelPartition
 {
     int RetainedIndex { get; }

@@ -9,6 +9,9 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Decides whether a collider pair can raise trigger events based on its trigger roles and body bindings.
+/// </summary>
 internal static class ColliderTriggerEventPolicy
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -10,6 +10,9 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Tracks the last shape snapshot and determines when 3D runtime geometry needs rebuilding.
+/// </summary>
 internal class ColliderRuntimeShapeState<TSnapshot>
     where TSnapshot : IEquatable<TSnapshot>
 {

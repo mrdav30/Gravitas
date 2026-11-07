@@ -7,6 +7,9 @@
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Selects angular-velocity integration or kinematic interpolation for a 3D rotational sweep.
+/// </summary>
 internal enum ContinuousCollisionRotationPath3D : byte
 {
     IntegratedAngularVelocity,

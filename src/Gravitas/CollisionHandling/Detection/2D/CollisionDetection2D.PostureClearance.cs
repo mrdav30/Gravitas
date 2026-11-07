@@ -12,6 +12,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Tests planar circle and capsule posture candidates for exact penetration.</content>
 internal static partial class CollisionDetection2D
 {
     // The caller has validated the candidate's circle/capsule family and the

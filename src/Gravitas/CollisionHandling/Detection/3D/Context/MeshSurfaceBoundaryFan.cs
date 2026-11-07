@@ -78,10 +78,10 @@ internal sealed class MeshSurfaceBoundaryFan
                     : WideTriangleRelations.LocateEdgePoint(source, original.GeometryFrame, n, d,
                         new FixedSegment(edge.Start, edge.End), mesh.GeometryFrame, edge.Interval);
                 if (location < 0) continue;
-                if (edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Ambiguous) { _rays.FastClear(); return false; }
-                if (edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Exposed) HasExposedBoundary = true;
+                if (edge.Kind == SpanKind.Ambiguous) { _rays.FastClear(); return false; }
+                if (edge.Kind == SpanKind.Exposed) HasExposedBoundary = true;
                 var neighbor = (edge.OtherMember, edge.OtherSurface);
-                if (edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined && _visited.Add(neighbor)) _owners.Add(neighbor);
+                if (edge.Kind == SpanKind.Joined && _visited.Add(neighbor)) _owners.Add(neighbor);
             }
             int count = GetFan(mesh, key.Surface, source, original, n, d, fan, point,
                 key.Member == sourceMember && key.Surface == first.Item2 ? sourceSurface : key.Surface);

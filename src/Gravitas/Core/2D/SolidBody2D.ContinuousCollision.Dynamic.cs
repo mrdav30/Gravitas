@@ -14,6 +14,7 @@ using Gravitas.Materials;
 
 namespace Gravitas;
 
+/// <content>Resolves dynamic planar sweeps and applies same-plane and mixed collision handoffs.</content>
 public sealed partial class SolidBody2D
 {
     internal bool ApplyContinuousCollisionHandoff(

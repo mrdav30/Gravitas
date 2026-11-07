@@ -11,6 +11,7 @@ using FixedMathSharp;
 
 namespace Gravitas.Colliders;
 
+/// <content>Caches and evaluates mesh mass integrals for compound collider parts.</content>
 public partial class PhysicsMesh
 {
     // Allocate retained moments only when inertia is requested. Each physical

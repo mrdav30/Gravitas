@@ -12,6 +12,7 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
+/// <content>Tracks planar motion segments and samples the body trajectory for continuous collision detection.</content>
 public sealed partial class SolidBody2D
 {
     private LSCollider? _continuousCollisionHandoffIgnoredCollider3D;

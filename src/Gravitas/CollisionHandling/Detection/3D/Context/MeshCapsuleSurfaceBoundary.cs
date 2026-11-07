@@ -35,7 +35,7 @@ internal sealed class MeshCapsuleSurfaceBoundary
         MeshSurfaceBoundaryDomain? domain = faces.GetJoinedBoundary(collider, surfaceTriangle);
         if (domain != null)
         {
-            ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> spans = domain.Spans;
+            ReadOnlySpan<BoundarySpan3D> spans = domain.Spans;
             for (int span = 0; span < spans.Length; span++)
             {
                 var piece = spans[span];

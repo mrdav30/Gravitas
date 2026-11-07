@@ -13,6 +13,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Finds finite cylinder contacts and builds cap contacts for cylinder pairs.</content>
 public static partial class CollisionDetection
 {
     #region Cylinder

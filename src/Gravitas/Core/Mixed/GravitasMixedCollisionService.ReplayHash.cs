@@ -12,6 +12,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+/// <content>Writes mixed collision pairs and optional broad-phase cache state to the replay hash.</content>
 internal sealed partial class GravitasMixedCollisionService
 {
     internal void ContributeReplayHash(

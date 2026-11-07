@@ -14,6 +14,7 @@ using Gravitas.Queries;
 
 namespace Gravitas;
 
+/// <content>Maintains planar ground probes, support contacts, and grounded-state transitions.</content>
 public sealed partial class SolidBody2D
 {
     private static readonly Vector2d DefaultGroundUpDirection = Vector2d.Forward;

@@ -11,6 +11,9 @@ namespace Gravitas.Constraints;
 
 
 
+/// <summary>
+/// Stores a planar joint row with its anchors, impulse limits, and warm-start state.
+/// </summary>
 internal struct JointConstraintRow2D
 {
     public JointConstraintRow2D(

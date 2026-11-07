@@ -10,6 +10,7 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.Colliders;
 
+/// <content>Prepares and commits planar shape changes, including geometry used for mixed slab admission.</content>
 public abstract partial class LSCollider2D
 {
     private Vector2d _committedCenter;

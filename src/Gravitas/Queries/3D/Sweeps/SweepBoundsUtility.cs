@@ -10,6 +10,9 @@ using FixedMathSharp;
 
 namespace Gravitas.Queries;
 
+/// <summary>
+/// Builds swept bounds and clips query segments to candidate bounds before narrow-phase tests.
+/// </summary>
 internal static class SweepBoundsUtility
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

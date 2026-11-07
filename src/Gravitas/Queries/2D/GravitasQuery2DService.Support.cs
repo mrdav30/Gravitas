@@ -12,9 +12,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns pure 2D query scratch, version, and bounds helpers.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQuery2DService
 {
     private void EnsureCandidateCapacity()

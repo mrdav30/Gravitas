@@ -9,6 +9,9 @@ using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Resolves impact normals and constrained velocity changes for 2D and 3D CCD response.
+/// </summary>
 internal static class ContinuousCollisionImpulsePolicy
 {
     internal static bool TryResolveVelocityDelta(

@@ -12,7 +12,7 @@ using Gravitas.Colliders;
 using Gravitas.Materials;
 using SwiftCollections;
 using SwiftCollections.Query;
-using Member = Gravitas.CollisionHandling.MeshJoinedSurfaceRegions<FixedMathSharp.Geometry.FiniteSlabRayFrame>.Member;
+using Member = Gravitas.CollisionHandling.Member<FixedMathSharp.Geometry.FiniteSlabRayFrame>;
 
 namespace Gravitas.CollisionHandling;
 
@@ -366,7 +366,7 @@ internal sealed partial class MeshSlabFaceRegions
     internal bool IntersectsContinuousBoundary(LSMeshCollider collider, int owner, in FiniteSlabSectionFrame section)
     {
         Member member = _joined.Members[_joined.MemberBySurface[(collider.Mesh, owner)]];
-        ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> pieces = member.Boundary.Spans;
+        ReadOnlySpan<BoundarySpan3D> pieces = member.Boundary.Spans;
         for (int span = 0; span < pieces.Length; span++)
         {
             if (member.JoinedSpans[span]) continue;

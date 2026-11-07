@@ -16,6 +16,7 @@ using SwiftCollections.Query;
 
 namespace Gravitas;
 
+/// <content>Searches rotating planar trajectories against spatial targets and resolves mixed contact manifolds.</content>
 public sealed partial class SolidBody2D
 {
     private readonly ContactManifold _rotationalMixedKnownManifold = new();
@@ -222,7 +223,7 @@ public sealed partial class SolidBody2D
             _rotationalMixedStatic3DCandidates,
             staticStyleOnly: true,
             cachePartitionRefresh: true);
-        _rotationalMixedStatic3DCandidates.SortInPlace(default(ColliderRegistry<LSCollider>.ReplayOrderComparer));
+        _rotationalMixedStatic3DCandidates.SortInPlace(default(ReplayOrderComparer<LSCollider>));
 
         SwiftList<int> candidateIds =
             Context.Physics.QueryContinuousCollisionCandidates(bounds);
@@ -348,21 +349,21 @@ public sealed partial class SolidBody2D
                     return true;
                 }
             }
-            Span<ContinuousCollisionMath.RotationalInterval> intervals =
-                stackalloc ContinuousCollisionMath.RotationalInterval[
+            Span<RotationalInterval> intervals =
+                stackalloc RotationalInterval[
                     ContinuousCollisionMath.RotationalIntervalMaxDepth + 2];
             int intervalCount = 1;
             int processedNodeCount = 0;
             bool hasKnownContact = false;
             Fixed64 knownContactTime = Fixed64.One;
-            intervals[0] = new ContinuousCollisionMath.RotationalInterval(
+            intervals[0] = new RotationalInterval(
                 searchStart,
                 searchEnd,
                 depth: 0);
 
             while (intervalCount > 0)
             {
-                ContinuousCollisionMath.RotationalInterval interval = intervals[--intervalCount];
+                RotationalInterval interval = intervals[--intervalCount];
                 Fixed64 midpoint =
                     (interval.LowerTime + interval.UpperTime) * Fixed64.Half;
                 Fixed64 intervalSpan = interval.UpperTime - interval.LowerTime;
@@ -472,7 +473,7 @@ public sealed partial class SolidBody2D
                 if (sampleHasContact)
                 {
                     intervals[intervalCount++] =
-                        new ContinuousCollisionMath.RotationalInterval(
+                        new RotationalInterval(
                             interval.LowerTime,
                             midpoint,
                             childDepth);
@@ -480,12 +481,12 @@ public sealed partial class SolidBody2D
                 }
 
                 intervals[intervalCount++] =
-                    new ContinuousCollisionMath.RotationalInterval(
+                    new RotationalInterval(
                         midpoint,
                         interval.UpperTime,
                         childDepth);
                 intervals[intervalCount++] =
-                    new ContinuousCollisionMath.RotationalInterval(
+                    new RotationalInterval(
                         interval.LowerTime,
                         midpoint,
                         childDepth);

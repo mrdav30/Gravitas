@@ -11,6 +11,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Finds cuboid contacts against spheres, capsules, and other cuboids.</content>
 public static partial class CollisionDetection
 {
     #region Cuboid

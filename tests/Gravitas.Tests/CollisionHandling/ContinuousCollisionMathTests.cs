@@ -107,7 +107,7 @@ public sealed class ContinuousCollisionMathTests
     {
         Fixed64 lowerTime = Fixed64.FromFraction(1, 4);
         Fixed64 witnessTime = lowerTime + Fixed64.FromFraction(1, 4096);
-        var interval = new ContinuousCollisionMath.RotationalInterval(
+        var interval = new RotationalInterval(
             lowerTime,
             witnessTime,
             ContinuousCollisionMath.RotationalIntervalMaxDepth);
@@ -134,7 +134,7 @@ public sealed class ContinuousCollisionMathTests
         Fixed64 lowerTime = Fixed64.Zero;
         Fixed64 upperTime = Fixed64.FromFraction(1, 4096);
         Fixed64 laterWitnessTime = Fixed64.Half;
-        var interval = new ContinuousCollisionMath.RotationalInterval(
+        var interval = new RotationalInterval(
             lowerTime,
             upperTime,
             ContinuousCollisionMath.RotationalIntervalMaxDepth);
@@ -161,7 +161,7 @@ public sealed class ContinuousCollisionMathTests
     {
         Fixed64 lowerTime = Fixed64.FromFraction(1, 4);
         Fixed64 witnessTime = Fixed64.Half;
-        var interval = new ContinuousCollisionMath.RotationalInterval(
+        var interval = new RotationalInterval(
             lowerTime,
             witnessTime,
             depth: 1);
@@ -199,7 +199,7 @@ public sealed class ContinuousCollisionMathTests
     public void RotationalSearchLimit_AtMaxDepthWithoutWitness_ShouldRemainConservative()
     {
         Fixed64 lowerTime = Fixed64.FromFraction(1, 4);
-        var interval = new ContinuousCollisionMath.RotationalInterval(
+        var interval = new RotationalInterval(
             lowerTime,
             Fixed64.Half,
             ContinuousCollisionMath.RotationalIntervalMaxDepth);

@@ -13,6 +13,7 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.Queries;
 
+/// <content>Defines support samples, triangle candidates, and simplex results for convex sweeps.</content>
 internal sealed partial class ConvexSweepQueryWorker
 {
     private readonly struct SupportPoint

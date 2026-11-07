@@ -7,14 +7,14 @@
 
 namespace Gravitas.CollisionHandling;
 
-/// <content>Defines the nested GroupedSolveState type.</content>
-public static partial class CollisionResponse2D
+// Ordinary pairs retain only a null reference. Grouped pairs reuse their
+// phase-local incoming motion and exact lever frames across island iterations.
+/// <summary>
+/// Retains incoming motion and exact lever frames for grouped 2D contacts
+/// across island iterations.
+/// </summary>
+internal sealed class GroupedSolveState
 {
-    // Ordinary pairs retain only a null reference. Grouped pairs reuse their
-    // phase-local incoming motion and exact lever frames across island iterations.
-    internal sealed class GroupedSolveState
-    {
-        internal ContactResponseSnapshot Impact;
-        internal ContactAnchor2D CenterA, CenterB;
-    }
+    internal ContactResponseSnapshot Impact;
+    internal ContactAnchor2D CenterA, CenterB;
 }

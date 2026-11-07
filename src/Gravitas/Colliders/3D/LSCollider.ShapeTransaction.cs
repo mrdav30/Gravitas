@@ -10,6 +10,7 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.Colliders;
 
+/// <content>Prepares and commits 3D shape changes while retaining the last committed geometry for readers.</content>
 public abstract partial class LSCollider
 {
     private Vector3d _committedCenter;

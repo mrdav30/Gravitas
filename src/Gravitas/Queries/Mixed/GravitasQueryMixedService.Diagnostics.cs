@@ -12,9 +12,9 @@ using Gravitas.Diagnostics;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns mixed query diagnostics, candidate accounting, and reducer counters.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQueryMixedService
 {
     private void EmitMixedSweepDiagnostics(

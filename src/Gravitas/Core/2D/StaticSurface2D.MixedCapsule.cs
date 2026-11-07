@@ -170,7 +170,7 @@ public sealed partial class StaticSurface2D : IPrismCapsuleContactDomain
         {
             MixedBand band = prism.Bands[bandIndex];
             foreach (var span in band.Boundary.Spans)
-                if (span.Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Joined
+                if (span.Kind != SpanKind.Joined
                     && WideConvexPrismRelations.TryClipProjectedPrismFace(projected, denominator, member.ConvexRotation,
                         span.Start, span.End, span.Interval, band.Lower, band.Upper, solidClip, out var retained))
                 { Keep(retained); KeepParent(span.First, span.Interval, band.Lower, band.Upper); }

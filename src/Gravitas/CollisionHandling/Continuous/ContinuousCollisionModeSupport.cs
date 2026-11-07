@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
+/// <summary>Validates continuous collision modes at settings and body boundaries.</summary>
 internal static class ContinuousCollisionModeSupport
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

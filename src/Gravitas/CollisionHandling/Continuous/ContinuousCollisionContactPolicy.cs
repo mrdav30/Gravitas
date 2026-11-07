@@ -11,6 +11,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>Resolves target surface witnesses and normals for swept-sphere hits.</summary>
 internal static class ContinuousCollisionContactPolicy
 {
     internal static bool TryResolveSweptSphereContact(

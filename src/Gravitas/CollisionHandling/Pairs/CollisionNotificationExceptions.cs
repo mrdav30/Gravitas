@@ -12,6 +12,7 @@ using SwiftCollections;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>Collects collision notification failures for reporting after dispatch.</summary>
 internal static class CollisionNotificationExceptions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

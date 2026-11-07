@@ -10,6 +10,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Checks each collider's local layer exclusions before allowing a physical pair.
+/// </summary>
 internal static class ColliderCollisionFilter
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

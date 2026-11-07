@@ -81,7 +81,7 @@ public sealed partial class StaticSurface2D
             {
                 MixedBand band = prism.Bands[bandIndex];
                 foreach (var span in band.Boundary.Spans)
-                    if (span.Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+                    if (span.Kind != SpanKind.Joined)
                         KeepMixedCurvedWindow(domain, new(span.First, span.Interval, band.Lower, band.Upper));
             }
             Fixed64 half = _mixedLocal[_mixedMember].MixedHalfThickness;

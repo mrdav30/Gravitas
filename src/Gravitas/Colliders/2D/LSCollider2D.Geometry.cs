@@ -12,6 +12,9 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.Colliders;
 
+/// <content>
+/// Resolves planar pose, scale, offsets, and bounds for standalone colliders and compound parts.
+/// </content>
 public abstract partial class LSCollider2D
 {
     /// <summary>Gets the planar runtime position.</summary>

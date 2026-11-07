@@ -13,8 +13,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
-
-
+/// <content>Maintains spatial collision pairs, including collider invalidation, response processing, and pooled deactivation.</content>
 public sealed partial class GravitasPhysicsService
 {
     internal CollisionPair? GetCollisionPair(int id1, int id2)

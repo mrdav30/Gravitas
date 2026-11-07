@@ -10,6 +10,9 @@ using FixedMathSharp;
 
 namespace Gravitas;
 
+/// <summary>
+/// Canonicalizes and combines planar angles in the half-open interval from negative pi to pi.
+/// </summary>
 internal static class PlanarRotation
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -7,6 +7,9 @@
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Classifies CCD targets by dimension and motion and represents unresolved mixed hits.
+/// </summary>
 internal enum ContinuousCollisionTargetKind : byte
 {
     None,

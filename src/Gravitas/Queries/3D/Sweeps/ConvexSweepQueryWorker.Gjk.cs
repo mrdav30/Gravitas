@@ -10,6 +10,7 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.Queries;
 
+/// <content>Computes convex separation and witness points using GJK support queries.</content>
 internal sealed partial class ConvexSweepQueryWorker
 {
     private GjkResult ComputeDistance(ConvexShape sourceShape, ConvexShape targetShape)

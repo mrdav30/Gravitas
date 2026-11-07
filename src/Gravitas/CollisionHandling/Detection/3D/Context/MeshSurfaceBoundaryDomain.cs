@@ -22,16 +22,13 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal sealed partial class MeshSurfaceBoundaryDomain
 {
-    private readonly SwiftList<BoundarySpan> _spans = new();
+    private readonly SwiftList<BoundarySpan3D> _spans = new();
     private readonly SwiftList<Coverage> _coverage = new();
     private readonly SwiftList<Parameter> _cuts = new();
     private readonly SwiftList<int> _triangles = new();
     private readonly SwiftHashSet<(int Member, int Surface)> _own = new(), _opposite = new();
 
-
-
-
-    internal ReadOnlySpan<BoundarySpan> Spans => _spans.AsReadOnlySpan();
+    internal ReadOnlySpan<BoundarySpan3D> Spans => _spans.AsReadOnlySpan();
     internal int SourceMember { get; private set; }
     internal int SourceSurface { get; private set; }
     internal Vector3d Origin { get; private set; }
@@ -122,18 +119,18 @@ internal sealed partial class MeshSurfaceBoundaryDomain
             // Avoid artificial event endpoints at irrelevant triangle cuts.
             if (_spans.Count > edgeStart)
             {
-                BoundarySpan previous = _spans[_spans.Count - 1];
+                BoundarySpan3D previous = _spans[_spans.Count - 1];
                 if (previous.Kind == kind && previous.OtherMember == otherMember && previous.OtherSurface == otherSurface)
                 {
                     var merged = new RationalSegmentInterval(Parameter.Lower(previous.Interval).N,
                         Parameter.Lower(previous.Interval).D, upper.N, upper.D);
-                    _spans[_spans.Count - 1] = new BoundarySpan(first, second, start, end, merged, kind, otherMember, otherSurface);
+                    _spans[_spans.Count - 1] = new BoundarySpan3D(first, second, start, end, merged, kind, otherMember, otherSurface);
                     lower = upper;
                     continue;
                 }
             }
             var interval = new RationalSegmentInterval(lower.N, lower.D, upper.N, upper.D);
-            _spans.Add(new BoundarySpan(first, second, start, end, interval, kind, otherMember, otherSurface));
+            _spans.Add(new BoundarySpan3D(first, second, start, end, interval, kind, otherMember, otherSurface));
             lower = upper;
         }
     }

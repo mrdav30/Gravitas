@@ -7,6 +7,9 @@
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Defines eligibility for dynamic candidate indexes and static or kinematic CCD targets.
+/// </summary>
 internal static class ContinuousCollisionTargetPolicy
 {
     internal static bool AllowsIndexed3DTarget(

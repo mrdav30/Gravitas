@@ -9,6 +9,7 @@ using Chronicler.Hashing;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Hashes mixed pair identity, contact freshness, and retained manifolds.</content>
 internal sealed partial class CollisionPairMixed
 {
     internal void ContributeReplayHash(

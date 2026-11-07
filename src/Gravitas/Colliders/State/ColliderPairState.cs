@@ -10,6 +10,9 @@ using SwiftCollections;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Tracks active collision pairs and pair holders for one collider.
+/// </summary>
 internal struct ColliderPairState<TPair>
     where TPair : class
 {

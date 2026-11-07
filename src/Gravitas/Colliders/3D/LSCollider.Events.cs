@@ -10,8 +10,7 @@ using SwiftCollections;
 
 namespace Gravitas.Colliders;
 
-
-
+/// <content>Exposes collision pair state and dispatches 3D and mixed contact notifications.</content>
 public abstract partial class LSCollider
 {
     internal int CollisionPairCount => _pairState.CollisionPairCount;

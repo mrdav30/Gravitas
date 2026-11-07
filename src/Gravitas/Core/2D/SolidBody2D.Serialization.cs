@@ -11,6 +11,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas;
 
+/// <content>Records planar body state and rebuilds its dependent state after loading.</content>
 public sealed partial class SolidBody2D
 {
     /// <summary>Records or restores deterministic body state through Chronicler.</summary>

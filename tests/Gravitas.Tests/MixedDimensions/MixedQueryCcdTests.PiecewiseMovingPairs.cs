@@ -47,15 +47,15 @@ public sealed partial class MixedQueryCcdTests
                 Fixed64.Zero,
                 null
             };
-            ContinuousCollisionMath.IntervalSearchStatus status =
-                (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody)
+            IntervalSearchStatus status =
+                (IntervalSearchStatus)typeof(SolidBody)
                     .GetMethod(
                         "TryGetDynamicMixed2DContinuousCollisionHit",
                         BindingFlags.Instance | BindingFlags.NonPublic)!
                     .Invoke(source.Body, arguments)!;
             var hit = (DynamicMixedIntervalHit)arguments[7]!;
 
-            status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+            status.Should().Be(IntervalSearchStatus.ExactHit);
             hit.ExactHit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
             hit.ExactHit.Distance.Should().Be(oneRaw);
             hit.SafeDistance.Should().Be(oneRaw);
@@ -84,15 +84,15 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.Zero,
             null
         };
-        ContinuousCollisionMath.IntervalSearchStatus status2D =
-            (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody2D)
+        IntervalSearchStatus status2D =
+            (IntervalSearchStatus)typeof(SolidBody2D)
                 .GetMethod(
                     "TryGetDynamicMixed3DContinuousCollisionHit",
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(source2D, arguments2D)!;
         var hit2D = (DynamicMixedIntervalHit)arguments2D[6]!;
 
-        status2D.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+        status2D.Should().Be(IntervalSearchStatus.ExactHit);
         hit2D.ExactHit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
         hit2D.ExactHit.Distance.Should().Be(oneRaw);
         hit2D.SafeDistance.Should().Be(oneRaw);
@@ -138,13 +138,13 @@ public sealed partial class MixedQueryCcdTests
                 Fixed64.Zero,
                 null
             };
-            var status = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody)
+            var status = (IntervalSearchStatus)typeof(SolidBody)
                 .GetMethod(
                     "TryGetDynamicMixed2DContinuousCollisionHit",
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(source.Body, arguments)!;
 
-            status.Should().NotBe(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+            status.Should().NotBe(IntervalSearchStatus.ExactHit);
             return;
         }
 
@@ -174,13 +174,13 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.Zero,
             null
         };
-        var status2D = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody2D)
+        var status2D = (IntervalSearchStatus)typeof(SolidBody2D)
             .GetMethod(
                 "TryGetDynamicMixed3DContinuousCollisionHit",
                 BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(source2D, arguments2D)!;
 
-        status2D.Should().NotBe(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+        status2D.Should().NotBe(IntervalSearchStatus.ExactHit);
     }
 
     [Theory]
@@ -223,13 +223,13 @@ public sealed partial class MixedQueryCcdTests
                 Fixed64.Zero,
                 null
             };
-            var status = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody)
+            var status = (IntervalSearchStatus)typeof(SolidBody)
                 .GetMethod(
                     "TryGetDynamicMixed2DContinuousCollisionHit",
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(source.Body, arguments)!;
 
-            status.Should().NotBe(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+            status.Should().NotBe(IntervalSearchStatus.ExactHit);
             return;
         }
 
@@ -260,13 +260,13 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.Zero,
             null
         };
-        var status2D = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody2D)
+        var status2D = (IntervalSearchStatus)typeof(SolidBody2D)
             .GetMethod(
                 "TryGetDynamicMixed3DContinuousCollisionHit",
                 BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(source2D, arguments2D)!;
 
-        status2D.Should().NotBe(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+        status2D.Should().NotBe(IntervalSearchStatus.ExactHit);
     }
 
     [Theory]
@@ -315,13 +315,13 @@ public sealed partial class MixedQueryCcdTests
                 Fixed64.Zero,
                 null
             };
-            var status = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody)
+            var status = (IntervalSearchStatus)typeof(SolidBody)
                 .GetMethod(
                     "TryGetDynamicMixed2DContinuousCollisionHit",
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(source.Body, arguments)!;
 
-            status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+            status.Should().Be(IntervalSearchStatus.ExactHit);
             ((DynamicMixedIntervalHit)arguments[7]!).ExactHit.ReducerKind
                 .Should().Be(PhysicsQueryReducerKind.Exact);
             return;
@@ -356,13 +356,13 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.Zero,
             null
         };
-        var status2D = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody2D)
+        var status2D = (IntervalSearchStatus)typeof(SolidBody2D)
             .GetMethod(
                 "TryGetDynamicMixed3DContinuousCollisionHit",
                 BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(source2D, arguments2D)!;
 
-        status2D.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+        status2D.Should().Be(IntervalSearchStatus.ExactHit);
         ((DynamicMixedIntervalHit)arguments2D[6]!).ExactHit.ReducerKind
             .Should().Be(PhysicsQueryReducerKind.Exact);
     }
@@ -402,14 +402,14 @@ public sealed partial class MixedQueryCcdTests
                 Fixed64.Zero,
                 null
             };
-            var status = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody)
+            var status = (IntervalSearchStatus)typeof(SolidBody)
                 .GetMethod(
                     "TryGetDynamicMixed2DContinuousCollisionHit",
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(source.Body, arguments)!;
             var hit = (DynamicMixedIntervalHit)arguments[7]!;
 
-            status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+            status.Should().Be(IntervalSearchStatus.ExactHit);
             hit.ExactHit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
             hit.ExactHit.Distance.Should().Be(Fixed64.Half);
             hit.SafeDistance.Should().Be(Fixed64.Half);
@@ -437,14 +437,14 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.Zero,
             null
         };
-        var status2D = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody2D)
+        var status2D = (IntervalSearchStatus)typeof(SolidBody2D)
             .GetMethod(
                 "TryGetDynamicMixed3DContinuousCollisionHit",
                 BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(source2D, arguments2D)!;
         var hit2D = (DynamicMixedIntervalHit)arguments2D[6]!;
 
-        status2D.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+        status2D.Should().Be(IntervalSearchStatus.ExactHit);
         hit2D.ExactHit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
         hit2D.ExactHit.Distance.Should().Be(Fixed64.Half);
         hit2D.SafeDistance.Should().Be(Fixed64.Half);
@@ -495,13 +495,13 @@ public sealed partial class MixedQueryCcdTests
                 Fixed64.Zero,
                 null
             };
-            var status = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody)
+            var status = (IntervalSearchStatus)typeof(SolidBody)
                 .GetMethod(
                     "TryGetDynamicMixed2DContinuousCollisionHit",
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(source.Body, arguments)!;
 
-            status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+            status.Should().Be(IntervalSearchStatus.ExactHit);
             ((DynamicMixedIntervalHit)arguments[7]!).ExactHit.ReducerKind
                 .Should().Be(PhysicsQueryReducerKind.Exact);
             return;
@@ -532,13 +532,13 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.Zero,
             null
         };
-        var status2D = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody2D)
+        var status2D = (IntervalSearchStatus)typeof(SolidBody2D)
             .GetMethod(
                 "TryGetDynamicMixed3DContinuousCollisionHit",
                 BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(source2D, arguments2D)!;
 
-        status2D.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+        status2D.Should().Be(IntervalSearchStatus.ExactHit);
         ((DynamicMixedIntervalHit)arguments2D[6]!).ExactHit.ReducerKind
             .Should().Be(PhysicsQueryReducerKind.Exact);
     }
@@ -582,15 +582,15 @@ public sealed partial class MixedQueryCcdTests
                 Fixed64.Half,
                 null
             };
-            ContinuousCollisionMath.IntervalSearchStatus status =
-                (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody)
+            IntervalSearchStatus status =
+                (IntervalSearchStatus)typeof(SolidBody)
                     .GetMethod(
                         "TryGetDynamicMixed2DContinuousCollisionHit",
                         BindingFlags.Instance | BindingFlags.NonPublic)!
                     .Invoke(source.Body, arguments)!;
             var hit = (DynamicMixedIntervalHit)arguments[7]!;
 
-            status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+            status.Should().Be(IntervalSearchStatus.ExactHit);
             hit.ExactHit.Distance.Should().Be(Fixed64.FromFraction(7, 4));
             return;
         }
@@ -619,15 +619,15 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.Half,
             null
         };
-        ContinuousCollisionMath.IntervalSearchStatus status2D =
-            (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody2D)
+        IntervalSearchStatus status2D =
+            (IntervalSearchStatus)typeof(SolidBody2D)
                 .GetMethod(
                     "TryGetDynamicMixed3DContinuousCollisionHit",
                     BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(source2D, arguments2D)!;
         var hit2D = (DynamicMixedIntervalHit)arguments2D[6]!;
 
-        status2D.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+        status2D.Should().Be(IntervalSearchStatus.ExactHit);
         hit2D.ExactHit.Distance.Should().Be(Fixed64.FromFraction(7, 4));
     }
 
@@ -669,14 +669,14 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.Zero,
             null
         };
-        var status = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody)
+        var status = (IntervalSearchStatus)typeof(SolidBody)
             .GetMethod(
                 "TryGetDynamicMixed2DContinuousCollisionHit",
                 BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(source.Body, arguments)!;
 
         status.Should().Be(
-            ContinuousCollisionMath.IntervalSearchStatus.CertifiedNoHit);
+            IntervalSearchStatus.CertifiedNoHit);
     }
 
     [Fact]
@@ -723,14 +723,14 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.Zero,
             null
         };
-        var status = (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody2D)
+        var status = (IntervalSearchStatus)typeof(SolidBody2D)
             .GetMethod(
                 "TryGetDynamicMixed3DContinuousCollisionHit",
                 BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(source, arguments)!;
 
         status.Should().Be(
-            ContinuousCollisionMath.IntervalSearchStatus.CertifiedNoHit);
+            IntervalSearchStatus.CertifiedNoHit);
     }
 
     [Fact]

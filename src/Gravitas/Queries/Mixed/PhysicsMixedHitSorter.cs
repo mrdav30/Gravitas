@@ -10,6 +10,9 @@ using SwiftCollections;
 
 namespace Gravitas.Queries;
 
+/// <summary>
+/// Orders cross-dimensional hits by distance and deterministic tie breaks.
+/// </summary>
 internal static class PhysicsMixedHitSorter
 {
     internal static void SortByDistance(SwiftList<PhysicsMixedHit> hits)

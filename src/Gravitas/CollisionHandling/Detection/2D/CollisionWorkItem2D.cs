@@ -10,6 +10,9 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Carries the ordered collider pair and shape-pair kind for 2D narrow-phase dispatch.
+/// </summary>
 internal readonly struct CollisionWorkItem2D
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

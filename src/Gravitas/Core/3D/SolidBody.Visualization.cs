@@ -10,6 +10,7 @@ using FixedMathSharp;
 
 namespace Gravitas;
 
+/// <content>Tracks presentation pose changes and publishes interpolated or authoritative transforms.</content>
 public partial class SolidBody
 {
     internal void OnVisualize()

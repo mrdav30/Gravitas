@@ -10,6 +10,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.Queries;
 
+/// <content>Finds eligible support hits on planar collider shapes and compound parts.</content>
 internal static partial class QueryDetection2D
 {
     internal static bool TryFindSupport(in Physics2DSupportQuery request, Vector2d end,

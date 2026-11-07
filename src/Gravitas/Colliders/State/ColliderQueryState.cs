@@ -9,6 +9,9 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Stores visitation stamps used to deduplicate collider candidates during queries.
+/// </summary>
 internal struct ColliderQueryState
 {
     public uint RaycastVersion { get; set; }

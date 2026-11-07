@@ -13,6 +13,7 @@ using SwiftCollections.Query;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Finds finite cone contacts against spheres, convex shapes, and mesh surfaces.</content>
 public static partial class CollisionDetection
 {
     private static bool DoConeSphereCheck(CollisionWorkItem pair)

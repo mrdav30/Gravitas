@@ -34,7 +34,7 @@ public sealed partial class StaticSurface2D
                 MixedBand band = prism.Bands[index];
                 foreach (var span in band.Boundary.Spans)
                 {
-                    if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined) continue;
+                    if (span.Kind == SpanKind.Joined) continue;
                     GetMixedBoundaryBounds(span.Interval, out var ln, out var ld, out var un, out var ud);
                     Probe(new(_mixedMember, span.First, 0, new(ln, ld, ln, ld), band.Lower, band.Upper));
                     Probe(new(_mixedMember, span.First, 0, new(un, ud, un, ud), band.Lower, band.Upper));
@@ -46,7 +46,7 @@ public sealed partial class StaticSurface2D
                         int adjacent = end == 0 ? index - 1 : index + 1;
                         if (adjacent >= 0 && adjacent < prism.BandCount)
                             foreach (var joined in prism.Bands[adjacent].Boundary.Spans)
-                                if (joined.First == span.First && joined.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined
+                                if (joined.First == span.First && joined.Kind == SpanKind.Joined
                                     && TryIntersectMixedIntervals(span.Interval, joined.Interval, out var clip))
                                     Probe(new(_mixedMember, span.First, 0, clip, y, y));
                         // Incident fans can become blocked at a single endpoint only.
@@ -61,7 +61,7 @@ public sealed partial class StaticSurface2D
                 foreach (var span in prism.Bands[cap == 0 ? 0 : prism.BandCount - 1].Boundary.Spans)
                 {
                     int vertical = cap == 0 ? 1 : -1;
-                    if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+                    if (span.Kind == SpanKind.Joined)
                         Probe(new(_mixedMember, span.First, vertical, span.Interval, y, y));
                     GetMixedBoundaryBounds(span.Interval, out var ln, out var ld, out var un, out var ud);
                     Probe(new(_mixedMember, span.First, vertical, new(ln, ld, ln, ld), y, y));

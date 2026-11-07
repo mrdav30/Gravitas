@@ -11,10 +11,13 @@ using Gravitas.Queries;
 
 namespace Gravitas;
 
+/// <summary>
+/// Stores a moving mixed-pair search result and orders candidates by safe travel distance and contact evidence.
+/// </summary>
 internal readonly struct DynamicMixedIntervalHit
 {
     internal DynamicMixedIntervalHit(
-        ContinuousCollisionMath.IntervalSearchStatus status,
+        IntervalSearchStatus status,
         PhysicsMixedHit exactHit,
         Fixed64 safeDistance,
         Fixed64 closingSpeed,
@@ -27,7 +30,7 @@ internal readonly struct DynamicMixedIntervalHit
         TargetId = targetId;
     }
 
-    internal ContinuousCollisionMath.IntervalSearchStatus Status { get; }
+    internal IntervalSearchStatus Status { get; }
 
     internal PhysicsMixedHit ExactHit { get; }
 
@@ -50,9 +53,9 @@ internal readonly struct DynamicMixedIntervalHit
             return distance < 0;
 
         bool candidateIsExact =
-            candidate.Status == ContinuousCollisionMath.IntervalSearchStatus.ExactHit;
+            candidate.Status == IntervalSearchStatus.ExactHit;
         bool currentIsExact =
-            current.Status == ContinuousCollisionMath.IntervalSearchStatus.ExactHit;
+            current.Status == IntervalSearchStatus.ExactHit;
         if (candidateIsExact != currentIsExact)
             return candidateIsExact;
 
@@ -94,7 +97,7 @@ internal readonly struct DynamicMixedIntervalHit
             return true;
         if (candidate.SafeDistance < current.Distance)
             return true;
-        if (candidate.Status != ContinuousCollisionMath.IntervalSearchStatus.ExactHit)
+        if (candidate.Status != IntervalSearchStatus.ExactHit)
             return false;
 
         return ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(

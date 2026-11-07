@@ -10,6 +10,9 @@ using GridForge.Spatial;
 
 namespace Gravitas;
 
+/// <summary>
+/// Orders world voxel identities deterministically for spatial and planar partition traversal.
+/// </summary>
 internal static class WorldVoxelIndexOrdering
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

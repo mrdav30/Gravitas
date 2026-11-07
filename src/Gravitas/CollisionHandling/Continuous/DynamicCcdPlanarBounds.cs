@@ -9,6 +9,7 @@ using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>Stores the X/Z bounds of a planar CCD candidate or query.</summary>
 internal readonly struct DynamicCcdPlanarBounds
 {
     public DynamicCcdPlanarBounds(Fixed64 minX, Fixed64 minZ, Fixed64 maxX, Fixed64 maxZ)

@@ -186,7 +186,7 @@ public sealed class DynamicMixedIntervalHitTests
         Fixed64 safeDistance,
         int targetId) =>
         new(
-            ContinuousCollisionMath.IntervalSearchStatus.Unresolved,
+            IntervalSearchStatus.Unresolved,
             default,
             safeDistance,
             Fixed64.Zero,
@@ -196,7 +196,7 @@ public sealed class DynamicMixedIntervalHitTests
         Fixed64 safeDistance,
         Fixed64 exactDistance) =>
         new(
-            ContinuousCollisionMath.IntervalSearchStatus.ExactHit,
+            IntervalSearchStatus.ExactHit,
             CreateHit(exactDistance),
             safeDistance,
             Fixed64.One,

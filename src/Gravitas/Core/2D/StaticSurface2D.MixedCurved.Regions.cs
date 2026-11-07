@@ -85,7 +85,7 @@ public sealed partial class StaticSurface2D
             if (a.Lower < band.Lower || a.Lower > band.Upper) continue;
             foreach (var span in band.Boundary.Spans)
             {
-                if (span.Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Joined || span.OtherMember != b.Member) continue;
+                if (span.Kind != SpanKind.Joined || span.OtherMember != b.Member) continue;
                 RationalSegmentInterval clip = span.Interval;
                 if (a.BoundaryEdge >= 0 && !IntersectMixedCurvedEdges(a.Member, span.First, clip,
                     a.Member, a.BoundaryEdge, a.Clip, out clip)) continue;
@@ -111,7 +111,7 @@ public sealed partial class StaticSurface2D
             Fixed64 bottom = FixedMath.Max(lower, band.Lower), top = FixedMath.Min(upper, band.Upper);
             if (bottom > top) continue;
             foreach (var span in band.Boundary.Spans)
-                if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined && span.OtherMember == b.Member
+                if (span.Kind == SpanKind.Joined && span.OtherMember == b.Member
                     && IntersectMixedCurvedEdges(a.Member, a.Face, clip, a.Member, span.First, span.Interval, out var shared)
                     && CurvedPrismContact.IntersectsBoundaryLine(geometry, a.Face, shared, bottom, top)) return true;
         }

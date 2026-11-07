@@ -10,6 +10,7 @@ using Gravitas.Constraints;
 
 namespace Gravitas;
 
+/// <content>Queues spatial contact response and solves deterministic islands of contacts and joints.</content>
 public sealed partial class GravitasPhysicsService
 {
     internal void QueueDiscreteResponsePair(CollisionPair pair)

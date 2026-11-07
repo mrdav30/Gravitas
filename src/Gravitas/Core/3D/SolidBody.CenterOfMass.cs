@@ -11,6 +11,7 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
+/// <content>Maintains the spatial center-of-mass offset and resolves it in world space.</content>
 public partial class SolidBody
 {
     private Vector3d _localCenterOfMassOffset;

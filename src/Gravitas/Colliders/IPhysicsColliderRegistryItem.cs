@@ -7,6 +7,9 @@
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Exposes the registration identity, dense service index, and replay order managed by the collider registry.
+/// </summary>
 internal interface IPhysicsColliderRegistryItem
 {
     int Id { get; }

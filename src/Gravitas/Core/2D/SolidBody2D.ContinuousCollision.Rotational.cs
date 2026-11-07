@@ -16,6 +16,7 @@ using SwiftCollections.Query;
 
 namespace Gravitas;
 
+/// <content>Searches planar trajectories for the earliest rotational contact and resolves the resulting motion.</content>
 public sealed partial class SolidBody2D
 {
     /// <summary>Gets whether body rotation leaves this collider's occupied geometry unchanged.</summary>
@@ -628,22 +629,22 @@ public sealed partial class SolidBody2D
 
         try
         {
-            Span<ContinuousCollisionMath.RotationalInterval> intervals =
-                stackalloc ContinuousCollisionMath.RotationalInterval[
+            Span<RotationalInterval> intervals =
+                stackalloc RotationalInterval[
                     ContinuousCollisionMath.RotationalIntervalMaxDepth + 2];
             int intervalCount = 1;
             int processedNodeCount = 0;
             bool hasKnownContact = false;
             Fixed64 knownContactTime = Fixed64.One;
             Contact2D knownContact = default;
-            intervals[0] = new ContinuousCollisionMath.RotationalInterval(
+            intervals[0] = new RotationalInterval(
                 Fixed64.Zero,
                 Fixed64.One,
                 depth: 0);
 
             while (intervalCount > 0)
             {
-                ContinuousCollisionMath.RotationalInterval interval = intervals[--intervalCount];
+                RotationalInterval interval = intervals[--intervalCount];
                 Fixed64 midpoint = (interval.LowerTime + interval.UpperTime) * Fixed64.Half;
                 Fixed64 intervalSpan = interval.UpperTime - interval.LowerTime;
                 Fixed64 midpointFrameFraction = ResolveRotationalFrameFraction(
@@ -726,18 +727,18 @@ public sealed partial class SolidBody2D
                 {
                     // A real midpoint contact is already an upper bound. Only the
                     // earlier half can contain an earlier first contact.
-                    intervals[intervalCount++] = new ContinuousCollisionMath.RotationalInterval(
+                    intervals[intervalCount++] = new RotationalInterval(
                         interval.LowerTime,
                         midpoint,
                         childDepth);
                     continue;
                 }
 
-                intervals[intervalCount++] = new ContinuousCollisionMath.RotationalInterval(
+                intervals[intervalCount++] = new RotationalInterval(
                     midpoint,
                     interval.UpperTime,
                     childDepth);
-                intervals[intervalCount++] = new ContinuousCollisionMath.RotationalInterval(
+                intervals[intervalCount++] = new RotationalInterval(
                     interval.LowerTime,
                     midpoint,
                     childDepth);

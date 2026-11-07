@@ -9,6 +9,9 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Selects contact candidates by penetration depth, accounting for clamped values on ties.
+/// </summary>
 internal static class ContactSelectionPolicy
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

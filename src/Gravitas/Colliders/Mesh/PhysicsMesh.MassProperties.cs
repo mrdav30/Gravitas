@@ -11,6 +11,7 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.Colliders;
 
+/// <content>Evaluates and caches closed-volume mesh mass properties and their scaled forms.</content>
 public partial class PhysicsMesh
 {
     private static readonly Signed576 ClosedVolumeRawDenominator =
@@ -404,7 +405,7 @@ public partial class PhysicsMesh
                 ? new FixedTriangle(vertices[_triangles[triangleIndex]], vertices[_triangles[triangleIndex + 1]], vertices[_triangles[triangleIndex + 2]])
                 : new FixedTriangle(vertices[_triangles[triangleIndex]] - reference,
                     vertices[_triangles[triangleIndex + 1]] - reference, vertices[_triangles[triangleIndex + 2]] - reference);
-            var coordinates = new TriangleShellMassProperties.TriangleCoordinates(triangle, sourceFrame, exactScale);
+            var coordinates = new TriangleCoordinates(triangle, sourceFrame, exactScale);
             Signed576 weight = GetTetrahedronDeterminant(coordinates);
             signedVolume = WideArithmetic.AddSigned576(signedVolume, weight);
             firstX = AddWeightedCoordinateSum(firstX, coordinates.AX, coordinates.BX, coordinates.CX, weight);
@@ -434,7 +435,7 @@ public partial class PhysicsMesh
     private static Signed576 AddWeighted(Signed576 total, Signed576 weight, Signed320 value) =>
         WideArithmetic.AddSigned576(total, Signed576.NarrowValue(WideArithmetic.MultiplySigned576ToSigned832(weight, value)));
 
-    private static Signed576 GetTetrahedronDeterminant(in TriangleShellMassProperties.TriangleCoordinates t)
+    private static Signed576 GetTetrahedronDeterminant(in TriangleCoordinates t)
     {
         Signed320 x = WideArithmetic.SubtractSigned320(WideArithmetic.MultiplySigned192(t.BY, t.CZ), WideArithmetic.MultiplySigned192(t.BZ, t.CY));
         Signed320 y = WideArithmetic.SubtractSigned320(WideArithmetic.MultiplySigned192(t.BZ, t.CX), WideArithmetic.MultiplySigned192(t.BX, t.CZ));

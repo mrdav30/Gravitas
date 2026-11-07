@@ -9,6 +9,9 @@ using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Carries a 2D contact lever or signals that the solver must use exact anchor arithmetic.
+/// </summary>
 internal readonly struct ContactLever2D
 {
     private ContactLever2D(Vector2d vector, bool isExact)

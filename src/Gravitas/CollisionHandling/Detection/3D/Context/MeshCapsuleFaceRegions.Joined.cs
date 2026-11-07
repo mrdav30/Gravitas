@@ -12,7 +12,7 @@ using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Query;
-using JoinedMember = Gravitas.CollisionHandling.MeshJoinedSurfaceRegions<FixedMathSharp.Geometry.CapsulePlaneRayFrame>.Member;
+using JoinedMember = Gravitas.CollisionHandling.Member<FixedMathSharp.Geometry.CapsulePlaneRayFrame>;
 
 namespace Gravitas.CollisionHandling;
 
@@ -99,7 +99,7 @@ internal sealed partial class MeshCapsuleFaceRegions
                 if (state.Members[member].Connectivity.RegionCount == 0) continue;
                 state.CurrentMember = member;
                 JoinedMember current = state.Members[member]; _frame = current.Frame;
-                ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> spans = current.Boundary.Spans;
+                ReadOnlySpan<BoundarySpan3D> spans = current.Boundary.Spans;
                 for (int span = 0; span < spans.Length; span++)
                 {
                     if (current.JoinedSpans[span] || !_frame.Finite.IntersectsSegment(new FixedSegment(spans[span].Start, spans[span].End))) continue;
@@ -168,7 +168,7 @@ internal sealed partial class MeshCapsuleFaceRegions
         foreach (JoinedMember member in state.Members.AsReadOnlySpan()[..state.Inputs.Count])
         {
             if (member.Connectivity.RegionCount == 0) continue;
-            ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> spans = member.Boundary.Spans;
+            ReadOnlySpan<BoundarySpan3D> spans = member.Boundary.Spans;
             for (int span = 0; span < spans.Length; span++)
                 if (!member.JoinedSpans[span] && member.Frame.Finite.IntersectsSegment(new FixedSegment(spans[span].Start, spans[span].End), spans[span].Interval))
                     return false;
@@ -195,11 +195,11 @@ internal sealed partial class MeshCapsuleFaceRegions
         for (int member = 0; member < state.Inputs.Count; member++)
         {
             JoinedMember source = state.Members[member];
-            ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> spans = source.Boundary.Spans;
+            ReadOnlySpan<BoundarySpan3D> spans = source.Boundary.Spans;
             for (int span = 0; span < spans.Length; span++)
             {
                 var edge = spans[span];
-                if (edge.Kind != MeshSurfaceBoundaryDomain.SpanKind.Joined) continue;
+                if (edge.Kind != SpanKind.Joined) continue;
                 if (!state.MemberBySurface.TryGetValue((state.Meshes[edge.OtherMember], edge.OtherSurface), out int other)) continue;
                 JoinedMember target = state.Members[other];
                 if (!edge.Interval.IsClipped && source.Connectivity.RegionCount == 1 && target.Connectivity.RegionCount == 1)

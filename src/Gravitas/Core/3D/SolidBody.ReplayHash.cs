@@ -10,6 +10,7 @@ using FixedMathSharp.Chronicler;
 
 namespace Gravitas;
 
+/// <content>Writes spatial body state and continuous collision trajectories to the replay hash.</content>
 public partial class SolidBody
 {
     internal void ContributeReplayHash(

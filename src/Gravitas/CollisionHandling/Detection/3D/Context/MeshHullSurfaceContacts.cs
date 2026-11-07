@@ -291,7 +291,7 @@ internal sealed class MeshHullSurfaceContacts : IConvexHullContactDomain, IScale
                 int saved = _member; _member = other;
                 foreach (var reciprocal in neighbor.Boundary.Spans)
                 {
-                    if (reciprocal.Kind != MeshSurfaceBoundaryDomain.SpanKind.Joined
+                    if (reciprocal.Kind != SpanKind.Joined
                         || reciprocal.OtherMember != member.Boundary.SourceMember || reciprocal.OtherSurface != member.Owner
                         || !IsReciprocalSpan(edge, member.Collider.Mesh, reciprocal, neighbor.Collider.Mesh)) continue;
                     int second = SupportEdgeRegion(other, reciprocal.First, reciprocal.Second);
@@ -311,8 +311,8 @@ internal sealed class MeshHullSurfaceContacts : IConvexHullContactDomain, IScale
         }
     }
 
-    private static bool IsReciprocalSpan(in MeshSurfaceBoundaryDomain.BoundarySpan source, PhysicsMesh sourceMesh,
-        in MeshSurfaceBoundaryDomain.BoundarySpan target, PhysicsMesh targetMesh)
+    private static bool IsReciprocalSpan(in BoundarySpan3D source, PhysicsMesh sourceMesh,
+        in BoundarySpan3D target, PhysicsMesh targetMesh)
     {
         // Trusted reciprocal spans are positive maximal runs after collinear
         // reduction and equal-class merging. Both exact ends identify the same
@@ -504,7 +504,7 @@ internal sealed class MeshHullSurfaceContacts : IConvexHullContactDomain, IScale
         return _intervals.AsReadOnlySpan();
     }
 
-    private bool MapBoundaryInterval(in MeshSurfaceBoundaryDomain.BoundarySpan edge, in RationalSegmentInterval interval,
+    private bool MapBoundaryInterval(in BoundarySpan3D edge, in RationalSegmentInterval interval,
         int start, int end, out RationalSegmentInterval mapped)
     {
         if (edge.First == _vertices[start] && edge.Second == _vertices[end])

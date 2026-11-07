@@ -11,6 +11,7 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
+/// <content>Provides deterministic ordering and response-island records for mixed collision solving.</content>
 internal sealed partial class GravitasMixedCollisionService
 {
     private sealed class PhysicsMixedPartitionOrderComparer : IComparer<PhysicsMixedPartition>

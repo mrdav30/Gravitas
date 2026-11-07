@@ -13,6 +13,7 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas.Queries;
 
+/// <content>Tests planar sweeps between convex shapes and constructs the earliest accepted hit.</content>
 internal static partial class QueryDetection2D
 {
     private static bool TrySweepCapsuleMover(

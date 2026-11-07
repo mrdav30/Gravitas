@@ -49,7 +49,7 @@ public sealed class MeshAuthoredFrameTests
         domain.Build(new[] { first.Mesh, second.Mesh }, 0, 0);
         int joined = 0;
         foreach (var span in domain.Spans)
-            if (span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined) joined++;
+            if (span.Kind == SpanKind.Joined) joined++;
         Assert.Equal(1, joined);
 
         using var surface = scene.Context.Physics.CreateStaticSurface(new[] { first, second });

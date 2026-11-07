@@ -12,6 +12,7 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas;
 
+/// <content>Samples rotational contact manifolds and resolves dynamic and kinematic spatial motion at contact.</content>
 public partial class SolidBody
 {
     /// <summary>Gets whether body rotation leaves this collider's occupied geometry unchanged.</summary>

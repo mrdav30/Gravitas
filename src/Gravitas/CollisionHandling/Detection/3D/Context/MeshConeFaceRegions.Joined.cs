@@ -11,7 +11,7 @@ using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Query;
-using Member = Gravitas.CollisionHandling.MeshJoinedSurfaceRegions<FixedMathSharp.Geometry.ConePlaneRayFrame>.Member;
+using Member = Gravitas.CollisionHandling.Member<FixedMathSharp.Geometry.ConePlaneRayFrame>;
 
 namespace Gravitas.CollisionHandling;
 
@@ -84,7 +84,7 @@ internal sealed partial class MeshConeFaceRegions
             Member source = state.Members[member];
             if (source.Connectivity.RegionCount == 0) continue;
             _currentMember = member; _frame = source.Frame;
-            ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> spans = source.Boundary.Spans;
+            ReadOnlySpan<BoundarySpan3D> spans = source.Boundary.Spans;
             for (int span = 0; span < spans.Length; span++)
             {
                 if (source.JoinedSpans[span] || !_frame.IntersectsSegment(new FixedSegment(spans[span].Start, spans[span].End))) continue;
@@ -114,11 +114,11 @@ internal sealed partial class MeshConeFaceRegions
             // A certified span can still suppress its seam and share response,
             // but ambiguous owner coverage cannot merge the exit regions.
             if (!source.BoundaryTrusted) continue;
-            ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> spans = source.Boundary.Spans;
+            ReadOnlySpan<BoundarySpan3D> spans = source.Boundary.Spans;
             for (int span = 0; span < spans.Length; span++)
             {
                 var edge = spans[span];
-                if (edge.Kind != MeshSurfaceBoundaryDomain.SpanKind.Joined
+                if (edge.Kind != SpanKind.Joined
                     || !state.MemberBySurface.TryGetValue((state.Meshes[edge.OtherMember], edge.OtherSurface), out int other)) continue;
                 Member target = state.Members[other];
                 if (!target.BoundaryTrusted) continue;

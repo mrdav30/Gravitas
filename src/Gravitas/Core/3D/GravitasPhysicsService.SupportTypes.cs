@@ -12,6 +12,7 @@ using Gravitas.Constraints;
 
 namespace Gravitas;
 
+/// <content>Provides spatial pair ordering, body mobility checks, and response-island records and comparers.</content>
 public sealed partial class GravitasPhysicsService
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

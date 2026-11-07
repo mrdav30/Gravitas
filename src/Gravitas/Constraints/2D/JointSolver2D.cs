@@ -12,6 +12,9 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas.Constraints;
 
+/// <summary>
+/// Builds and solves planar joint rows, applying cached impulses and recording solve metrics.
+/// </summary>
 internal static class JointSolver2D
 {
     internal const int MaxRowsPerJoint = 8;

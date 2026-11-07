@@ -174,13 +174,13 @@ public sealed partial class StaticSurface2D
                 if (RationalPoint3d.CompareProjection(point, a, Vector3d.Up) < 0
                     || RationalPoint3d.CompareProjection(point, b, Vector3d.Up) > 0) continue;
                 foreach (var span in band.Boundary.Spans)
-                    if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined && !_mixedFan.Contains(span.OtherMember)
+                    if (span.Kind == SpanKind.Joined && !_mixedFan.Contains(span.OtherMember)
                         && Locate(member, span) >= 0) _mixedFan.Add(span.OtherMember);
             }
         }
         return true;
 
-        int Locate(int member, MeshSurfaceBoundaryDomain2D.BoundarySpan span)
+        int Locate(int member, BoundarySpan2D span)
         {
             MixedPrism prism = _mixedPrisms[member];
             FixedSegment edge = new(new(span.Start.X, Fixed64.Zero, span.Start.Y), new(span.End.X, Fixed64.Zero, span.End.Y));

@@ -13,6 +13,7 @@ using Gravitas.Queries;
 
 namespace Gravitas;
 
+/// <content>Selects planar sweep modes and proxy radii and filters eligible continuous collision hits.</content>
 public sealed partial class SolidBody2D
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

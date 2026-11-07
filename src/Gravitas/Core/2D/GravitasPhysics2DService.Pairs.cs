@@ -13,6 +13,7 @@ using SwiftCollections;
 
 namespace Gravitas;
 
+/// <content>Finds planar collider pairs, expands the response set, and manages pair reuse and cleanup.</content>
 public sealed partial class GravitasPhysics2DService
 {
     internal void ProcessPartitionCandidate(int firstId, int secondId, WorldVoxelIndex partitionIndex)

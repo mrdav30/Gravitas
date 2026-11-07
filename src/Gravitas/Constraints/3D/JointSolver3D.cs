@@ -11,6 +11,9 @@ using Gravitas.CollisionHandling;
 
 namespace Gravitas.Constraints;
 
+/// <summary>
+/// Builds and solves spatial joint rows, applying cached impulses and recording solve metrics.
+/// </summary>
 internal static class JointSolver3D
 {
     internal const int MaxRowsPerJoint = 12;

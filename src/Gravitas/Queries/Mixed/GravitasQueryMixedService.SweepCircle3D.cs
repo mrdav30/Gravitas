@@ -13,9 +13,9 @@ using SwiftCollections;
 
 namespace Gravitas.Queries;
 
-/// <summary>
+/// <content>
 /// Owns mixed 2D-circle against 3D-collider sweep query behavior.
-/// </summary>
+/// </content>
 public sealed partial class GravitasQueryMixedService
 {
     /// <summary>

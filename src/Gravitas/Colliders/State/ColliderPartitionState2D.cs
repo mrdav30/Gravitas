@@ -12,6 +12,9 @@ using SwiftCollections;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Tracks planar partition memberships, previous grid bounds, and broad-phase changes.
+/// </summary>
 internal struct ColliderPartitionState2D
 {
     public bool IsPartitioned { get; private set; }

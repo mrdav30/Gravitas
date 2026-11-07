@@ -9,6 +9,7 @@ using FixedMathSharp;
 
 namespace Gravitas;
 
+/// <content>Maintains spatial mass and inertia tensors and derives effective mobility for the solver.</content>
 public partial class SolidBody
 {
     private bool CanUseAngularInertia => IsDynamic && !IsRotationFullyFrozen;

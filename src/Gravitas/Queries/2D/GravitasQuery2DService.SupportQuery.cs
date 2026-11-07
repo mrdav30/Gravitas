@@ -10,6 +10,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.Queries;
 
+/// <content>Finds planar support for a registered collider under the physical collision filtering rules.</content>
 public sealed partial class GravitasQuery2DService
 {
     /// <summary>Finds the nearest eligible physical support at a stable between-frame boundary.</summary>

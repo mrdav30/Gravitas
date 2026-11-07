@@ -9,4 +9,7 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.Queries;
 
+/// <summary>
+/// Filters a mesh triangle sweep hit against the continuous surface contact rules.
+/// </summary>
 internal delegate bool ContinuousSurfaceTriangleAdmission(int triangle, ref Physics3DHit hit, WideDirection3d? exactNormal);

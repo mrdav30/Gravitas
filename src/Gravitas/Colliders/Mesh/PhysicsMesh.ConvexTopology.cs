@@ -13,6 +13,7 @@ using SwiftCollections;
 
 namespace Gravitas.Colliders;
 
+/// <content>Welds topology vertices and validates convex boundaries for mesh collision features.</content>
 public partial class PhysicsMesh
 {
     private readonly SwiftList<VertexUse> _topologyVertexUses = new();

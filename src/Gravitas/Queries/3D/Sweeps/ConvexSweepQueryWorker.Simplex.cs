@@ -11,6 +11,7 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.Queries;
 
+/// <content>Reduces GJK simplices to their closest features and computes interpolation weights.</content>
 internal sealed partial class ConvexSweepQueryWorker
 {
     private static ClosestSimplexResult ReduceSegment(
