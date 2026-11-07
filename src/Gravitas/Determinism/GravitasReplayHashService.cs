@@ -20,7 +20,7 @@ internal static class GravitasReplayHashService
         GravitasReplayHashMode mode)
     {
         var writer = new ChronicleHashWriter();
-        writer.WriteSection("gravitas.replay", 2);
+        writer.WriteSection("gravitas.replay", 3);
         writer.WriteEnum(mode);
         writer.WriteEnum(context.Settings.RuntimeMode);
         writer.WriteInt32(context.FrameRate);

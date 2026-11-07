@@ -1,5 +1,16 @@
 # Gravitas Migration Guide
 
+## Byte-backed enums and replay hashes
+
+Replay hash schema 3 writes the byte-backed hash mode, 3D shape definition kind,
+mesh inertia policy, and material combine policies as one byte each. Regenerate
+saved replay hash baselines and use the same Gravitas build across peers when
+comparing hashes.
+
+`PhysicsMaterialCombine` now uses `byte`. Rebuild consumers against the new enum
+definition. MemoryPack payloads containing `PhysicsMaterial` use the new binary
+field layout.
+
 ## Shared diagnostics extraction
 
 Shared logging and exception guards now come from the independent

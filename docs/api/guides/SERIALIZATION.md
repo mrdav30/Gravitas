@@ -237,15 +237,16 @@ The authoritative hash follows the same boundary as
 
 Replay hashes use `Chronicler.Hashing.ChronicleHash` and Chronicler's
 hash-writer mechanics. Gravitas owns the physics-specific inclusion policy and
-deterministic ordering. The root `gravitas.replay` section is version 2: frame
-and late-phase stamps are signed 64-bit values, and elapsed time is ordered
-whole seconds (`long`) then fractional seconds (`uint`). Affected body, pair,
-manifold, and cache sections are versioned independently for their widened
-stamps. The `body.3d` section is version 7 and includes the automatic
-support-normal threshold; `body.2d` remains version 4. The `pair.mixed` section
-is version 9 and records retained contact-geometry freshness without hashing
-historical publication counters or poses. Hashes from older schema versions are
-not comparable.
+deterministic ordering. The root `gravitas.replay` section is version 3. The
+hash mode, 3D shape definition kind, mesh inertia policy, and material combine
+policies each contribute one byte. Frame and late-phase stamps are signed 64-bit
+values, and elapsed time is ordered whole seconds (`long`) then fractional
+seconds (`uint`). Affected body, pair, manifold, and cache sections are
+versioned independently for their widened stamps. The `body.3d` section is
+version 7 and includes the automatic support-normal threshold; `body.2d` remains
+version 4. The `pair.mixed` section is version 9 and records retained
+contact-geometry freshness without hashing historical publication counters or
+poses. Hashes from older schema versions are not comparable.
 
 Sparse transports that omit a default-valued `MotionType` deterministically
 resolve it to `Dynamic`. Both body recorders validate `GroundMinNormalDot` in
