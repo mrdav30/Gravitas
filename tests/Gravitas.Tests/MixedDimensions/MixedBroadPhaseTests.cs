@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -7,7 +8,6 @@ using GridForge.Configuration;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;

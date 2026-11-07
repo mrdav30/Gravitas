@@ -43,7 +43,8 @@ public sealed partial class MixedQueryCcdTests
         Vector2d planarPosition = new(9, 9);
         var planar = new SolidBody2D(new TestMatterAgent(context,
             new FixedTransform(planarPosition.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One)),
-            planarCollider) { Mass = Fixed64.One };
+            planarCollider)
+        { Mass = Fixed64.One };
         planar.Initialize(planarPosition, motionType: meshSource ? BodyMotionType.Static : BodyMotionType.Kinematic);
         planar.UseManualGrounding();
         mesh.Bounds.Intersects(planarCollider.MixedBounds3D).Should().BeTrue();

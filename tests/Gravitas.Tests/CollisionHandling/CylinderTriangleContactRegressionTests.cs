@@ -1,11 +1,11 @@
+using System;
+using System.Linq;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -152,7 +152,8 @@ public sealed class CylinderTriangleContactRegressionTests
         floor.Material = PhysicsMaterial.Default;
         scene.InitializeStaticCollider(floor, Vector3d.Zero);
         var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(Fixed64.Quarter,
-            (Fixed64)10 + Fixed64.FromRaw(heightOffset))) { Material = PhysicsMaterial.Frictionless };
+            (Fixed64)10 + Fixed64.FromRaw(heightOffset)))
+        { Material = PhysicsMaterial.Frictionless };
         scene.InitializeStaticCollider(cylinder, Vector3d.Zero);
         var pair = scene.CreatePair(floor, cylinder);
 

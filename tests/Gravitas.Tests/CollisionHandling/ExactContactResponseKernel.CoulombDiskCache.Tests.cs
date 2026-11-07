@@ -1,5 +1,4 @@
 using FixedMathSharp;
-using FixedMathSharp.Geometry;
 using Gravitas.CollisionHandling;
 using Xunit;
 

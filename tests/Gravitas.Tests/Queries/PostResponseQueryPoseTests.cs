@@ -25,7 +25,9 @@ public sealed class PostResponseQueryPoseTests
         AddWall(scene, mixed);
         var capsule = new LSCapsuleCollider
         {
-            Radius = Fixed64.Half, Size = new(1, 3, 1), Material = PhysicsMaterial.Frictionless
+            Radius = Fixed64.Half,
+            Size = new(1, 3, 1),
+            Material = PhysicsMaterial.Frictionless
         };
         var body = scene.CreateBody(capsule, new((Fixed64)(-2), Fixed64.Zero, Fixed64.Quarter), FixedQuaternion.Identity).Body;
         body.FreezeAxes = BodyFreezeAxes3D.PositionY | BodyFreezeAxes3D.Rotation;
@@ -58,7 +60,9 @@ public sealed class PostResponseQueryPoseTests
         AddWall(scene, mixed);
         var capsule = new LSCapsuleCollider
         {
-            Radius = (Fixed64)2, Size = new(4, 6, 4), Material = PhysicsMaterial.Frictionless
+            Radius = (Fixed64)2,
+            Size = new(4, 6, 4),
+            Material = PhysicsMaterial.Frictionless
         };
         var body = scene.CreateBody(capsule, new(-2, 0, 0), FixedQuaternion.Identity).Body;
         body.FreezeAxes = BodyFreezeAxes3D.PositionY | BodyFreezeAxes3D.Rotation;
@@ -105,7 +109,9 @@ public sealed class PostResponseQueryPoseTests
         AddWall(scene, mixed: true);
         var capsule = new LSCapsuleCollider
         {
-            Radius = Fixed64.Half, Size = new(1, 3, 1), Material = PhysicsMaterial.Frictionless
+            Radius = Fixed64.Half,
+            Size = new(1, 3, 1),
+            Material = PhysicsMaterial.Frictionless
         };
         var body = scene.CreateBody(capsule,
             new((Fixed64)(-2), Fixed64.Zero, Fixed64.Quarter), FixedQuaternion.Identity).Body;
@@ -122,7 +128,9 @@ public sealed class PostResponseQueryPoseTests
         Assert.Equal(Fixed64.Quarter, capsule.ScaledRadius);
         var reference = scene.CreateBody(new LSCapsuleCollider
         {
-            Radius = Fixed64.Quarter, Size = new(1, 3, 1), LocalOffset = Vector3d.Up * Fixed64.Quarter
+            Radius = Fixed64.Quarter,
+            Size = new(1, 3, 1),
+            LocalOffset = Vector3d.Up * Fixed64.Quarter
         }, new(5, 0, 5), body.Rotation).Body;
         Assert.Equal(reference.LocalCenterOfMassOffset, body.LocalCenterOfMassOffset);
         Assert.Equal(reference.InverseInertiaTensor, body.InverseInertiaTensor);
@@ -136,7 +144,9 @@ public sealed class PostResponseQueryPoseTests
         AddWall(scene, mixed: true);
         var capsule = new LSCapsuleCollider
         {
-            Radius = Fixed64.Half, Size = new(1, 3, 1), Material = PhysicsMaterial.Frictionless
+            Radius = Fixed64.Half,
+            Size = new(1, 3, 1),
+            Material = PhysicsMaterial.Frictionless
         };
         var body = scene.CreateBody(capsule, new((Fixed64)(-2), Fixed64.Zero, Fixed64.Half), FixedQuaternion.Identity).Body;
         body.FreezeAxes = BodyFreezeAxes3D.PositionY | BodyFreezeAxes3D.Rotation;
@@ -212,7 +222,7 @@ public sealed class PostResponseQueryPoseTests
         }
         else
             scene.InitializeStaticCollider(new LSCuboidCollider
-                { Size = new(16, 4, 2), Material = PhysicsMaterial.Frictionless }, new(0, 0, -1));
+            { Size = new(16, 4, 2), Material = PhysicsMaterial.Frictionless }, new(0, 0, -1));
     }
 
     private static void Configure(GravitasWorldContext context, bool mixed)

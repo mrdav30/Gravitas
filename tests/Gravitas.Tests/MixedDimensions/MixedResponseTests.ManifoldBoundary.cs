@@ -21,7 +21,8 @@ public sealed partial class MixedResponseTests
         LSMeshCollider mesh = MeshTestFixtures.CreateConvexCube(MeshColliderMode.Concave);
         mesh.Material = rough;
         var rotor = new SolidBody(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), mesh) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), mesh)
+        { Mass = Fixed64.One };
         rotor.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         rotor.FreezeAxes = BodyFreezeAxes3D.RotationX | BodyFreezeAxes3D.RotationZ;
         rotor.ApplyCollisionLinearVelocityDelta(Vector3d.Right);
@@ -73,9 +74,11 @@ public sealed partial class MixedResponseTests
         {
             new Vector3d(x, (Fixed64)(-2), (Fixed64)(-2)), new Vector3d(x, (Fixed64)2, (Fixed64)(-2)),
             new Vector3d(x, (Fixed64)(-2), (Fixed64)2), new Vector3d(x, (Fixed64)2, (Fixed64)2)
-        }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = rough };
+        }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = rough };
         var mover = new SolidBody(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), mesh) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), mesh)
+        { Mass = Fixed64.One };
         mover.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
         SolidBody2D circle = CreateCircularNormalBody(context, zeroCore: false, Vector2d.Zero);
         circle.Collider.Material = rough;
@@ -110,7 +113,8 @@ public sealed partial class MixedResponseTests
             CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Right * Fixed64.FromFraction(3, 4), PhysicsMaterial.Frictionless),
             CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Forward * Fixed64.FromFraction(3, 4), PhysicsMaterial.Frictionless));
         var target = new SolidBody2D(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), collider) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), collider)
+        { Mass = Fixed64.One };
         target.Initialize(Vector2d.Zero);
         target.FreezeAxes = BodyFreezeAxes2D.Rotation;
         source.Collider.Material = PhysicsMaterial.Frictionless;
@@ -219,11 +223,13 @@ public sealed partial class MixedResponseTests
         LSCollider shapeA = planarRecipient ? new LSCuboidCollider { Size = Vector3d.One } : new LSSphereCollider();
         LSCollider2D shapeB = planarRecipient ? new LSCircleCollider2D(Fixed64.Half) : new LSAABBoxCollider2D(Vector2d.One);
         var bodyA = new SolidBody(new TestMatterAgent(context,
-            new FixedTransform(positionA, FixedQuaternion.Identity, Vector3d.One)), shapeA) { Mass = Fixed64.One };
+            new FixedTransform(positionA, FixedQuaternion.Identity, Vector3d.One)), shapeA)
+        { Mass = Fixed64.One };
         bodyA.Initialize(positionA, FixedQuaternion.Identity,
             planarRecipient ? BodyMotionType.Kinematic : BodyMotionType.Dynamic);
         var bodyB = new SolidBody2D(new TestMatterAgent(context,
-            new FixedTransform(positionB.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One)), shapeB) { Mass = Fixed64.One };
+            new FixedTransform(positionB.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One)), shapeB)
+        { Mass = Fixed64.One };
         bodyB.Initialize(positionB, motionType: planarRecipient ? BodyMotionType.Dynamic : BodyMotionType.Kinematic);
         shapeA.Material = shapeB.Material = PhysicsMaterial.Frictionless;
         bodyA.FreezeAxes = planarRecipient ? BodyFreezeAxes3D.None : BodyFreezeAxes3D.Rotation;
@@ -255,11 +261,13 @@ public sealed partial class MixedResponseTests
         Vector3d wallPosition = new(Fixed64.Half, Fixed64.Zero, Fixed64.FromFraction(2, 5));
         var wall = new LSCuboidCollider { Size = new Vector3d(Fixed64.Half, Fixed64.Two, Fixed64.FromFraction(1, 5)) };
         var bodyA = new SolidBody(new TestMatterAgent(context,
-            new FixedTransform(wallPosition, FixedQuaternion.Identity, Vector3d.One)), wall) { Mass = Fixed64.One };
+            new FixedTransform(wallPosition, FixedQuaternion.Identity, Vector3d.One)), wall)
+        { Mass = Fixed64.One };
         bodyA.Initialize(wallPosition, FixedQuaternion.Identity, BodyMotionType.Kinematic);
         var box = new LSAABBoxCollider2D(Vector2d.One);
         var bodyB = new SolidBody2D(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), box) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), box)
+        { Mass = Fixed64.One };
         bodyB.Initialize(Vector2d.Zero);
         wall.Material = box.Material = PhysicsMaterial.Frictionless;
         var manifold = new ContactManifold();
@@ -292,14 +300,16 @@ public sealed partial class MixedResponseTests
         {
             body2D = new SolidBody2D(new TestMatterAgent(context,
                 new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)),
-                new LSAABBoxCollider2D(new Vector2d((Fixed64)4, Fixed64.One))) { Mass = Fixed64.FromRaw(4) };
+                new LSAABBoxCollider2D(new Vector2d((Fixed64)4, Fixed64.One)))
+            { Mass = Fixed64.FromRaw(4) };
             body2D.Initialize(Vector2d.Zero);
         }
         else
         {
             body3D = new SolidBody(new TestMatterAgent(context,
                 new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)),
-                new LSCuboidCollider { Size = new Vector3d((Fixed64)4, Fixed64.One, Fixed64.One) }) { Mass = Fixed64.FromRaw(4) };
+                new LSCuboidCollider { Size = new Vector3d((Fixed64)4, Fixed64.One, Fixed64.One) })
+            { Mass = Fixed64.FromRaw(4) };
             body3D.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         }
         // The normal is the genuine +Z face direction at its X=2 corner.
@@ -319,7 +329,8 @@ public sealed partial class MixedResponseTests
         using GravitasWorldContext context = CreateMixedContext();
         var body = new SolidBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)),
-            new LSCuboidCollider { Size = Vector3d.One }) { Mass = Fixed64.One };
+            new LSCuboidCollider { Size = Vector3d.One })
+        { Mass = Fixed64.One };
         body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
 
         ContactNormalImpulseMixed.TryCalculateVelocityDeltas(body, Vector3d.Forward,
@@ -355,7 +366,8 @@ public sealed partial class MixedResponseTests
             CompoundColliderPart2D.AABBox(new Vector2d(Fixed64.FromFraction(1, 5), (Fixed64)4),
                 Vector2d.Right * Fixed64.FromFraction(2, 5)),
             CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)4, Fixed64.FromFraction(1, 5)),
-                Vector2d.Forward * Fixed64.FromFraction(2, 5))) { IsTrigger = !spatialTrigger };
+                Vector2d.Forward * Fixed64.FromFraction(2, 5)))
+        { IsTrigger = !spatialTrigger };
         var agent2D = new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One));
         SolidBody2D? body2D = null;
@@ -397,7 +409,8 @@ public sealed partial class MixedResponseTests
             CompoundColliderPart2D.AABBox(new Vector2d(Fixed64.FromFraction(1, 5), Fixed64.FromFraction(1, 5)),
                 Vector2d.Forward * Fixed64.FromFraction(2, 5), PhysicsMaterial.Frictionless));
         var target = new SolidBody2D(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), collider) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), collider)
+        { Mass = Fixed64.One };
         target.Initialize(Vector2d.Zero);
         target.FreezeAxes = BodyFreezeAxes2D.Rotation;
         source.Body.Mass = target.Mass = Fixed64.MaxValue;
@@ -523,7 +536,8 @@ public sealed partial class MixedResponseTests
         using GravitasWorldContext context = CreateMixedContext();
         var box = new LSCuboidCollider { Size = Vector3d.One, Material = PhysicsMaterial.Frictionless };
         var source = new SolidBody(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), box) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), box)
+        { Mass = Fixed64.One };
         source.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         var wall = new LSAABBoxCollider2D(new Vector2d(Fixed64.Half, Fixed64.FromFraction(1, 5)))
         { Material = PhysicsMaterial.Frictionless };

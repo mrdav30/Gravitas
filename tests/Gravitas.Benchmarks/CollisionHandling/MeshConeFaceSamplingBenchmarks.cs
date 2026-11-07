@@ -1,14 +1,8 @@
-//=======================================================================
-// MeshConeFaceSamplingBenchmarks.cs
-//=======================================================================
-// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
-// See LICENSE file in the project root for full license information.
-//=======================================================================
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System;
 
 namespace Gravitas.Benchmarks;
 
@@ -39,20 +33,20 @@ public class MeshConeFaceSamplingBenchmarks
         Vector3d[] corners = { new(-extent,Fixed64.Zero,-extent), new(extent,Fixed64.Zero,-extent),
             new(extent,Fixed64.Zero,extent), new(-extent,Fixed64.Zero,extent) };
         Vector3d[] vertices = corners;
-        int[] triangles = { 0,1,2, 0,2,3 };
+        int[] triangles = { 0, 1, 2, 0, 2, 3 };
         if (subdivided)
         {
             const int segments = 8;
             vertices = new Vector3d[segments * 4 + 1];
             triangles = new int[segments * 4 * 3];
             for (int side = 0; side < 4; side++)
-            for (int step = 0; step < segments; step++)
-            {
-                int index = side * segments + step;
-                vertices[index + 1] = Vector3d.Lerp(corners[side], corners[(side + 1) % 4], Fixed64.FromFraction(step, segments));
-                triangles[index * 3 + 1] = index + 1;
-                triangles[index * 3 + 2] = (index + 1) % (segments * 4) + 1;
-            }
+                for (int step = 0; step < segments; step++)
+                {
+                    int index = side * segments + step;
+                    vertices[index + 1] = Vector3d.Lerp(corners[side], corners[(side + 1) % 4], Fixed64.FromFraction(step, segments));
+                    triangles[index * 3 + 1] = index + 1;
+                    triangles[index * 3 + 2] = (index + 1) % (segments * 4) + 1;
+                }
         }
         _mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
         // Every triangle includes the cone's interior center, exactly. The

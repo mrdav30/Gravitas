@@ -247,10 +247,10 @@ public sealed class JoinedConeBoundaryTests
     {
         using var scene = PhysicsScenarioBuilder.Create();
         Vector3d scale = new(Fixed64.FromFraction(2, 3), Fixed64.One, Fixed64.FromFraction(3, 5));
-        var first = Mesh(scene, new[] { new Vector3d(-4,0,-4), new(-4,0,4), new(0,0,-4), new(0,0,4) },
-            new[] { 0,1,2,2,1,3 }, scale: scale);
-        var second = Mesh(scene, new[] { new Vector3d(0,0,-4), new(0,0,4), new(5,0,-4), new(5,0,4) },
-            new[] { 0,1,2,2,1,3 }, scale: scale);
+        var first = Mesh(scene, new[] { new Vector3d(-4, 0, -4), new(-4, 0, 4), new(0, 0, -4), new(0, 0, 4) },
+            new[] { 0, 1, 2, 2, 1, 3 }, scale: scale);
+        var second = Mesh(scene, new[] { new Vector3d(0, 0, -4), new(0, 0, 4), new(5, 0, -4), new(5, 0, 4) },
+            new[] { 0, 1, 2, 2, 1, 3 }, scale: scale);
         using var surface = scene.Context.Physics.CreateStaticSurface(new[] { second, first });
         var cone = new LSConeCollider();
         Vector3d center = Vector3d.Up * Fixed64.Quarter;

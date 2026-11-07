@@ -1,12 +1,12 @@
+using System;
+using System.Collections.Generic;
+using Chronicler.Timing;
 using FixedMathSharp;
 using FixedMathSharp.Chronicler;
-using Chronicler.Timing;
 using FluentAssertions;
 using GridForge.Configuration;
 using GridForge.Grids;
 using GridForge.Grids.Topology;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Runtime;

@@ -52,7 +52,7 @@ Package mode remains the release-validation path.
 
 1. Keep the change focused and preserve deterministic behavior, stable ordering,
    and engine-agnostic runtime boundaries.
-2. Add or update tests for behavior changes and keep the README, wiki, XML
+2. Add or update tests for behavior changes and keep the README, guides, XML
    documentation, and benchmarks aligned with the affected public contract.
 3. Run the `Release` build and tests. Also run `ReleaseLean` when changing
    packages, serialization, MemoryPack conditionals, or shared runtime APIs.
@@ -65,87 +65,59 @@ Package mode remains the release-validation path.
 
 - Keep the root README short, welcoming, and focused on why someone would use
   Gravitas.
-- Put task-oriented guidance and cross-cutting behavior in `docs/wiki`; keep
-  links between wiki pages relative and include their `.md` extensions.
+- Put task-oriented guidance and cross-cutting behavior in `docs/api/guides`;
+  keep links between guide pages relative and include their `.md` extensions.
 - Keep public XML documentation factual and useful because it feeds the DocFX
   API reference.
-- Update the matching wiki page whenever lifecycle, dimensional behavior,
-  collision, queries, serialization, replay, or diagnostics change.
+- Update the matching guide whenever lifecycle, dimensional behavior, collision,
+  queries, serialization, replay, or diagnostics change.
 
-Please follow the code of conduct in all project interactions.
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md) in all project
+interactions. See [Support](.github/SUPPORT.md) for help and
+[Security](SECURITY.md) for private vulnerability reports.
 
-## Code of Conduct
+## Documentation ownership and cleanup
 
-### Our Pledge
+Conceptual guides publish alongside the API reference from `docs/api/guides`.
+The repository Markdown is the source of truth; there is no wiki synchronization
+workflow. Keep guides evergreen and preserve completed design and validation
+records under `docs/feature-work/done` as history.
 
-In the interest of fostering an open and welcoming environment, we as
-contributors and maintainers pledge to making participation in our project and
-our community a harassment-free experience for everyone, regardless of age, body
-size, disability, ethnicity, gender identity and expression, level of
-experience, nationality, personal appearance, race, religion, or sexual identity
-and orientation.
+Give each namespace-level type or delegate its own file. Public/internal nested
+types use companion files while preserving containing types, generic
+constraints, attributes and CLR identities. Private nested helpers may stay with
+their owner. Authored C# files under `src` carry the current filename and MIT
+license header. Test and benchmark files under `tests` have no license headers.
 
-### Our Standards
+Run cleanup explicitly before review using the SDK from `global.json` and
+Node.js/npm for Prettier:
 
-Examples of behavior that contributes to creating a positive environment
-include:
+```powershell
+$env:TargetFramework='net10.0'
+dotnet format Gravitas.slnx --severity error
+Remove-Item Env:TargetFramework
+npx --yes prettier@3.9.5 --write .
+```
 
-- Using welcoming and inclusive language
-- Being respectful of differing viewpoints and experiences
-- Gracefully accepting constructive criticism
-- Focusing on what is best for the community
-- Showing empathy towards other community members
+Select one target framework for formatting to avoid competing fixes in shared
+multi-target files. Keep imports needed by other targets inside their matching
+conditional block, and validate both target frameworks after cleanup. Clear the
+framework selection before normal multi-target builds. If workspace loading
+reports unmatched project/metadata references, stop semantic fixes and
+clean/rebuild before retrying. Use the existing local-stack environment flags
+when coordinated-source formatting is needed.
 
-Examples of unacceptable behavior by participants include:
+The .NET formatter follows `.editorconfig`; it does not reproduce a Visual
+Studio cleanup profile. Prettier is pinned in the command and may download on
+first use. `.prettierignore` excludes generated output and reviewed replay
+fixtures whose exact file hashes identify conformance inputs. No commit hook
+rewrites or stages files.
 
-- The use of sexualized language or imagery and unwelcome sexual attention or
-  advances
-- Trolling, insulting/derogatory comments, and personal or political attacks
-- Public or private harassment
-- Publishing others' private information, such as a physical or electronic
-  address, without explicit permission
-- Other conduct which could reasonably be considered inappropriate in a
-  professional setting
+Check without rewriting files:
 
-### Our Responsibilities
-
-Project maintainers are responsible for clarifying the standards of acceptable
-behavior and are expected to take appropriate and fair corrective action in
-response to any instances of unacceptable behavior.
-
-Project maintainers have the right and responsibility to remove, edit, or reject
-comments, commits, code, wiki edits, issues, and other contributions that are
-not aligned to this Code of Conduct, or to ban temporarily or permanently any
-contributor for other behaviors that they deem inappropriate, threatening,
-offensive, or harmful.
-
-### Scope
-
-This Code of Conduct applies both within project spaces and in public spaces
-when an individual is representing the project or its community. Examples of
-representing a project or community include using an official project e-mail
-address, posting via an official social media account, or acting as an appointed
-representative at an online or offline event. Representation of a project may be
-further defined and clarified by project maintainers.
-
-### Enforcement
-
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team at `david.oravsky@gmail.com`. All
-complaints will be reviewed and investigated and will result in a response that
-is deemed necessary and appropriate to the circumstances. The project team is
-obligated to maintain confidentiality with regard to the reporter of an
-incident. Further details of specific enforcement policies may be posted
-separately.
-
-Project maintainers who do not follow or enforce the Code of Conduct in good
-faith may face temporary or permanent repercussions as determined by other
-members of the project's leadership.
-
-### Attribution
-
-This Code of Conduct is adapted from the [Contributor Covenant][homepage],
-version 1.4, available at the [version 1.4 text][version].
-
-[homepage]: https://www.contributor-covenant.org/
-[version]: https://www.contributor-covenant.org/version/1/4/code-of-conduct/
+```powershell
+$env:TargetFramework='net10.0'
+dotnet format Gravitas.slnx --severity error --verify-no-changes
+Remove-Item Env:TargetFramework
+npx --yes prettier@3.9.5 --check .
+```

@@ -1,10 +1,10 @@
+using System.Numerics;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -79,10 +79,10 @@ public sealed class CollisionPositionCorrectionTests
             var cases = new TheoryData<PhysicsRuntimeMode, Fixed64, Fixed64, Vector2d>();
             foreach (PhysicsRuntimeMode mode in new[]
                 { PhysicsRuntimeMode.TwoD, PhysicsRuntimeMode.ThreeD, PhysicsRuntimeMode.Mixed })
-            foreach (Vector2d normal in new[] { Vector2d.Right,
+                foreach (Vector2d normal in new[] { Vector2d.Right,
                 new Vector2d(Fixed64.FromFraction(3, 5), Fixed64.FromFraction(4, 5)) })
-            foreach ((Fixed64 first, Fixed64 second) in new[]
-            {
+                    foreach ((Fixed64 first, Fixed64 second) in new[]
+                    {
                 (Fixed64.Zero, Fixed64.FromRaw(3)),
                 (Fixed64.FromRaw(3), Fixed64.Zero),
                 (Fixed64.FromRaw(5), Fixed64.FromRaw(5)),
@@ -100,7 +100,7 @@ public sealed class CollisionPositionCorrectionTests
                 (Fixed64.Zero, Fixed64.MaxValue),
                 (Fixed64.MaxValue, Fixed64.Zero)
             })
-                cases.Add(mode, first, second, normal);
+                        cases.Add(mode, first, second, normal);
             return cases;
         }
     }

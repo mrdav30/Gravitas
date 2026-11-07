@@ -1,11 +1,11 @@
+using System;
+using System.Collections.Generic;
 using Chronicler.Hashing;
 using Chronicler.Timing;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Determinism;

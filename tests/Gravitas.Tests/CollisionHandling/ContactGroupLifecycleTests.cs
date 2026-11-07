@@ -1,12 +1,12 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using Chronicler.Hashing;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;

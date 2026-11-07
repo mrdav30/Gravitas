@@ -1,8 +1,8 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System;
 
 namespace Gravitas.Benchmarks;
 
@@ -27,34 +27,34 @@ public class MeshConeSurfaceContactBenchmarks
         int[] triangles;
         if (Geometry == "JoinedWalls")
         {
-            vertices = new Vector3d[] { new(0,-4,0), new(0,4,0), new(0,4,4), new(0,-4,4), new(4,-4,0), new(4,4,0) };
-            triangles = new[] { 0,1,2, 0,2,3, 0,4,5, 0,5,1 };
+            vertices = new Vector3d[] { new(0, -4, 0), new(0, 4, 0), new(0, 4, 4), new(0, -4, 4), new(4, -4, 0), new(4, 4, 0) };
+            triangles = new[] { 0, 1, 2, 0, 2, 3, 0, 4, 5, 0, 5, 1 };
         }
         else if (Geometry == "DisconnectedSupports")
         {
-            Fixed64 near = Fixed64.FromFraction(1,16), far = Fixed64.FromFraction(3,16);
+            Fixed64 near = Fixed64.FromFraction(1, 16), far = Fixed64.FromFraction(3, 16);
             vertices = new[] { new Vector3d(-far,Fixed64.Zero,-near), new Vector3d(-near,Fixed64.Zero,-near),
                 new Vector3d(-near,Fixed64.Zero,near), new Vector3d(-far,Fixed64.Zero,near),
                 new Vector3d(near,Fixed64.Zero,-near), new Vector3d(far,Fixed64.Zero,-near),
                 new Vector3d(far,Fixed64.Zero,near), new Vector3d(near,Fixed64.Zero,near) };
-            triangles = new[] { 0,1,2, 0,2,3, 4,5,6, 4,6,7 };
+            triangles = new[] { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 };
         }
         else if (Geometry == "Ring")
         {
-            Fixed64 inner = Fixed64.FromFraction(1,16);
+            Fixed64 inner = Fixed64.FromFraction(1, 16);
             vertices = new[] { new Vector3d(-1,0,-1), new Vector3d(1,0,-1), new Vector3d(1,0,1), new Vector3d(-1,0,1),
                 new Vector3d(-inner,Fixed64.Zero,-inner), new Vector3d(inner,Fixed64.Zero,-inner),
                 new Vector3d(inner,Fixed64.Zero,inner), new Vector3d(-inner,Fixed64.Zero,inner) };
-            triangles = new[] { 0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6, 3,0,4, 3,4,7 };
+            triangles = new[] { 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7 };
         }
         else if (Geometry == "ThinTab")
         {
-            Fixed64 side = Fixed64.FromFraction(1,10), tab = Fixed64.FromFraction(1,32);
+            Fixed64 side = Fixed64.FromFraction(1, 10), tab = Fixed64.FromFraction(1, 32);
             vertices = new[] { new Vector3d(-side,Fixed64.Zero,-side), new Vector3d(side,Fixed64.Zero,-side),
                 new Vector3d(side,Fixed64.Zero,-tab), new Vector3d(Fixed64.Half,Fixed64.Zero,-tab),
                 new Vector3d(Fixed64.Half,Fixed64.Zero,tab), new Vector3d(side,Fixed64.Zero,tab),
                 new Vector3d(side,Fixed64.Zero,side), new Vector3d(-side,Fixed64.Zero,side) };
-            triangles = new[] { 0,1,2, 0,2,5, 0,5,6, 0,6,7, 2,3,4, 2,4,5 };
+            triangles = new[] { 0, 1, 2, 0, 2, 5, 0, 5, 6, 0, 6, 7, 2, 3, 4, 2, 4, 5 };
         }
         else
         {
@@ -93,7 +93,7 @@ public class MeshConeSurfaceContactBenchmarks
         var cone = new LSConeCollider();
         var coneAgent = new BenchmarkMatterAgent(_context,
             Geometry == "JoinedWalls"
-                ? new Vector3d(Fixed64.FromFraction(3,10), Fixed64.Zero, Fixed64.FromFraction(3,10))
+                ? new Vector3d(Fixed64.FromFraction(3, 10), Fixed64.Zero, Fixed64.FromFraction(3, 10))
                 : new Vector3d(tilted ? -Fixed64.FromFraction(28, 25)
                     : Geometry == "QuadEdge" ? Fixed64.Two : Fixed64.Zero,
                     -Fixed64.Quarter, Fixed64.Zero));

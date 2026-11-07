@@ -1,7 +1,6 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Queries;
 using Gravitas.Tests.Support;

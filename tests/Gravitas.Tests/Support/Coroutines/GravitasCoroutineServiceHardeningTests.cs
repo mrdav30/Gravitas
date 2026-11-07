@@ -1,10 +1,10 @@
-using FluentAssertions;
-using Gravitas.Support;
-using SwiftCollections;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using FluentAssertions;
+using Gravitas.Support;
+using SwiftCollections;
 using Xunit;
 using static Gravitas.Tests.Support.Coroutines.CoroutineTestRoutines;
 

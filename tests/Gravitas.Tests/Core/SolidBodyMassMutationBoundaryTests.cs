@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -5,7 +6,6 @@ using Gravitas.CollisionHandling;
 using Gravitas.Constraints;
 using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -20,7 +20,8 @@ public sealed class SolidBodyMassMutationBoundaryTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var body = new SolidBody(new TestMatterAgent(context),
-            new LSSphereCollider(ColliderShapeDefinition.Sphere((Fixed64)1024))) { Mass = Fixed64.FromRaw(3) };
+            new LSSphereCollider(ColliderShapeDefinition.Sphere((Fixed64)1024)))
+        { Mass = Fixed64.FromRaw(3) };
         body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         body.Sleep();
         object payload = GravitasSerializationHarness.Serialize(body, transport);

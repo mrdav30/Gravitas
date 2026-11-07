@@ -1,17 +1,17 @@
 //=======================================================================
 // SolidBody2D.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System.Runtime.CompilerServices;
 using Chronicler;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using SwiftCollections;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 

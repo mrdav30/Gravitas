@@ -4,11 +4,12 @@
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
+
+using System;
+using System.Collections.Generic;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using SwiftCollections;
-using System;
-using System.Collections.Generic;
 
 namespace Gravitas.CollisionHandling;
 
@@ -213,7 +214,9 @@ internal sealed partial class MeshConeFaceRegions
         internal Sample(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor, Vector3d p, Vector3d q, Fixed64 depth, ulong identity = 0,
             int member = -1, int supplier = -1, int span = -1,
             Vector3d authored = default, Vector3d coneLocal = default)
-        { Source = source; Event = descriptor; MeshPoint = p; ConePoint = q; Depth = depth; Identity = identity;
-            Member = member; Supplier = supplier; Span = span; AuthoredPoint = authored; ConeLocalPoint = coneLocal; }
+        {
+            Source = source; Event = descriptor; MeshPoint = p; ConePoint = q; Depth = depth; Identity = identity;
+            Member = member; Supplier = supplier; Span = span; AuthoredPoint = authored; ConeLocalPoint = coneLocal;
+        }
     }
 }

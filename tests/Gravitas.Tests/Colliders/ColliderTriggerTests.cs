@@ -1,9 +1,9 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;

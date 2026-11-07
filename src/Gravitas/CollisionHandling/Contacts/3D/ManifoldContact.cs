@@ -1,14 +1,14 @@
-﻿//=======================================================================
+//=======================================================================
 // ManifoldContact.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using FixedMathSharp;
-using Gravitas.Materials;
 using System;
 using System.Runtime.CompilerServices;
+using FixedMathSharp;
+using Gravitas.Materials;
 
 namespace Gravitas.CollisionHandling;
 

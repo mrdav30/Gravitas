@@ -1,10 +1,10 @@
+using System;
+using System.Linq;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;

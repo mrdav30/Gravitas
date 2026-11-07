@@ -1,8 +1,8 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -20,7 +20,8 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
         FixedQuaternion rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, -Fixed64.One, Fixed64.One).Normalized;
         var source = ColliderShapeDefinition.Capsule(Fixed64.Half, (Fixed64)21).CreateCollider();
         var body = new SolidBody(new TestMatterAgent(context,
-            new FixedTransform(position, rotation, Vector3d.One)), source) { Mass = Fixed64.One };
+            new FixedTransform(position, rotation, Vector3d.One)), source)
+        { Mass = Fixed64.One };
         body.Initialize(position, rotation, BodyMotionType.Kinematic);
         LSCollider obstacle = ColliderShapeDefinition.Cylinder((Fixed64)10, Fixed64.Two).CreateCollider();
         obstacle.InitializeWithNoBody(new TestMatterAgent(context,
@@ -52,7 +53,8 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var source = ColliderShapeDefinition.Cylinder(Fixed64.Half, Fixed64.Two).CreateCollider();
         var body = new SolidBody(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), source) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), source)
+        { Mass = Fixed64.One };
         body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
         FixedQuaternion rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized;
         LSCollider obstacle = ColliderShapeDefinition.Cylinder(Fixed64.FromFraction(5, 4), Fixed64.Two).CreateCollider();
@@ -83,7 +85,8 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var source = ColliderShapeDefinition.Cylinder(Fixed64.One, Fixed64.Two).CreateCollider();
         var body = new SolidBody(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), source) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), source)
+        { Mass = Fixed64.One };
         body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
         var obstacle = new LSMeshCollider(new[] { new Vector3d(0, 7, -5), new Vector3d(10, 1, -5), new Vector3d(5, 4, 5) },
             new[] { 0, 1, 2 }, MeshColliderMode.Concave);
@@ -140,8 +143,8 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
     public static IEnumerable<object[]> TargetFamilies()
     {
         for (int source = 0; source < 3; source++)
-        for (int target = 0; target < 8; target++)
-            yield return new object[] { source, target };
+            for (int target = 0; target < 8; target++)
+                yield return new object[] { source, target };
     }
 
     [Theory]
@@ -150,52 +153,52 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
         int sourceFamily, int targetFamily)
     {
         foreach (bool compound in new[] { false, true })
-        foreach (int offset in new[] { -1, 0, 1 })
-        {
-            // Concave mesh is a standalone surface, not an authored compound part.
-            if (compound && targetFamily == 7) continue;
-            using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-            Fixed64 targetTop = targetFamily >= 6 ? Fixed64.Zero
-                : targetFamily == 1 ? Fixed64.Two : Fixed64.One;
-            Fixed64 sourceHalfHeight = sourceFamily == 1 ? Fixed64.Two : Fixed64.One;
-            Vector3d position = new(Fixed64.Zero,
-                targetTop + sourceHalfHeight + Fixed64.FromRaw(offset), Fixed64.Zero);
-            ColliderShapeDefinition initial = SourceShape(sourceFamily, Fixed64.Half);
-            LSCollider source = initial.CreateCollider();
-            var body = new SolidBody(new TestMatterAgent(context,
-                new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One)), source)
-            { Mass = Fixed64.One };
-            body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
-            LSCollider obstacle = CreateTarget(targetFamily, compound);
-            obstacle.InitializeWithNoBody(new TestMatterAgent(context,
-                new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
-            var before = context.ComputeReplayHash();
-            int publications = 0;
-
-            ColliderReconfigurationStatus result = body.TryReconfigureCollider(
-                SourceShape(sourceFamily, Fixed64.One), Vector3d.Zero, position,
-                out var blocker, out var failure, () => publications++);
-
-            // Every target has a known top support point; source bottom is
-            // exactly targetTop+offset. No contact result defines this oracle.
-            bool penetrates = offset < 0;
-            result.Should().Be(penetrates ? ColliderReconfigurationStatus.Blocked
-                : ColliderReconfigurationStatus.Applied,
-                $"source {sourceFamily}, target {targetFamily}, compound {compound}, offset {offset}");
-            failure.Should().BeNull();
-            publications.Should().Be(penetrates ? 0 : 1);
-            if (penetrates)
+            foreach (int offset in new[] { -1, 0, 1 })
             {
-                blocker.Should().BeSameAs(obstacle);
-                context.ComputeReplayHash().Should().Be(before);
-                body.Collider.Should().BeSameAs(source);
+                // Concave mesh is a standalone surface, not an authored compound part.
+                if (compound && targetFamily == 7) continue;
+                using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+                Fixed64 targetTop = targetFamily >= 6 ? Fixed64.Zero
+                    : targetFamily == 1 ? Fixed64.Two : Fixed64.One;
+                Fixed64 sourceHalfHeight = sourceFamily == 1 ? Fixed64.Two : Fixed64.One;
+                Vector3d position = new(Fixed64.Zero,
+                    targetTop + sourceHalfHeight + Fixed64.FromRaw(offset), Fixed64.Zero);
+                ColliderShapeDefinition initial = SourceShape(sourceFamily, Fixed64.Half);
+                LSCollider source = initial.CreateCollider();
+                var body = new SolidBody(new TestMatterAgent(context,
+                    new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One)), source)
+                { Mass = Fixed64.One };
+                body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+                LSCollider obstacle = CreateTarget(targetFamily, compound);
+                obstacle.InitializeWithNoBody(new TestMatterAgent(context,
+                    new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+                var before = context.ComputeReplayHash();
+                int publications = 0;
+
+                ColliderReconfigurationStatus result = body.TryReconfigureCollider(
+                    SourceShape(sourceFamily, Fixed64.One), Vector3d.Zero, position,
+                    out var blocker, out var failure, () => publications++);
+
+                // Every target has a known top support point; source bottom is
+                // exactly targetTop+offset. No contact result defines this oracle.
+                bool penetrates = offset < 0;
+                result.Should().Be(penetrates ? ColliderReconfigurationStatus.Blocked
+                    : ColliderReconfigurationStatus.Applied,
+                    $"source {sourceFamily}, target {targetFamily}, compound {compound}, offset {offset}");
+                failure.Should().BeNull();
+                publications.Should().Be(penetrates ? 0 : 1);
+                if (penetrates)
+                {
+                    blocker.Should().BeSameAs(obstacle);
+                    context.ComputeReplayHash().Should().Be(before);
+                    body.Collider.Should().BeSameAs(source);
+                }
+                else
+                {
+                    blocker.Should().BeNull();
+                    source.ScaledRadius.Should().Be(Fixed64.One);
+                }
             }
-            else
-            {
-                blocker.Should().BeNull();
-                source.ScaledRadius.Should().Be(Fixed64.One);
-            }
-        }
     }
 
     private static ColliderShapeDefinition SourceShape(int family, Fixed64 radius) => family switch
@@ -215,15 +218,15 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
             3,7,6, 3,6,2, 0,4,7, 0,7,3, 1,2,6, 1,6,5 };
         if (family == 8)
             return new LSMeshCollider(cube, faces, MeshColliderMode.Concave);
-        Vector3d[] plane = { new(-2,0,-2), new(2,0,-2), new(0,0,2) };
-        int[] triangle = { 0,2,1 };
+        Vector3d[] plane = { new(-2, 0, -2), new(2, 0, -2), new(0, 0, 2) };
+        int[] triangle = { 0, 2, 1 };
         if (family == 7)
             return new LSMeshCollider(plane, triangle, MeshColliderMode.Concave);
         ColliderShapeDefinition shape = family switch
         {
             0 => ColliderShapeDefinition.Sphere(Fixed64.One),
             1 => ColliderShapeDefinition.Capsule(Fixed64.One, (Fixed64)4),
-            2 => ColliderShapeDefinition.Cuboid(new Vector3d(2,2,2)),
+            2 => ColliderShapeDefinition.Cuboid(new Vector3d(2, 2, 2)),
             3 => ColliderShapeDefinition.Cylinder(Fixed64.One, Fixed64.Two),
             4 => ColliderShapeDefinition.Cone(Fixed64.One, Fixed64.Two),
             5 => ColliderShapeDefinition.ConvexMesh(cube, faces),

@@ -1,7 +1,7 @@
+using System;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -58,7 +58,7 @@ public sealed class MeshSurfaceConnectivityTests
         {
             Vector3d.Zero, new Vector3d(-1,0,-1), new Vector3d(1,0,-1),
             new Vector3d(1,0,1), new Vector3d(-1,0,1)
-        }, new[] { 0,1,2, 0,2,3, 0,3,4, 0,4,1 });
+        }, new[] { 0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1 });
         var connectivity = new MeshSurfaceConnectivity();
         Vector3d center = Vector3d.Up * (Fixed64.One + (Fixed64)coreLength / 2);
         connectivity.BuildCapsule(mesh, 0, center, FixedQuaternion.Identity, (Fixed64)coreLength,
@@ -247,7 +247,7 @@ public sealed class MeshSurfaceConnectivityTests
         {
             new Vector3d(0,0,3), new Vector3d(-3,0,1), new Vector3d(-2,0,-3),
             new Vector3d(2,0,-3), new Vector3d(3,0,1), Vector3d.Zero
-        }, new[] { 5,0,2, 5,2,4, 5,4,1, 5,1,3, 5,3,0 });
+        }, new[] { 5, 0, 2, 5, 2, 4, 5, 4, 1, 5, 1, 3, 5, 3, 0 });
         var connectivity = new MeshSurfaceConnectivity();
         connectivity.Build(mesh, 2, new Vector3d(Fixed64.Quarter, Fixed64.Zero, (Fixed64)3 / 4),
             FixedQuaternion.Identity, (Fixed64)4, Fixed64.Quarter, new[] { 2, 4 });
@@ -305,7 +305,7 @@ public sealed class MeshSurfaceConnectivityTests
         new Vector3d(-2,0,-2), new Vector3d(2,0,-2), new Vector3d(2,0,2), new Vector3d(-2,0,2),
         new Vector3d(-Fixed64.Half,Fixed64.Zero,-Fixed64.Half), new Vector3d(Fixed64.Half,Fixed64.Zero,-Fixed64.Half),
         new Vector3d(Fixed64.Half,Fixed64.Zero,Fixed64.Half), new Vector3d(-Fixed64.Half,Fixed64.Zero,Fixed64.Half)
-    }, new[] { 0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6, 3,0,4, 3,4,7 });
+    }, new[] { 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7 });
 
     private static PhysicsMesh Create(Vector3d[] vertices, int[] triangles) =>
         new(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);

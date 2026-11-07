@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -6,7 +7,6 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using SwiftCollections;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Queries;
@@ -17,7 +17,8 @@ public sealed class CertifiedMeshSweepTests
     private static readonly Fixed64 Tolerance = ConvexSweepQueryWorker.ContactTolerance * 2;
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void AlmostAlignedCircleCast_ShouldRetainItsFiniteHitOrMiss(bool misses)
     {
         using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
@@ -51,7 +52,8 @@ public sealed class CertifiedMeshSweepTests
     }
 
     [Theory]
-    [InlineData(-45)] [InlineData(45)]
+    [InlineData(-45)]
+    [InlineData(45)]
     public void PosedTiltedFace_ShouldPublishTheMatchingSlabCap(int roll)
     {
         using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
@@ -69,7 +71,8 @@ public sealed class CertifiedMeshSweepTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void AlmostVerticalFace_ShouldKeepTheExactCapSign(bool mirror)
     {
         using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
@@ -112,7 +115,8 @@ public sealed class CertifiedMeshSweepTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void PartialOrInitiallyIntersectingBounds_ShouldRetainAuthoredFiniteEntry(bool tilted)
     {
         using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
@@ -151,7 +155,8 @@ public sealed class CertifiedMeshSweepTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void MixedEntry_ShouldDistinguishARealRimFromATiltedSupportingFace(bool tilted)
     {
         using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
@@ -198,8 +203,10 @@ public sealed class CertifiedMeshSweepTests
     }
 
     [Theory]
-    [InlineData(1, false)] [InlineData(1, true)]
-    [InlineData(16, false)] [InlineData(16, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(16, false)]
+    [InlineData(16, true)]
     public void RepeatedMissTriangles_ShouldNotHideADifferentHitOrRetainSourceInputs(int repeats, bool includeHit)
     {
         using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
@@ -264,15 +271,17 @@ public sealed class CertifiedMeshSweepTests
     }
 
     [Theory]
-    [InlineData(-1)] [InlineData(0)] [InlineData(1)]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
     public void OffsetSlabAgainstVerticalPatch_ShouldKeepASupportingFaceNormal(int side)
     {
         using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
         scene.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         var vertices = new Vector3d[9];
         for (int y = 0; y < 3; y++)
-        for (int z = 0; z < 3; z++)
-            vertices[y * 3 + z] = new Vector3d(Fixed64.Zero, Fixed64.FromFraction(y - 1, 2), Fixed64.FromFraction(z - 1, 2));
+            for (int z = 0; z < 3; z++)
+                vertices[y * 3 + z] = new Vector3d(Fixed64.Zero, Fixed64.FromFraction(y - 1, 2), Fixed64.FromFraction(z - 1, 2));
         var target = new LSMeshCollider(vertices, new[] { 0, 3, 1, 1, 3, 4, 1, 4, 2, 2, 4, 5,
             3, 6, 4, 4, 6, 7, 4, 7, 5, 5, 7, 8 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         scene.InitializeStaticCollider(target, Vector3d.Zero);
@@ -285,60 +294,65 @@ public sealed class CertifiedMeshSweepTests
     }
 
     [Theory]
-    [InlineData(0, false)] [InlineData(0, true)]
-    [InlineData(1, false)] [InlineData(1, true)]
-    [InlineData(2, false)] [InlineData(2, true)]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
     public void OrdinaryFace_ShouldRetainAnalyticTimeAndFiniteWitnesses(int kind, bool affine)
     {
         foreach (bool reverse in new[] { false, true })
-        foreach (FixedQuaternion rotation in new[] { FixedQuaternion.Identity, PhysicsScenarioBuilder.Yaw(31),
+            foreach (FixedQuaternion rotation in new[] { FixedQuaternion.Identity, PhysicsScenarioBuilder.Yaw(31),
             new FixedQuaternion(Fixed64.Zero, Fixed64.One, Fixed64.Zero, Fixed64.One).Normalized })
-        foreach (Fixed64 z in new[] { Fixed64.Zero, Fixed64.MinValue + (Fixed64)32 })
-        foreach (int side in new[] { -1, 1 })
-        {
-            using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
-            scene.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-            Vector3d origin = Vector3d.Forward * z;
-            if (z != Fixed64.Zero)
-                scene.Context.World.TryAddGrid(new GridConfiguration(origin - Vector3d.One * 8,
-                    origin + Vector3d.One * 8), out _).Should().BeTrue();
-            LSMeshCollider target = Quad(affine, reverse);
-            target.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(origin, rotation,
-                new Vector3d(affine ? Fixed64.Half : Fixed64.One, Fixed64.One, Fixed64.One))));
-            target.Mesh.HasSingleConvexCoplanarPatch.Should().BeTrue();
-            Vector3d start = origin + rotation * Vector3d.Right * (side * 3);
-            Vector3d travel = rotation * Vector3d.Left * (side * 6);
-            LSMeshCollider? source = CreateSource(scene, kind, start, rotation);
+                foreach (Fixed64 z in new[] { Fixed64.Zero, Fixed64.MinValue + (Fixed64)32 })
+                    foreach (int side in new[] { -1, 1 })
+                    {
+                        using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
+                        scene.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+                        Vector3d origin = Vector3d.Forward * z;
+                        if (z != Fixed64.Zero)
+                            scene.Context.World.TryAddGrid(new GridConfiguration(origin - Vector3d.One * 8,
+                                origin + Vector3d.One * 8), out _).Should().BeTrue();
+                        LSMeshCollider target = Quad(affine, reverse);
+                        target.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(origin, rotation,
+                            new Vector3d(affine ? Fixed64.Half : Fixed64.One, Fixed64.One, Fixed64.One))));
+                        target.Mesh.HasSingleConvexCoplanarPatch.Should().BeTrue();
+                        Vector3d start = origin + rotation * Vector3d.Right * (side * 3);
+                        Vector3d travel = rotation * Vector3d.Left * (side * 6);
+                        LSMeshCollider? source = CreateSource(scene, kind, start, rotation);
 
-            Sweep(scene.Context, kind, source, start, travel, out Fixed64 distance, out Vector3d point,
-                out Vector3d normal, out Vector3d companion).Should().BeTrue();
-            (distance - Fixed64.FromFraction(5, 2)).Abs().Should().BeLessThanOrEqualTo(Tolerance);
-            Vector3d local = rotation.Inverse() * (point - origin);
-            local.X.Abs().Should().BeLessThanOrEqualTo(Tolerance);
-            local.Y.Abs().Should().BeLessThanOrEqualTo(kind == 2 ? Fixed64.Half + Tolerance : Fixed64.One + Tolerance);
-            local.Z.Abs().Should().BeLessThanOrEqualTo(Fixed64.One + Tolerance);
-            Vector3d.Dot(normal, travel).Should().BeLessThan(Fixed64.Zero);
-            Vector3d center = start + travel.Normalized * distance;
-            if (kind == 0)
-                ((point - center).Magnitude - Fixed64.Half).Abs().Should().BeLessThanOrEqualTo(Tolerance);
-            else if (kind == 1)
-            {
-                Vector3d onSource = rotation.Inverse() * (point - center);
-                (onSource.X.Abs() - Fixed64.Half).Abs().Should().BeLessThanOrEqualTo(Tolerance);
-                onSource.Y.Abs().Should().BeLessThanOrEqualTo(Fixed64.Half + Tolerance);
-                onSource.Z.Abs().Should().BeLessThanOrEqualTo(Fixed64.Half + Tolerance);
-            }
-            else
-            {
-                (point - companion).Magnitude.Should().BeLessThanOrEqualTo(Tolerance);
-                ((companion.ToVector2d() - center.ToVector2d()).Magnitude - Fixed64.Half).Abs()
-                    .Should().BeLessThanOrEqualTo(Tolerance);
-            }
-        }
+                        Sweep(scene.Context, kind, source, start, travel, out Fixed64 distance, out Vector3d point,
+                            out Vector3d normal, out Vector3d companion).Should().BeTrue();
+                        (distance - Fixed64.FromFraction(5, 2)).Abs().Should().BeLessThanOrEqualTo(Tolerance);
+                        Vector3d local = rotation.Inverse() * (point - origin);
+                        local.X.Abs().Should().BeLessThanOrEqualTo(Tolerance);
+                        local.Y.Abs().Should().BeLessThanOrEqualTo(kind == 2 ? Fixed64.Half + Tolerance : Fixed64.One + Tolerance);
+                        local.Z.Abs().Should().BeLessThanOrEqualTo(Fixed64.One + Tolerance);
+                        Vector3d.Dot(normal, travel).Should().BeLessThan(Fixed64.Zero);
+                        Vector3d center = start + travel.Normalized * distance;
+                        if (kind == 0)
+                            ((point - center).Magnitude - Fixed64.Half).Abs().Should().BeLessThanOrEqualTo(Tolerance);
+                        else if (kind == 1)
+                        {
+                            Vector3d onSource = rotation.Inverse() * (point - center);
+                            (onSource.X.Abs() - Fixed64.Half).Abs().Should().BeLessThanOrEqualTo(Tolerance);
+                            onSource.Y.Abs().Should().BeLessThanOrEqualTo(Fixed64.Half + Tolerance);
+                            onSource.Z.Abs().Should().BeLessThanOrEqualTo(Fixed64.Half + Tolerance);
+                        }
+                        else
+                        {
+                            (point - companion).Magnitude.Should().BeLessThanOrEqualTo(Tolerance);
+                            ((companion.ToVector2d() - center.ToVector2d()).Magnitude - Fixed64.Half).Abs()
+                                .Should().BeLessThanOrEqualTo(Tolerance);
+                        }
+                    }
     }
 
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
     public void RimAndEmptyCorner_ShouldKeepTheFiniteSurface(int kind)
     {
         using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
@@ -388,7 +402,9 @@ public sealed class CertifiedMeshSweepTests
     }
 
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
     public void EqualDistanceTargets_ShouldKeepColliderOrderAndRepeatExactly(int kind)
     {
         using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();

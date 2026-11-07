@@ -113,9 +113,12 @@ public sealed class StaticSurfaceContinuationTests
     }
 
     [Theory]
-    [InlineData(false, 0)] [InlineData(true, 0)]
-    [InlineData(false, 1)] [InlineData(true, 1)]
-    [InlineData(false, 2)] [InlineData(true, 2)]
+    [InlineData(false, 0)]
+    [InlineData(true, 0)]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
     public void JoinedQuerySupport_ShouldRevalidateItsMemberWithoutWakingForAnUnchangedWitness(bool planar, int change)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -132,7 +135,7 @@ public sealed class StaticSurfaceContinuationTests
             surface = scene.Context.Physics2D.CreateStaticSurface(new[] { left, right, remote });
             var circle = new LSCircleCollider2D(Fixed64.Half) { LocalOffset = Vector2d.Forward };
             flat = new SolidBody2D(new TestMatterAgent(scene.Context), circle)
-                { Mass = Fixed64.One, Gravity = -Vector2d.Forward, SleepEnabled = false };
+            { Mass = Fixed64.One, Gravity = -Vector2d.Forward, SleepEnabled = false };
             flat.Initialize(new(-2, 0));
             mutate = change == 0 ? () => remote.Material = PhysicsMaterial.Bouncy
                 : change == 1 ? () => right.Agent.Transform.LocalPosition += Vector3d.Right * (Fixed64)12

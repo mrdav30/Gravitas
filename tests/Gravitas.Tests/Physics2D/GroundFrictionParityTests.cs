@@ -1,9 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.CollisionHandling;
 using Gravitas.Materials;
-using Gravitas.Support;
 using Gravitas.Tests.Support;
 using Xunit;
 
@@ -17,9 +15,9 @@ public sealed class GroundFrictionParityTests
         {
             var cases = new TheoryData<PhysicsRuntimeMode, int, int>();
             foreach (PhysicsRuntimeMode mode in new[] { PhysicsRuntimeMode.TwoD, PhysicsRuntimeMode.Mixed })
-            foreach (int rate in new[] { 4, 64 })
-            foreach (int sizeDivisor in new[] { 1, 8 })
-                cases.Add(mode, rate, sizeDivisor);
+                foreach (int rate in new[] { 4, 64 })
+                    foreach (int sizeDivisor in new[] { 1, 8 })
+                        cases.Add(mode, rate, sizeDivisor);
             return cases;
         }
     }

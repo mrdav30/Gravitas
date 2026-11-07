@@ -9,12 +9,7 @@ using FixedMathSharp;
 
 namespace Gravitas.Constraints;
 
-internal enum JointConstraintRowKind3D : byte
-{
-    Linear,
-    Angular,
-    Motor
-}
+
 
 internal struct JointConstraintRow3D
 {

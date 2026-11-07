@@ -52,6 +52,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Gravitas.SharedBenchmarkSupport\ContinuousCollisionBenchmarkLayout.cs" Link="Support\ContinuousCollisionBenchmarkLayout.cs" />
+    <Compile Include="..\Gravitas.SharedBenchmarkSupport\ContinuousCollisionBenchmarkSet.cs" Link="Support\ContinuousCollisionBenchmarkSet.cs" />
+    <Compile Include="..\Gravitas.SharedBenchmarkSupport\ContinuousCollisionBenchmarkDescriptor.cs" Link="Support\ContinuousCollisionBenchmarkDescriptor.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Remove=".gitignore" />

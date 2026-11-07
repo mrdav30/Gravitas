@@ -17,13 +17,16 @@ public sealed partial class ContinuousCollisionDetectionTests
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         var mesh = new LSMeshCollider(new[] { Vector3d.Zero, Vector3d.Right * (Fixed64)10,
-            Vector3d.Up * (Fixed64)10 }, new[] { 0,1,2 }, MeshColliderMode.Concave,
+            Vector3d.Up * (Fixed64)10 }, new[] { 0, 1, 2 }, MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
-        var cuboid = new LSCuboidCollider { Size = new Vector3d((Fixed64)12,
-            Fixed64.FromFraction(1,10), Fixed64.FromFraction(1,10)) };
+        var cuboid = new LSCuboidCollider
+        {
+            Size = new Vector3d((Fixed64)12,
+            Fixed64.FromFraction(1, 10), Fixed64.FromFraction(1, 10))
+        };
         SolidBody meshBody = scenario.CreateBody(mesh, Vector3d.Zero, FixedQuaternion.Identity,
             immovable: !meshSource, isKinematic: meshSource).Body;
-        SolidBody boxBody = scenario.CreateBody(cuboid, new Vector3d(9,9,0), FixedQuaternion.Identity,
+        SolidBody boxBody = scenario.CreateBody(cuboid, new Vector3d(9, 9, 0), FixedQuaternion.Identity,
             immovable: meshSource, isKinematic: !meshSource).Body;
         SolidBody source = meshSource ? meshBody : boxBody;
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
@@ -76,17 +79,22 @@ public sealed partial class ContinuousCollisionDetectionTests
             new Vector3d(0,2,-2), new Vector3d(0,2,2)
         };
         int[] triangles = joinedWall
-            ? new[] { 0,3,1, 1,3,2, 0,4,3, 3,4,5 }
-            : new[] { 0,3,1, 1,3,2 };
+            ? new[] { 0, 3, 1, 1, 3, 2, 0, 4, 3, 3, 4, 5 }
+            : new[] { 0, 3, 1, 1, 3, 2 };
         if (!joinedWall) System.Array.Resize(ref vertices, 4);
         var mesh = new LSMeshCollider(vertices, triangles, mode,
-            MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+            MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
         scenario.CreateBody(mesh, Vector3d.Zero, FixedQuaternion.Identity, immovable: true);
         using var surface = declaredSurface ? scenario.Context.Physics.CreateStaticSurface(new[] { mesh }) : null;
-        var cone = new LSConeCollider { Radius = Fixed64.Half, Size = Vector3d.One,
-            Material = PhysicsMaterial.Frictionless };
+        var cone = new LSConeCollider
+        {
+            Radius = Fixed64.Half,
+            Size = Vector3d.One,
+            Material = PhysicsMaterial.Frictionless
+        };
         SolidBody body = scenario.CreateBody(cone,
-            new Vector3d(Fixed64.FromFraction(3,5), Fixed64.FromFraction(11,20), Fixed64.Zero),
+            new Vector3d(Fixed64.FromFraction(3, 5), Fixed64.FromFraction(11, 20), Fixed64.Zero),
             FixedQuaternion.Identity, isKinematic: true).Body;
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         body.UseManualGrounding();
@@ -118,11 +126,15 @@ public sealed partial class ContinuousCollisionDetectionTests
         var mesh = new LSMeshCollider(new[] { new Vector3d(0, 0, -2), new Vector3d(2, 0, -2),
             new Vector3d(2, 0, 2), new Vector3d(0, 0, 2) }, new[] { 0, 3, 1, 1, 3, 2 },
             MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
-            { Material = PhysicsMaterial.Frictionless };
+        { Material = PhysicsMaterial.Frictionless };
         SolidBody meshBody = scene.CreateBody(mesh, Vector3d.Zero, FixedQuaternion.Identity,
             isKinematic: meshSource).Body;
-        var cone = new LSConeCollider { Radius = Fixed64.Half, Size = Vector3d.One,
-            Material = PhysicsMaterial.Frictionless };
+        var cone = new LSConeCollider
+        {
+            Radius = Fixed64.Half,
+            Size = Vector3d.One,
+            Material = PhysicsMaterial.Frictionless
+        };
         SolidBody coneBody = scene.CreateBody(cone,
             new Vector3d(Fixed64.FromFraction(3, 5), Fixed64.Half, Fixed64.Zero),
             FixedQuaternion.Identity, isKinematic: !meshSource).Body;
@@ -178,8 +190,12 @@ public sealed partial class ContinuousCollisionDetectionTests
         LSMeshCollider mesh = MeshTestFixtures.CreateConvexQuadFloor(MeshColliderMode.Concave);
         mesh.Material = PhysicsMaterial.Frictionless;
         scene.InitializeStaticCollider(mesh, Vector3d.Zero);
-        var cone = new LSConeCollider { Radius = Fixed64.Half, Size = Vector3d.One,
-            Material = PhysicsMaterial.Frictionless };
+        var cone = new LSConeCollider
+        {
+            Radius = Fixed64.Half,
+            Size = Vector3d.One,
+            Material = PhysicsMaterial.Frictionless
+        };
         SolidBody body = scene.CreateBody(cone, new Vector3d(Fixed64.FromFraction(3, 5),
             Fixed64.Half, Fixed64.Zero), FixedQuaternion.Identity).Body;
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;

@@ -5,30 +5,14 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using SwiftCollections;
 using System.Collections.Generic;
+using SwiftCollections;
 
 namespace Gravitas;
 
-internal interface IIslandNodeState
-{
-    int BodyKey { get; }
 
-    int ParentIndex { get; set; }
 
-    int RootKey { get; set; }
 
-    bool IsAwakeForCollision { get; }
-
-    void WakeFromCollision();
-}
-
-internal sealed class IslandNodeKeyComparer<TNode> : IComparer<TNode>
-    where TNode : struct, IIslandNodeState
-{
-    public int Compare(TNode left, TNode right) =>
-        left.BodyKey.CompareTo(right.BodyKey);
-}
 
 internal static class IslandGraphUtility
 {

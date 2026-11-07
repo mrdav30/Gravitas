@@ -39,7 +39,8 @@ public sealed partial class MixedResponseTests
         ScenarioBody<LSSphereCollider> first = CreateSphere3D(context, Vector3d.Zero, preventAngularForces: true);
         var box = new LSAABBoxCollider2D(new Vector2d((Fixed64)2048, Fixed64.One));
         var second = new SolidBody2D(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), box) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), box)
+        { Mass = Fixed64.One };
         second.Initialize(Vector2d.Zero);
         second.FreezeAxes = BodyFreezeAxes2D.Rotation;
         var material = new PhysicsMaterial(Fixed64.Zero, Fixed64.Zero, Fixed64.One);

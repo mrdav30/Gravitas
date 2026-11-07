@@ -1,15 +1,15 @@
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
-public sealed class ConvexColliderSupportTests
+public sealed partial class ConvexColliderSupportTests
 {
     [Fact]
     public void CylinderSupport_InteriorDistanceSupport_ShouldPreserveContactFeatureSelection()
@@ -824,10 +824,5 @@ public sealed class ConvexColliderSupportTests
         return point;
     }
 
-    public enum FiniteAxisShape
-    {
-        Capsule,
-        Cylinder,
-        Cone,
-    }
+
 }

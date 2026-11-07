@@ -1,11 +1,16 @@
+//=======================================================================
+// StaticSurface2D.MixedRegions.cs
+//=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
-using System;
 
 namespace Gravitas;
 
@@ -391,8 +396,10 @@ public sealed partial class StaticSurface2D
         internal readonly Fixed64 Lower, Upper;
         internal MixedRegion(int group, int member, int face, int band, in MeshSurfaceBoundaryDomain2D.BoundarySpan span,
             Fixed64 lower, Fixed64 upper, int edgeStart, int edgeEnd, in RationalSegmentInterval edgeInterval)
-        { Group = group; Member = member; Face = face; Band = band; Span = span; Lower = lower; Upper = upper;
-            EdgeStart = edgeStart; EdgeEnd = edgeEnd; EdgeInterval = edgeInterval; }
+        {
+            Group = group; Member = member; Face = face; Band = band; Span = span; Lower = lower; Upper = upper;
+            EdgeStart = edgeStart; EdgeEnd = edgeEnd; EdgeInterval = edgeInterval;
+        }
     }
 
     private sealed class MixedRegionSupport : IScaledConvexHullContactDomain

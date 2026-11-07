@@ -1,3 +1,5 @@
+using System;
+using System.Numerics;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
@@ -6,8 +8,6 @@ using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
 using SwiftCollections;
 using SwiftCollections.Query;
-using System;
-using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -22,7 +22,7 @@ public sealed class MeshAuthoredLifecycleTests
         var collider = new LSMeshCollider(vertices, new[] { 0, 2, 1 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         Vector3d scale = Vector3d.One * Fixed64.Half;
         var body = new SolidBody(new TestMatterAgent(context, new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, scale)), collider)
-            { Mass = Fixed64.One };
+        { Mass = Fixed64.One };
         body.Initialize(Vector3d.One, FixedQuaternion.Identity);
         var rotation = FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)17, (Fixed64)23, (Fixed64)31);
         Vector3d reference = collider.Mesh.LocalBounds.Center;
@@ -310,7 +310,8 @@ public sealed class MeshAuthoredLifecycleTests
             var collider = new LSMeshCollider(new[] { new Vector3d(-2, 0, -2), new Vector3d(3, 0, -2), new Vector3d(0, 0, 3) },
                 new[] { 0, 2, 1 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
             var body = new SolidBody(new TestMatterAgent(context, new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity,
-                new Vector3d(Fixed64.FromFraction(2, 3), Fixed64.One, Fixed64.FromFraction(3, 5)))), collider) { Mass = Fixed64.One };
+                new Vector3d(Fixed64.FromFraction(2, 3), Fixed64.One, Fixed64.FromFraction(3, 5)))), collider)
+            { Mass = Fixed64.One };
             body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
             return body;
         }
@@ -343,7 +344,7 @@ public sealed class MeshAuthoredLifecycleTests
             BigInteger x = r.X.m_rawValue, y = r.Y.m_rawValue, z = r.Z.m_rawValue, w = r.W.m_rawValue;
             return (new[,] { { w*w+x*x-y*y-z*z, 2*(x*y-z*w), 2*(x*z+y*w) },
                 { 2*(x*y+z*w), w*w-x*x+y*y-z*z, 2*(y*z-x*w) },
-                { 2*(x*z-y*w), 2*(y*z+x*w), w*w-x*x-y*y+z*z } }, x*x+y*y+z*z+w*w);
+                { 2*(x*z-y*w), 2*(y*z+x*w), w*w-x*x-y*y+z*z } }, x * x + y * y + z * z + w * w);
         }
     }
 }

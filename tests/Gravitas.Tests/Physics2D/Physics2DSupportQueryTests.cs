@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -5,7 +6,6 @@ using Gravitas.Constraints;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -119,7 +119,8 @@ public sealed class Physics2DSupportQueryTests
             context.ApplySettings(new PhysicsSettings(4, new[,]
             {
                 { true, true, false }, { true, true, true }, { false, true, true }
-            }) { RuntimeMode = PhysicsRuntimeMode.TwoD });
+            })
+            { RuntimeMode = PhysicsRuntimeMode.TwoD });
         SolidBody2D source = Source(context);
         var near = new LSAABBoxCollider2D(new Vector2d(12, 1));
         near.Layer = new PhysicsLayer(2);

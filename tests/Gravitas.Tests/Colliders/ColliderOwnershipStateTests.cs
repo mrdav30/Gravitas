@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using Chronicler.Diagnostics;
 using Chronicler.Hashing;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
@@ -7,9 +10,6 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
-using Chronicler.Diagnostics;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;

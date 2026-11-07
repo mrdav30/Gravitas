@@ -1,8 +1,8 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;
@@ -20,12 +20,14 @@ public sealed class GeometryRangeSerializationTests
         using GravitasWorldContext targetContext = GravitasWorldContext.CreateOwned();
         sourceContext.Settings.RuntimeMode = targetContext.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
         var source = new SolidBody2D(new TestMatterAgent(sourceContext, CreateTransform(Fixed64.Quarter)),
-            new LSCircleCollider2D((Fixed64)6000)) { Mass = (Fixed64)2 };
+            new LSCircleCollider2D((Fixed64)6000))
+        { Mass = (Fixed64)2 };
         source.Initialize(Vector2d.Zero);
         source.Sleep();
         object payload = GravitasSerializationHarness.Serialize(source, transport);
         var target = new SolidBody2D(new TestMatterAgent(targetContext, CreateTransform(Fixed64.Quarter)),
-            new LSCircleCollider2D(Fixed64.One)) { Mass = (Fixed64)2 };
+            new LSCircleCollider2D(Fixed64.One))
+        { Mass = (Fixed64)2 };
         target.Initialize(Vector2d.Zero);
 
         GravitasSerializationHarness.Populate(target, payload, transport);
@@ -53,12 +55,14 @@ public sealed class GeometryRangeSerializationTests
         using GravitasWorldContext sourceContext = GravitasWorldContext.CreateOwned();
         using GravitasWorldContext targetContext = GravitasWorldContext.CreateOwned();
         var source = new SolidBody(new TestMatterAgent(sourceContext, CreateTransform(Fixed64.Quarter)),
-            new LSSphereCollider { Radius = (Fixed64)6000 }) { Mass = (Fixed64)2 };
+            new LSSphereCollider { Radius = (Fixed64)6000 })
+        { Mass = (Fixed64)2 };
         source.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         source.Sleep();
         object payload = GravitasSerializationHarness.Serialize(source, transport);
         var target = new SolidBody(new TestMatterAgent(targetContext, CreateTransform(Fixed64.Quarter)),
-            new LSSphereCollider { Radius = Fixed64.One }) { Mass = (Fixed64)2 };
+            new LSSphereCollider { Radius = Fixed64.One })
+        { Mass = (Fixed64)2 };
         target.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
 
         GravitasSerializationHarness.Populate(target, payload, transport);

@@ -16,9 +16,9 @@ public sealed class SleepingContactInvalidationTests
         {
             var cases = new TheoryData<bool, bool, int>();
             foreach (bool bodyless in new[] { false, true })
-            foreach (bool automatic in new[] { false, true })
-            foreach (int change in new[] { 0, 1, 2 })
-                cases.Add(bodyless, automatic, change);
+                foreach (bool automatic in new[] { false, true })
+                    foreach (int change in new[] { 0, 1, 2 })
+                        cases.Add(bodyless, automatic, change);
             return cases;
         }
     }

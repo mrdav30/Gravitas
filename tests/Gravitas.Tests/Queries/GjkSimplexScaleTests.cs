@@ -1,6 +1,6 @@
+using System;
 using FixedMathSharp;
 using Gravitas.Queries;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Queries;

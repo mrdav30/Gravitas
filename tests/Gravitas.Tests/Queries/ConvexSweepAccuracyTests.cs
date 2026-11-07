@@ -3,8 +3,8 @@ using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Queries;
-using Gravitas.Tests.Support;
 using Gravitas.Support;
+using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using Xunit;
 
@@ -150,15 +150,15 @@ public sealed class ConvexSweepAccuracyTests
         bool expected)
     {
         for (int a = 0; a < 4; a++)
-        for (int b = 0; b < 4; b++)
-        for (int c = 0; c < 4; c++)
-        {
-            if (a == b || a == c || b == c)
-                continue;
-            int d = 6 - a - b - c;
-            ConvexSweepQueryWorker.IsOriginInsideTetrahedron(
-                vertices[a], vertices[b], vertices[c], vertices[d]).Should().Be(expected);
-        }
+            for (int b = 0; b < 4; b++)
+                for (int c = 0; c < 4; c++)
+                {
+                    if (a == b || a == c || b == c)
+                        continue;
+                    int d = 6 - a - b - c;
+                    ConvexSweepQueryWorker.IsOriginInsideTetrahedron(
+                        vertices[a], vertices[b], vertices[c], vertices[d]).Should().Be(expected);
+                }
     }
 
     private static Vector3d FromRaw(long x, long y, long z) =>

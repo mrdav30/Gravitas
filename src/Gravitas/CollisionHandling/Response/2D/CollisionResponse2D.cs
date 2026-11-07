@@ -1,21 +1,20 @@
 //=======================================================================
 // CollisionResponse2D.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using FixedMathSharp;
-using FixedMathSharp.Geometry;
-using Gravitas.Materials;
 using System.Runtime.CompilerServices;
+using FixedMathSharp;
+using Gravitas.Materials;
 
 namespace Gravitas.CollisionHandling;
 
 /// <summary>
 /// Deterministic pure 2D manifold contact response.
 /// </summary>
-public static class CollisionResponse2D
+public static partial class CollisionResponse2D
 {
     /// <summary>Penetration tolerated before positional correction is applied.</summary>
     public static readonly Fixed64 PenetrationSlop = (Fixed64)0.01f;
@@ -23,13 +22,7 @@ public static class CollisionResponse2D
     /// <summary>Fraction of excess penetration corrected by the solver.</summary>
     public static readonly Fixed64 PenetrationCorrectionPercent = Fixed64.One;
 
-    // Ordinary pairs retain only a null reference. Grouped pairs reuse their
-    // phase-local incoming motion and exact lever frames across island iterations.
-    internal sealed class GroupedSolveState
-    {
-        internal ContactResponseSnapshot Impact;
-        internal ContactAnchor2D CenterA, CenterB;
-    }
+
 
     internal static void PrepareSolve(CollisionPair2D pair)
     {

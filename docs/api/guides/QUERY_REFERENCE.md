@@ -1,0 +1,370 @@
+# Query Reference
+
+This page contains the detailed query API matrix, reducer policy, batch
+contract, mesh-source boundary, and per-family implementation notes. For the
+short guide, read [Query Services](QUERY_SERVICES.md).
+
+## Reducer Labels
+
+| Label                  | Meaning                                                                                            |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| `Exact`                | The accepted hit is produced by shape math that matches the documented source and target geometry. |
+| `ConservativeFallback` | The accepted hit may be earlier or extra, but must not create false negatives.                     |
+| `NotSupported`         | No public runtime API exists for that source/target family.                                        |
+
+Mixed query hits expose this through `PhysicsMixedHit.ReducerKind`. 2D and 3D
+public query paths expose exact public hits.
+
+## Query Witnesses
+
+`Physics2DHit`, `Physics3DHit`, and `PhysicsMixedHit` retain authoritative
+surface witnesses as local-frame contact anchors. An anchor keeps its
+representable origin and rotation separate from two additive local feature
+terms, so collision classification does not require a rotated offset or absolute
+point to fit in one `Fixed64` coordinate.
+
+The `Point`, `Point3D`, and `Point2D` convenience properties return a world
+point when the final coordinate is representable and throw otherwise. Use the
+matching `TryGetPoint*` method when a query can reach a scalar face. A failed
+materialization does not turn an accepted hit into a miss, fabricate a clipped
+point, or change deterministic hit ordering.
+
+Hit `Distance` follows the producing query family, independently of witness
+materialization. See
+[hit data and distance metrics](QUERY_SERVICES.md#hit-data).
+
+## Public Query Surface
+
+### 3D
+
+All 3D all-hit results use caller-owned buffers and distance/collider-ID
+ordering, except cone volumes sort by axial distance before collider ID.
+
+| Surface                                                         | Source                                                          | Targets                                                               |
+| --------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `Query3D.Raycast`, `RaycastAll`                                 | bounded 3D segment                                              | sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound |
+| `Query3D.SweepSphere`, `SweepSphereAll`                         | 3D sphere                                                       | sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound |
+| `SweepCapsule`, `SweepCuboid`, `SweepCylinder`, `SweepCone`     | registered convex 3D collider at current pose plus displacement | supported 3D targets, concave mesh target triangles, compound         |
+| `SweepConvexMesh`                                               | convex `LSMeshCollider` at current pose plus displacement       | supported 3D targets and concave mesh target triangles                |
+| `SweepCompound`                                                 | authored `LSCompoundCollider` from supported convex parts       | supported 3D targets                                                  |
+| `OverlapCone`, `OverlapConeAll`                                 | apex-origin finite cone volume                                  | 3D colliders                                                          |
+| `OverlapCircle`, `OverlapCircleInDirection`, `OverlapCircleAll` | X/Z projected-circle overlap                                    | complete X/Z projections of supported 3D colliders                    |
+
+Reducer notes:
+
+- Capsule and finite-cylinder raycasts solve against the authored segment and
+  return Q32.32 spatial distances with one final round-to-even narrowing. Hit
+  points use the same exact authored-chord interpolation, so long segments do
+  not amplify parameter rounding or lose small representable components.
+- Finite-cone raycasts use the corresponding centered-cone physical-distance
+  interval. Axial clipping, conic coefficients, discriminant evaluation, and
+  root selection remain wide, while the closed interval owns side, apex, flat
+  base, and rim contact without downstream feature deduplication. Cone bounds,
+  support points, axial ordering, and closest-axis witnesses retain the exact
+  squared length of an accepted near-unit axis rather than treating it as a
+  mathematically exact unit vector.
+- Swept-sphere capsule and mesh-edge reducers use full-domain finite-axis
+  intervals. Finite-cylinder and finite-cone targets share the canonical
+  support-mapped convex sweep worker, including sphere expansion at cap rims.
+- mesh targets query triangle BVH candidates and report the owning collider.
+- registered convex source sweeps use deterministic support-mapped conservative
+  advancement and skip the source collider.
+- high-vertex convex mesh sources use deterministic support-tree pruning.
+- concave source meshes throw; author stable convex compound source parts.
+- cone volumes use exact supported convex target checks and stable compound
+  reduction.
+- `OverlapCircle` is an X/Z projected overlap, not swept movement.
+
+### 2D
+
+2D queries operate over `Vector2d` values in the X/Z plane. All-hit results sort
+by distance and collider ID.
+
+| Surface                               | Source                                              | Targets                                                                                |
+| ------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `OverlapCircle`, `OverlapCircleAll`   | 2D circle                                           | circle, capsule, AABB, convex polygon, compound                                        |
+| `OverlapAabb`, `OverlapAabbAll`       | 2D AABB area                                        | circle, capsule, AABB, convex polygon, compound                                        |
+| `OverlapPolygon`, `OverlapPolygonAll` | convex 2D polygon area                              | circle, capsule, AABB, convex polygon, compound                                        |
+| `Raycast`, `RaycastAll`               | 2D segment                                          | circle, capsule, AABB, convex polygon, compound                                        |
+| `SweepCircle`, `SweepCircleAll`       | 2D circle                                           | circle, capsule, AABB, convex polygon, compound                                        |
+| `QuerySupport`                        | registered source policy plus downward circle probe | physically eligible bodyless/static/kinematic circle, capsule, AABB, polygon, compound |
+
+Reducer notes:
+
+- overlaps use exact SAT and closest-point checks.
+- polygon query vertices must be convex and non-collinear.
+- edge-touching counts as overlap.
+- zero-length ray segments miss.
+- starting inside a raycast target returns distance zero.
+- Capsule raycasts and circle sweeps use the full-domain finite-segment capsule
+  distance interval, with target radius and sweep expansion kept separate until
+  the exact comparison. Hit points are reconstructed directly from the authored
+  segment and returned distance.
+- compounds report the owner once through stable part reduction.
+- Support probes apply physical pair and normal eligibility before compound
+  reduction. Unlike generic sweeps, they accept every positive distance and
+  distinguish `NoSupport` from an unready or unrepresentable query. See
+  [Physical 2D Support](QUERY_SERVICES.md#physical-2d-support) for lifecycle and
+  sampled-lifetime rules.
+
+### Mixed
+
+Mixed query hits sort by distance, then 3D collider ID, then 2D collider ID.
+
+| Surface                                           | Source                                                | Targets                                                                     |
+| ------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| `SweepSphereAgainst2D`, `SweepSphereAgainst2DAll` | 3D sphere                                             | 2D circle slab, capsule slab, AABB slab, convex polygon slab, compound slab |
+| `SweepCircleAgainst3D`, `SweepCircleAgainst3DAll` | 2D circle embedded in a finite Y slab                 | 3D sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound    |
+| Concave/raw mesh-source sweeps                    | concave `LSMeshCollider` or raw mesh as moving source | no public runtime API                                                       |
+
+Reducer notes:
+
+- Capsule slabs use an exact feature union: the expanded planar side and cap
+  cores, four sphere-dilated straight rims, and two sphere-dilated vertical
+  endpoint cylinders. Circle slabs use the exact spherical dilation of their
+  finite vertical cylinder. Both reducers keep finite-axis and rounded-rim
+  arithmetic wide through the final authored-segment distance and correctly
+  report `Exact`.
+- AABB, convex-polygon, and stable compound reductions report `Exact`.
+- supported 3D primitive slabs, finite cones at any rotation, mesh triangles,
+  and compounds report `Exact`.
+- conservative fallback labels are reserved for safe internal proxy candidates
+  that must not create false negatives; they are not a custom-collider extension
+  mechanism.
+- concave/raw mesh-source sweeps are `NotSupported`; author stable convex
+  compound source parts.
+
+All public all-hit APIs use service-owned scratch and caller-owned hit buffers.
+
+## Batch APIs
+
+Every public query family also has typed batch access on its owning service.
+Batch APIs keep dimensional semantics explicit instead of routing all queries
+through one tagged request type.
+
+| Service      | Batch families                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| `Query3D`    | raycast, swept sphere, registered source sweeps, cone volume, X/Z projected-circle overlap |
+| `Query2D`    | raycast, overlap, swept circle                                                             |
+| `QueryMixed` | sphere-against-2D and circle-against-3D                                                    |
+
+Closest-hit batches take a typed request span and one output hit span. The
+output span must contain at least one slot per request. A miss writes the
+default hit value for that request, and the return value is the number of
+requests that hit.
+
+All-hit batches take a typed request span, a caller-owned shared hit
+`SwiftList<T>`, and a `Span<PhysicsQueryHitRange>` with one slot per request.
+The shared hit list is cleared once at batch start. Each request writes one
+range, including misses and zero-length movement requests.
+
+Structurally invalid input, such as an undersized output span, invalid polygon
+vertex range, invalid AABB size, or an unsupported numeric source-size envelope,
+throws before caller output buffers are mutated. Radius sign rules remain
+dimension-specific: nonpositive 3D sphere sweeps remain misses. Cone
+sign/direction/endpoint errors, registered-source preparation and invalid live
+target slabs are checked per request; failure retains a completed prefix rather
+than rolling back the batch.
+
+Each query service exposes summary counters for the last batch call:
+
+- `LastBatchRequestCount`
+- `LastBatchHitCount`
+- `LastBatchCandidateCount`
+- `QueryMixed.LastBatchMeshTriangleCandidateCount`
+
+These counters are frame-local tuning aids and benchmark signals, not replay
+state.
+
+## Mesh-Source Boundary
+
+Mesh-as-source means a public query where mesh geometry is the moving sweep
+source. Convex mesh sources are supported through `Query3D.SweepConvexMesh` and
+`SweepConvexMeshAll`.
+
+Capsule, cuboid, finite-cylinder, and finite-cone collider sources have explicit
+source-sweep APIs. Authored compounds made from supported convex parts are
+supported through `Query3D.SweepCompound` and `SweepCompoundAll`.
+
+Concave mesh sources are intentionally outside the public runtime query surface.
+That boundary avoids hiding `source triangles x target candidates` work, runtime
+convex decomposition, and ambiguous concave-source ordering behind a simple
+query call. Hosts should author concave-looking movers as offline decomposed
+`LSCompoundCollider` assets with stable convex part order.
+
+`SweptSphereQueryWorker.TrySweep(LSCollider collider, ...)` is not a mesh-source
+query. That worker is prepared with a swept sphere source, then tests one target
+collider against that swept sphere.
+
+## 3D Raycasts
+
+`RaycastAll` clears the caller-provided `SwiftList<Physics3DHit>`, writes hits,
+returns the hit count, and sorts by distance then collider ID. Closest-hit
+raycasts use the same ordering rule.
+
+Candidate path:
+
+1. prepare the segment worker.
+2. ask GridForge for topology-aware voxel candidates.
+3. suppress duplicate voxels and inspect each voxel's `PhysicsPartition`.
+4. resolve collider IDs through the owning context.
+5. filter by layer mask.
+6. skip duplicate colliders.
+7. run `ColliderOverlapsRay(...)`.
+8. build `Physics3DHit`.
+9. sort all-hit results.
+
+Mesh ray overlap is triangle-level and queries the mesh triangle BVH before
+testing candidate triangles.
+
+## 3D Sweeps And Volumes
+
+`SweepSphere` and `SweepSphereAll` use a segment-based true 3D swept sphere:
+
+- non-positive radius, zero direction, or zero segment length returns no hits.
+- starting overlap returns a zero-distance hit.
+- `excludedCollider` is skipped before duplicate stamping.
+- all-hit results sort by impact distance and collider ID.
+- hit distance is the swept center's time-of-impact distance.
+- hit point is the target surface point closest to the swept center at impact.
+
+Registered source sweeps use support-mapped conservative advancement for convex
+3D sources. The source collider is skipped automatically, and `excludedCollider`
+can skip one additional collider. Tetrahedron containment uses exact determinant
+signs, and distance convergence is checked against the supporting plane rather
+than successive distance improvements.
+
+The support-mapped reducers accept contact within `1/4,096` world units of
+separation. This bounds the normal gap, not travel-distance error: grazing
+approaches can have a larger difference along the chord. At an initial mesh
+contact, an exact face or boundary certificate takes precedence over an
+approximate separating normal. Genuinely disjoint contacts inside tolerance
+retain their separation axis rather than an uncertified hull face exit.
+
+`OverlapCone` and `OverlapConeAll` query an apex-origin finite cone volume.
+Supported convex targets use deterministic support-mapped cone-volume
+intersection. Compound targets scan parts in stable authored order and report
+the owner once. Concave meshes delegate each candidate to FixedMathSharp's
+full-domain finite-cone/triangle reducer. It compares stable AB, BC, CA edge
+candidates with the exact face-interior candidate before returning one
+maximum-scale lattice witness, so a cone section wholly contained by a triangle
+does not require an edge crossing or an axis/face intersection. Exact ties keep
+edge order, and equal-distance mesh hits keep triangle index order. The reducer
+retains the cone's world-space definition and exact rational mesh rotation
+through classification.
+
+It does not narrow the apex into mesh-local coordinates or materialize
+transformed triangle vertices. The selected witness is rounded once in the
+triangle's authored frame and returned as a contact anchor; use `TryGetPoint` if
+a world-space `Vector3d` is needed.
+
+The 3D `OverlapCircle` family classifies the complete X/Z projection of each
+supported 3D collider. It is not a `Query2D` call, not a swept circle, and not a
+swept sphere. Query Y does not affect candidate discovery, classification,
+distance, direction, or ordering. Exact containment is a zero-distance overlap;
+an exact positive separation retains its direction for directional filtering
+even when the public Q32.32 distance and offset round to zero. Equal compound
+parts and mesh triangles retain earlier authored order. Every hit owns a real 3D
+surface `ContactAnchor`; callers use `Physics3DHit.TryGetPoint(...)` when a
+materialized coordinate is required.
+
+Directional projected-circle queries ignore direction Y and reject a zero X/Z
+direction. Containment is admitted independently of direction because it has no
+separation side; every separated hit requires a positive exact X/Z dot product
+and a reported distance no greater than `maxDistance`.
+
+Candidate discovery uses a partition-synchronized planar index rather than
+scanning configured Y columns, so dense and sparse world height do not multiply
+the query cost. The index contains each registered collider that currently owns
+at least one active-grid 3D partition; colliders wholly outside configured grids
+remain undiscoverable, matching the other partition-backed 3D query families.
+
+## 2D Queries
+
+2D positions are `Vector2d` values in the X/Z plane. Use `Vector3d.ToVector2d()`
+when converting from a `FixedTransform`.
+
+Candidate gathering:
+
+1. project query bounds into the 2D Y=0 partition plane.
+2. scan covered GridForge cells and voxels.
+3. inspect `PhysicsPartition2D` payloads.
+4. suppress duplicate collider hits with 2D query-version stamps.
+5. reject inactive colliders, layer misses, and separated 2D bounds.
+6. run exact 2D shape checks.
+7. sort hits by distance and collider ID.
+
+`OverlapAabb` and `OverlapPolygon` run exact fixed-point SAT and closest-point
+checks against circle, capsule, AABB, convex polygon, and compound targets.
+Polygon query vertices must be convex and non-collinear; edge-touching counts as
+overlap.
+
+`Raycast` returns the closest segment hit from `start` to `end`. Zero-length
+segments miss. Starting inside a collider returns a zero-distance hit. Capsule
+targets use one exact finite-segment interval rather than independent side and
+endpoint tests, so authored center/axis/full-length geometry and the nearest
+outer feature remain authoritative even at extreme scale.
+
+`SweepCircle` is the 2D swept movement/query path used by 2D CCD. It is not a
+mixed 2D/3D bridge.
+
+## Mixed Queries
+
+Mixed query candidate gathering uses `PhysicsMixedPartition` payloads attached
+to GridForge voxels. The gatherer refreshes the relevant mixed partition side,
+scans deterministic voxel identities, suppresses duplicate collider IDs, filters
+by layer and bounds, and orders hits by distance with 3D ID and 2D ID
+tie-breakers.
+
+`SweepSphereAgainst2D` sweeps a 3D sphere center against embedded 2D slabs:
+
+- circles use the exact spherical dilation of the finite vertical cylinder,
+  including rounded cap rims.
+- capsules use an exact union of planar side and cap-core features, four
+  straight cap rims, and the two rounded endpoint columns.
+- AABB and convex polygon slabs use finite-prism reducers.
+- compounds reduce supported parts in authored order and report the owner.
+
+`SweepCircleAgainst3D` sweeps a 2D circle embedded at a supplied slab Y center
+and half-thickness against 3D targets:
+
+- spheres use finite-slab projection.
+- cuboids project the slab-intersecting portion into X/Z.
+- capsules, cylinders and finite cones clip the curved target to the world-Y
+  slab, then use planar circle intervals or support-mapped convex reducers.
+- mesh targets clip candidate triangles to the slab Y interval, project into
+  X/Z, and report the owning `LSMeshCollider`.
+- compounds reduce supported parts in authored order and report the owner.
+
+Curved targets whose representable support envelope crosses the world X/Z scalar
+limits use a target-relative X/Z frame while retaining the same world-Y clipping
+interval. Ordinary-sized targets near scalar coordinate limits therefore do not
+become misses merely because an absolute support point is unavailable. This
+geometric admission remains separate from the
+[representable body-position contract](HOST_INTEGRATION.md#representable-body-positions).
+
+When diagnostics are enabled, mixed queries emit both `MixedQuery` and
+`QuerySummary` events. `QuerySummary` reports exact reducer attempts, accepted
+hits, fallback hits, and rejected conservative fallback candidates.
+
+## Reentrancy And Allocation
+
+Query services keep mutable scratch buffers on the service instance. Do not run
+multiple queries concurrently against the same context service.
+
+All-hit APIs use caller-owned buffers. Batch APIs reuse service-owned scratch
+and caller-owned buffers. They do not allocate per-request arrays.
+
+Polygon batches keep vertex ownership explicit: the request stores a
+`VertexStart`/`VertexCount` range into the vertex span supplied to the batch
+call, and the caller must keep that span stable for the duration of the call.
+
+## Source Map
+
+| Area                | Source                                                                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3D query service    | [`src/Gravitas/Queries/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/3D)                                                         |
+| 2D query service    | [`src/Gravitas/Queries/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/2D)                                                         |
+| Mixed query service | [`src/Gravitas/Queries/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/Mixed)                                                   |
+| Query hit ranges    | [`src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs) |
+| CCD reference       | [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md)                                                                                        |

@@ -1,13 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -277,7 +276,7 @@ public sealed partial class JoinedStaticSolidMixedTests
         {
             int top = cap ? 2 : 0;
             var polygon = new LSPolygonCollider2D(new(first, -2), new(last, -2), new(last, top), new(first, top))
-                { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
             polygon.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(origin, rotation, Vector3d.One)));
             return polygon;
         }
@@ -635,7 +634,7 @@ public sealed partial class JoinedStaticSolidMixedTests
             if (unrelatedBand)
             {
                 var separate = new LSAABBoxCollider2D(Vector2d.One * Fixed64.FromFraction(1, 10))
-                    { MixedHalfThicknessOverride = Fixed64.Quarter };
+                { MixedHalfThicknessOverride = Fixed64.Quarter };
                 separate.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(
                     new Vector3d(3 * Fixed64.Quarter, -Fixed64.Quarter, 3 * Fixed64.Quarter), FixedQuaternion.Identity, Vector3d.One)));
                 members = new[] { left, right, separate };

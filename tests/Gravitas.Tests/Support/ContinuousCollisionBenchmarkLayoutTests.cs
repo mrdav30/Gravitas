@@ -1,6 +1,6 @@
+using System.Linq;
 using FluentAssertions;
 using Gravitas.Benchmarking;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.Support;

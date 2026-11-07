@@ -1,3 +1,4 @@
+using System.Linq;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -7,7 +8,6 @@ using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using GridForge.Grids;
 using SwiftCollections;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;

@@ -4,11 +4,12 @@
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
+
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections;
-using System;
 
 namespace Gravitas.CollisionHandling;
 
@@ -17,7 +18,7 @@ namespace Gravitas.CollisionHandling;
 /// members, preserving exact span provenance and ambiguous boundaries. The
 /// dimensional surface owner manages declarations, endpoint fans and response.
 /// </summary>
-internal sealed class MeshSurfaceBoundaryDomain2D
+internal sealed partial class MeshSurfaceBoundaryDomain2D
 {
     private readonly SwiftList<BoundarySpan> _spans = new();
     private readonly SwiftList<FixedBoundArea> _vertexBounds = new();
@@ -25,22 +26,8 @@ internal sealed class MeshSurfaceBoundaryDomain2D
     private readonly SwiftList<Parameter> _cuts = new();
     private readonly SwiftHashSet<int> _own = new(), _opposite = new();
 
-    internal enum SpanKind { Exposed, Joined, Ambiguous }
-    internal readonly struct BoundarySpan
-    {
-        internal readonly int First, Second, OtherMember;
-        internal readonly Vector2d Start, End;
-        internal readonly RationalSegmentInterval Interval;
-        internal readonly SpanKind Kind;
-        internal readonly FixedBoundArea Bounds;
-        internal BoundarySpan(int first, int second, Vector2d start, Vector2d end,
-            in RationalSegmentInterval interval, SpanKind kind, int otherMember, FixedBoundArea bounds)
-        {
-            First = first; Second = second; Start = start; End = end;
-            Interval = interval; Kind = kind; OtherMember = otherMember;
-            Bounds = bounds;
-        }
-    }
+
+
     internal ReadOnlySpan<BoundarySpan> Spans => _spans.AsReadOnlySpan();
     internal ReadOnlySpan<FixedBoundArea> VertexBounds => _vertexBounds.AsReadOnlySpan();
     internal Vector2d Origin { get; private set; }

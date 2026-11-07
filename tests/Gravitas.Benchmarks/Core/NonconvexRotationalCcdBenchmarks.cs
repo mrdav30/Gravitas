@@ -1,8 +1,8 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Materials;
-using System;
 using static Gravitas.Benchmarks.ContinuousCollisionBenchmarkSupport;
 
 namespace Gravitas.Benchmarks;
@@ -129,7 +129,8 @@ public class NonconvexRotationalCcdBenchmarks
             : new[] { 0, 3, 1, 1, 3, 2 };
         if (!joinedWall) Array.Resize(ref vertices, 4);
         var mesh = new LSMeshCollider(vertices, triangles, MeshColliderMode.Concave,
-            MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+            MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
         CreateBody3D(context, mesh, Vector3d.Zero, BodyMotionType.Static);
         SolidBody source = CreateBody3D(context, new LSConeCollider
         {

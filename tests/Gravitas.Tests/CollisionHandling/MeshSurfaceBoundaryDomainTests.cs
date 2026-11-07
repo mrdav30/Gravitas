@@ -1,8 +1,8 @@
+using System;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests;

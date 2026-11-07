@@ -1,11 +1,11 @@
+using System;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System;
-using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace Gravitas.Tests.Queries;

@@ -1,3 +1,4 @@
+using System;
 using Chronicler.Timing;
 using FixedMathSharp;
 using FluentAssertions;
@@ -9,7 +10,6 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Diagnostics;

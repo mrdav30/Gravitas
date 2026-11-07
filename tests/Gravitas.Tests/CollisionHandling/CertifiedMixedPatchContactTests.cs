@@ -1,10 +1,9 @@
+using System.Linq;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -19,50 +18,50 @@ public sealed class CertifiedMixedPatchContactTests
     public void CertifiedPatch_ShouldRetainOneGlobalFiniteExit(bool affine, bool reverse)
     {
         foreach (int subdivisions in new[] { 1, 4 })
-        foreach (Fixed64 x in new[] { Fixed64.Zero, Fixed64.MinValue + (Fixed64)32 })
-        {
-            using var context = GravitasWorldContext.CreateOwned();
-            context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-            var mesh = Quad(subdivisions, affine, reverse);
-            Fixed64 scale = affine ? Fixed64.Half : Fixed64.One;
-            Fixed64 depth = affine ? Fixed64.FromFraction(1, 8) : Fixed64.Quarter;
-            var transform = new FixedTransform(new(x, Fixed64.Zero, depth), FixedQuaternion.Identity, Vector3d.One * scale);
-            mesh.InitializeWithNoBody(new TestMatterAgent(context, transform));
-            var slab = new LSAABBoxCollider2D(new Vector2d(16, 2))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Bouncy };
-            slab.InitializeWithNoBody(new TestMatterAgent(context,
-                new FixedTransform(new(x, Fixed64.Zero, -Fixed64.One), FixedQuaternion.Identity, Vector3d.One)));
-            var contacts = new ContactManifold();
-            Assert.True(CollisionDetectionMixed.IntersectsForContinuousCollision(mesh, slab));
-            Assert.True(CollisionDetectionMixed.TryBuildManifold(mesh, slab, contacts));
-            Assert.Equal(1, contacts.GroupCount);
-            Assert.Equal(2, contacts.Count);
-            foreach (ManifoldContact row in contacts)
+            foreach (Fixed64 x in new[] { Fixed64.Zero, Fixed64.MinValue + (Fixed64)32 })
             {
-                Assert.Equal(Vector3d.Backward, row.Normal);
-                Assert.Equal(depth, row.Depth);
-                Assert.False(row.DepthIsClamped);
-                Assert.Equal(mesh.Material, row.MaterialA);
-                Assert.Equal(slab.Material, row.MaterialB);
-                Assert.True(row.AnchorA.TryGetWorldPoint(out Vector3d a));
-                Assert.True(row.AnchorB.TryGetWorldPoint(out Vector3d b));
-                Assert.Equal(Fixed64.Zero, a.Y);
-                Assert.Equal(-depth, a.Z);
-                Assert.Equal(Fixed64.Zero, b.Z);
-                Assert.Equal(a.X, b.X);
-                Assert.Equal(Fixed64.Zero, b.Y);
-                Assert.InRange((a.X - x).m_rawValue, (-Fixed64.Half * scale).m_rawValue,
-                    (Fixed64.Half * scale + Fixed64.MinIncrement).m_rawValue);
+                using var context = GravitasWorldContext.CreateOwned();
+                context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+                var mesh = Quad(subdivisions, affine, reverse);
+                Fixed64 scale = affine ? Fixed64.Half : Fixed64.One;
+                Fixed64 depth = affine ? Fixed64.FromFraction(1, 8) : Fixed64.Quarter;
+                var transform = new FixedTransform(new(x, Fixed64.Zero, depth), FixedQuaternion.Identity, Vector3d.One * scale);
+                mesh.InitializeWithNoBody(new TestMatterAgent(context, transform));
+                var slab = new LSAABBoxCollider2D(new Vector2d(16, 2))
+                { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Bouncy };
+                slab.InitializeWithNoBody(new TestMatterAgent(context,
+                    new FixedTransform(new(x, Fixed64.Zero, -Fixed64.One), FixedQuaternion.Identity, Vector3d.One)));
+                var contacts = new ContactManifold();
+                Assert.True(CollisionDetectionMixed.IntersectsForContinuousCollision(mesh, slab));
+                Assert.True(CollisionDetectionMixed.TryBuildManifold(mesh, slab, contacts));
+                Assert.Equal(1, contacts.GroupCount);
+                Assert.Equal(2, contacts.Count);
+                foreach (ManifoldContact row in contacts)
+                {
+                    Assert.Equal(Vector3d.Backward, row.Normal);
+                    Assert.Equal(depth, row.Depth);
+                    Assert.False(row.DepthIsClamped);
+                    Assert.Equal(mesh.Material, row.MaterialA);
+                    Assert.Equal(slab.Material, row.MaterialB);
+                    Assert.True(row.AnchorA.TryGetWorldPoint(out Vector3d a));
+                    Assert.True(row.AnchorB.TryGetWorldPoint(out Vector3d b));
+                    Assert.Equal(Fixed64.Zero, a.Y);
+                    Assert.Equal(-depth, a.Z);
+                    Assert.Equal(Fixed64.Zero, b.Z);
+                    Assert.Equal(a.X, b.X);
+                    Assert.Equal(Fixed64.Zero, b.Y);
+                    Assert.InRange((a.X - x).m_rawValue, (-Fixed64.Half * scale).m_rawValue,
+                        (Fixed64.Half * scale + Fixed64.MinIncrement).m_rawValue);
+                }
+                var expected = contacts.Select(row => (row.ContactId, row.AnchorA, row.AnchorB, row.Depth, row.Normal)).ToArray();
+                Assert.True(CollisionDetectionMixed.TryBuildManifold(mesh, slab, contacts));
+                Assert.Equal(expected, contacts.Select(row => (row.ContactId, row.AnchorA, row.AnchorB, row.Depth, row.Normal)).ToArray());
+                transform.LocalPosition += Vector3d.Forward * (depth + Fixed64.MinIncrement * 64);
+                mesh.Simulate();
+                // Independent authored-triangle admission checks whole-shape clearance.
+                Assert.False(CollisionDetectionMixed.IntersectsForContinuousCollision(mesh, slab));
+                Assert.False(CollisionDetectionMixed.TryBuildManifold(mesh, slab, contacts));
             }
-            var expected = contacts.Select(row => (row.ContactId, row.AnchorA, row.AnchorB, row.Depth, row.Normal)).ToArray();
-            Assert.True(CollisionDetectionMixed.TryBuildManifold(mesh, slab, contacts));
-            Assert.Equal(expected, contacts.Select(row => (row.ContactId, row.AnchorA, row.AnchorB, row.Depth, row.Normal)).ToArray());
-            transform.LocalPosition += Vector3d.Forward * (depth + Fixed64.MinIncrement * 64);
-            mesh.Simulate();
-            // Independent authored-triangle admission checks whole-shape clearance.
-            Assert.False(CollisionDetectionMixed.IntersectsForContinuousCollision(mesh, slab));
-            Assert.False(CollisionDetectionMixed.TryBuildManifold(mesh, slab, contacts));
-        }
     }
 
     [Theory]
@@ -183,15 +182,15 @@ public sealed class CertifiedMixedPatchContactTests
         var indices = new int[6 * divisions * divisions];
         Fixed64 size = Fixed64.One + (affine ? Fixed64.MinIncrement : Fixed64.Zero);
         for (int x = 0; x <= divisions; x++)
-        for (int z = 0; z <= divisions; z++)
-            vertices[x * (divisions + 1) + z] = new(-Fixed64.Half + size * x / divisions, Fixed64.Zero, -Fixed64.Half + size * z / divisions);
+            for (int z = 0; z <= divisions; z++)
+                vertices[x * (divisions + 1) + z] = new(-Fixed64.Half + size * x / divisions, Fixed64.Zero, -Fixed64.Half + size * z / divisions);
         for (int x = 0, offset = 0; x < divisions; x++)
-        for (int z = 0; z < divisions; z++)
-        {
-            int a = x * (divisions + 1) + z, b = a + divisions + 1;
-            indices[offset++] = a; indices[offset++] = a + 1; indices[offset++] = b;
-            indices[offset++] = b; indices[offset++] = a + 1; indices[offset++] = b + 1;
-        }
+            for (int z = 0; z < divisions; z++)
+            {
+                int a = x * (divisions + 1) + z, b = a + divisions + 1;
+                indices[offset++] = a; indices[offset++] = a + 1; indices[offset++] = b;
+                indices[offset++] = b; indices[offset++] = a + 1; indices[offset++] = b + 1;
+            }
         if (reverse) for (int i = 0; i < indices.Length; i += 3) (indices[i + 1], indices[i + 2]) = (indices[i + 2], indices[i + 1]);
         return new LSMeshCollider(vertices, indices, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
         { Material = PhysicsMaterial.Frictionless };

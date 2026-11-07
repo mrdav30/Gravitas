@@ -1,23 +1,18 @@
 //=======================================================================
 // PhysicsMixedPartition.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System.Runtime.CompilerServices;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
-internal enum MixedPartitionMobilityKind
-{
-    Dynamic = 0,
-    Kinematic = 1,
-    Static = 2
-}
+
 
 /// <summary>
 /// GridForge voxel partition that stores cross-dimensional broad-phase memberships.

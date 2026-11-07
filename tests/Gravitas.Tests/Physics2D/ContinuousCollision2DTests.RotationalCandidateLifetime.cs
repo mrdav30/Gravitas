@@ -1,7 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
-using Gravitas.CollisionHandling;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using SwiftCollections;
 using Xunit;
 

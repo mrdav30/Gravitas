@@ -1,10 +1,10 @@
+using System;
+using System.Collections.Generic;
+using Chronicler.Diagnostics;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Configuration;
 using SwiftCollections;
-using Chronicler.Diagnostics;
-using System;
-using System.Collections.Generic;
 
 namespace Gravitas.Benchmarks;
 

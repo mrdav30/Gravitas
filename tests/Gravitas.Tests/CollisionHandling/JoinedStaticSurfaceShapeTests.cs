@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using Chronicler.Hashing;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
@@ -5,9 +8,6 @@ using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using Xunit;
-using System;
-using System.Collections.Generic;
-using Chronicler.Hashing;
 
 namespace Gravitas.Tests;
 

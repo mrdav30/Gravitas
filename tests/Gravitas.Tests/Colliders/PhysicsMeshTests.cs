@@ -1,10 +1,10 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
 using SwiftCollections;
 using SwiftCollections.Query;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -44,7 +44,7 @@ public sealed class PhysicsMeshTests
         {
             new Vector3d(-3,0,0), new Vector3d(-1,0,0), new Vector3d((Fixed64)(-3), Fixed64.Zero, top),
             new Vector3d(1,0,0), new Vector3d(3,0,0), new Vector3d((Fixed64)3, Fixed64.Zero, top)
-        }, new[] { 0,1,2,3,4,5 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        }, new[] { 0, 1, 2, 3, 4, 5 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         collider.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(Vector3d.Zero,
             FixedQuaternion.Identity, new Vector3d(Fixed64.Two, Fixed64.One, Fixed64.Half))));
         var triangles = new SwiftList<int>();

@@ -3,7 +3,6 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests;

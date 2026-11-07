@@ -1,5 +1,5 @@
 ---
-title: Gravitas API
+title: Gravitas
 description: API reference and guides for deterministic fixed-point 2D, 3D, and mixed-dimension physics.
 ---
 
@@ -11,7 +11,7 @@ description: API reference and guides for deterministic fixed-point 2D, 3D, and 
   world contexts.</p>
   <div class="grv-actions">
     <a href="xref:Gravitas">Browse the API</a>
-    <a href="https://github.com/mrdav30/Gravitas/wiki/GETTING_STARTED">Get started</a>
+    <a href="guides/GETTING_STARTED.md">Get started</a>
   </div>
 </div>
 
@@ -58,12 +58,14 @@ description: API reference and guides for deterministic fixed-point 2D, 3D, and 
 
 ## Package family
 
-| Package         | Serialization profile                                      |
-| --------------- | ---------------------------------------------------------- |
-| `Gravitas`      | Standard package with built-in MemoryPack support          |
+| Package         | Serialization profile                                                  |
+| --------------- | ---------------------------------------------------------------------- |
+| `Gravitas`      | Standard package with built-in MemoryPack support                      |
 | `Gravitas.Lean` | Same core physics API without the direct MemoryPack runtime dependency |
 
-## Part of the LSF stack
+<a id="part-of-the-lsf-stack"></a>
+
+## Part of the LSF ecosystem
 
 Gravitas builds physics policy on focused lower layers:
 
@@ -76,12 +78,28 @@ Gravitas builds physics policy on focused lower layers:
 - [Chronicler](https://github.com/mrdav30/Chronicler) for deterministic state
   transfer, wide simulation timing, and replay infrastructure.
 
+[Trailblazer](https://github.com/mrdav30/Trailblazer) provides character
+controller and navigation systems in the same ecosystem.
+
+## Guides
+
+- [Get started](guides/GETTING_STARTED.md) with a host adapter, grid, and first
+  body.
+- [Integrate the host loop](guides/HOST_INTEGRATION.md) and choose
+  [2D, 3D, or mixed runtime modes](guides/DIMENSIONS.md).
+- Follow the [collision pipeline](guides/COLLISION_PIPELINE.md),
+  [shape contracts](guides/COLLIDER_SHAPE_REFERENCE.md), and
+  [continuous collision detection](guides/CONTINUOUS_COLLISION_DETECTION.md).
+- Use [queries](guides/QUERY_SERVICES.md),
+  [serialization and replay](guides/SERIALIZATION.md), and
+  [diagnostic adapters](guides/DIAGNOSTIC_ADAPTERS.md) at host boundaries.
+
 ## Resources
 
-- [Behavioral guides and getting started](https://github.com/mrdav30/Gravitas/wiki)
+- [All guides](guides/Home.md)
 - [Source, issues, and releases](https://github.com/mrdav30/Gravitas)
 - [Core test-suite coverage](https://mrdav30.github.io/Gravitas/coverage/)
 
-The API reference is generated from the library's XML documentation. The wiki
-explains lifecycle ownership, dimensional models, collision, queries,
+The API reference is generated from the library's XML documentation. The guides
+explain lifecycle ownership, dimensional models, collision, queries,
 serialization, replay, and diagnostics in task-oriented prose.

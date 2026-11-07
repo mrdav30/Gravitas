@@ -1,175 +1,20 @@
 //=======================================================================
 // ContactNormalImpulse3D.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using FixedMathSharp;
-using FixedMathSharp.Geometry;
 using System.Runtime.CompilerServices;
+using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
-/// <summary>
-/// Side-effect-free 3D contact-normal impulse result for two participants.
-/// </summary>
-internal readonly struct ContactNormalImpulseResult3D
-{
-    public ContactNormalImpulseResult3D(
-        Fixed64 normalVelocity,
-        Fixed64 impulseScalar,
-        Vector3d linearVelocityDeltaA,
-        Vector3d angularVelocityDeltaA,
-        Vector3d linearVelocityDeltaB,
-        Vector3d angularVelocityDeltaB)
-        : this(
-            normalVelocity,
-            impulseScalar,
-            impulseScalar,
-            linearVelocityDeltaA,
-            angularVelocityDeltaA,
-            linearVelocityDeltaB,
-            angularVelocityDeltaB)
-    {
-    }
 
-    public ContactNormalImpulseResult3D(
-        Fixed64 normalVelocity,
-        Fixed64 impulseScalar,
-        Fixed64 appliedImpulseScalar,
-        Vector3d linearVelocityDeltaA,
-        Vector3d angularVelocityDeltaA,
-        Vector3d linearVelocityDeltaB,
-        Vector3d angularVelocityDeltaB,
-        bool hasRepresentableNormalVelocity = true,
-        bool hasRepresentableAppliedImpulse = true)
-    {
-        NormalVelocity = normalVelocity;
-        ImpulseScalar = impulseScalar;
-        AppliedImpulseScalar = appliedImpulseScalar;
-        LinearVelocityDeltaA = linearVelocityDeltaA;
-        AngularVelocityDeltaA = angularVelocityDeltaA;
-        LinearVelocityDeltaB = linearVelocityDeltaB;
-        AngularVelocityDeltaB = angularVelocityDeltaB;
-        HasRepresentableNormalVelocity = hasRepresentableNormalVelocity;
-        HasRepresentableAppliedImpulse = hasRepresentableAppliedImpulse;
-    }
 
-    public Fixed64 NormalVelocity { get; }
 
-    public Fixed64 ImpulseScalar { get; }
 
-    public Fixed64 AppliedImpulseScalar { get; }
 
-    public bool HasRepresentableNormalVelocity { get; }
-
-    public bool HasRepresentableAppliedImpulse { get; }
-
-    public Vector3d LinearVelocityDeltaA { get; }
-
-    public Vector3d AngularVelocityDeltaA { get; }
-
-    public Vector3d LinearVelocityDeltaB { get; }
-
-    public Vector3d AngularVelocityDeltaB { get; }
-}
-
-/// <summary>
-/// Side-effect-free 3D velocity deltas for a normal response whose impulse
-/// scalar does not need to be representable.
-/// </summary>
-internal readonly struct ContactNormalVelocityDeltaResult3D
-{
-    public ContactNormalVelocityDeltaResult3D(
-        Fixed64 normalVelocity,
-        Vector3d linearVelocityDeltaA,
-        Vector3d angularVelocityDeltaA,
-        Vector3d linearVelocityDeltaB,
-        Vector3d angularVelocityDeltaB)
-        : this(
-            normalVelocity,
-            linearVelocityDeltaA,
-            angularVelocityDeltaA,
-            linearVelocityDeltaB,
-            angularVelocityDeltaB,
-            normalVelocity < Fixed64.Zero,
-            hasRepresentableNormalVelocity: true)
-    {
-    }
-
-    public ContactNormalVelocityDeltaResult3D(
-        Fixed64 normalVelocity,
-        Vector3d linearVelocityDeltaA,
-        Vector3d angularVelocityDeltaA,
-        Vector3d linearVelocityDeltaB,
-        Vector3d angularVelocityDeltaB,
-        bool isClosing,
-        bool hasRepresentableNormalVelocity)
-    {
-        NormalVelocity = normalVelocity;
-        LinearVelocityDeltaA = linearVelocityDeltaA;
-        AngularVelocityDeltaA = angularVelocityDeltaA;
-        LinearVelocityDeltaB = linearVelocityDeltaB;
-        AngularVelocityDeltaB = angularVelocityDeltaB;
-        IsClosing = isClosing;
-        HasRepresentableNormalVelocity = hasRepresentableNormalVelocity;
-    }
-
-    public Fixed64 NormalVelocity { get; }
-
-    public bool IsClosing { get; }
-
-    public bool HasRepresentableNormalVelocity { get; }
-
-    public Vector3d LinearVelocityDeltaA { get; }
-
-    public Vector3d AngularVelocityDeltaA { get; }
-
-    public Vector3d LinearVelocityDeltaB { get; }
-
-    public Vector3d AngularVelocityDeltaB { get; }
-}
-
-internal readonly struct ContactEffectiveMassTerms3D
-{
-    internal ContactEffectiveMassTerms3D(
-        Fixed64 linearA,
-        Fixed64 linearB,
-        Fixed64 angularA,
-        Fixed64 angularB)
-    {
-        LinearA = linearA;
-        LinearB = linearB;
-        AngularA = angularA;
-        AngularB = angularB;
-    }
-
-    internal Fixed64 LinearA { get; }
-
-    internal Fixed64 LinearB { get; }
-
-    internal Fixed64 AngularA { get; }
-
-    internal Fixed64 AngularB { get; }
-
-    internal Fixed64 SaturatedSum =>
-        LinearA + LinearB + AngularA + AngularB;
-
-    internal bool TryGetValue(out Fixed64 value)
-    {
-        bool resolved =
-            Fixed64.TryAdd(LinearA, LinearB, out Fixed64 linear);
-        resolved &= Fixed64.TryAdd(
-            linear,
-            AngularA,
-            out Fixed64 first);
-        resolved &= Fixed64.TryAdd(first, AngularB, out value);
-        if (!resolved)
-            value = default;
-        return resolved;
-    }
-}
 
 /// <summary>
 /// Calculates allocation-free 3D contact-point normal response without mutating either body.

@@ -1,0 +1,939 @@
+# Host Integration
+
+Gravitas does not own your application loop. A game engine, server,
+deterministic simulation harness, or unit test creates the host objects and
+calls Gravitas at deterministic points.
+
+This page is the practical starting point for wiring Gravitas into a host. For
+the shortest end-to-end setup, read [Getting Started](GETTING_STARTED.md). For
+runtime ownership details, read [Runtime Architecture](RUNTIME_ARCHITECTURE.md).
+For replay and snapshot boundaries, read
+[Serialization And Replay](SERIALIZATION.md).
+
+## Quick Read
+
+- Create or attach one `GravitasWorldContext` per simulation.
+- Add GridForge grid coverage before registering colliders.
+- Implement `IMatterAgent` to bridge host objects to context and
+  `FixedTransform`.
+- Use `SolidBody`/`LSCollider` for 3D and `SolidBody2D`/`LSCollider2D` for 2D.
+- Apply deterministic commands before `context.Simulate()`.
+- Call `context.Simulate()` and `context.LateSimulate()` from the authoritative
+  fixed step.
+- Use `context.Visualize()` and `context.LateVisualize()` only for presentation.
+- Deactivate bodies and colliders before pooling or destroying host wrappers.
+
+```mermaid
+flowchart LR
+    Commands["Ordered commands"] --> Simulate["context.Simulate()"]
+    Simulate --> Late["context.LateSimulate()"]
+    Late --> Hash["optional replay hash"]
+    Late --> Visualize["context.Visualize()"]
+    Visualize --> Render["host render/update"]
+```
+
+## Public Surface
+
+| Need                            | Use                                                        |
+| ------------------------------- | ---------------------------------------------------------- |
+| Create an owned world           | `GravitasWorldContext.CreateOwned(...)`                    |
+| Attach a host-owned world       | `GravitasWorldContext.Attach(world, takeOwnership)`        |
+| Bind a host object              | `IMatterAgent`                                             |
+| Register a 3D body              | `new SolidBody(agent, collider).Initialize(...)`           |
+| Register a 2D body              | `new SolidBody2D(agent, collider).Initialize(...)`         |
+| Register bodyless geometry      | `collider.InitializeWithNoBody(agent)`                     |
+| Reconfigure a 3D primitive body | `body.TryReconfigureCollider(...)`                         |
+| Set runtime mode                | `context.Settings.RuntimeMode`                             |
+| Run 3D constraints/ragdolls     | `context.Constraints3D`                                    |
+| Run 2D constraints/ragdolls     | `context.Constraints2D`                                    |
+| Query 3D, 2D, or mixed geometry | `context.Query3D`, `context.Query2D`, `context.QueryMixed` |
+| Hash replay state               | `context.ComputeReplayHash()`                              |
+| Reset a session                 | `context.Reset()`                                          |
+| End a context                   | `context.Dispose()`                                        |
+
+## Lifecycle Contract
+
+Use the LSF lifecycle names as a mental model, not as engine-specific APIs:
+
+| Phase           | Host responsibility                                                     | Gravitas call                                              |
+| --------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `Setup`         | Create package defaults, host resources, and worlds.                    | Create or attach `GravitasWorldContext`.                   |
+| `Initialize`    | Bind agents, transforms, colliders, bodies, settings, and grids.        | Initialize colliders and bodies.                           |
+| `Execute`       | Apply deterministic commands or network input in ordered frame batches. | No direct call. Mutate host-owned state before simulation. |
+| `Simulate`      | Advance the authoritative fixed step.                                   | `context.Simulate()`.                                      |
+| `LateSimulate`  | Finish deterministic end-of-frame work.                                 | `context.LateSimulate()`.                                  |
+| `Visualize`     | Interpolate or publish presentation state.                              | `context.Visualize()`.                                     |
+| `LateVisualize` | Finish presentation-only work.                                          | `context.LateVisualize()`.                                 |
+| `Deactivate`    | Pool/despawn agents and release registrations.                          | `body.Deactivate()` or `collider.Deactivate()`.            |
+| `Quit`          | Shut down the host process/session.                                     | `context.Dispose()` when the context is no longer needed.  |
+
+Authoritative simulation state belongs in `Simulate` and `LateSimulate`.
+`Visualize` and `LateVisualize` are for interpolation and presentation; do not
+use them to apply gameplay commands or physics corrections.
+
+The context owns its clock. When integrating Trailblazer, advance each context
+once per gameplay step with matching represented step durations; the adapter
+does not synchronize clocks or compensate for a missed advance. Apply rate
+changes to both contexts at the same fixed-step boundary. Their numeric frames
+can differ if initial world preparation advanced one earlier.
+
+Reset is a host-coordinated lifecycle boundary, not rollback. Stop the loop,
+discard pending work and old waits, coordinate context resets and runtime-shell
+reconstruction, then resume. Populating a body does not restore the world clock;
+neither context exposes a live-clock rewind API.
+
+## Minimal Setup
+
+### Host Agent
+
+The host provides `IMatterAgent` so Gravitas can bind an object to a context and
+fixed transform without depending on an engine, ECS, rendering, or a specific
+object model.
+
+```csharp
+using FixedMathSharp;
+using Gravitas;
+
+internal sealed class HostMatterAgent : IMatterAgent
+{
+    public HostMatterAgent(
+        GravitasWorldContext context,
+        FixedTransform transform,
+        bool isParent = true)
+    {
+        Context = context;
+        Transform = transform;
+        IsParent = isParent;
+    }
+
+    public GravitasWorldContext Context { get; }
+
+    public FixedTransform Transform { get; }
+
+    public bool IsParent { get; }
+
+    public bool IsInteracting { get; set; }
+}
+```
+
+`IsParent` marks whether an agent is intended to be a top-level hierarchy owner.
+Hierarchy collision filtering is bound explicitly on colliders:
+
+```csharp
+weaponCollider.SetParent(characterCollider);
+leftFootCollider.SetParent(characterCollider);
+rightFootCollider.SetParent(characterCollider);
+```
+
+`SetParent(...)` stores a dimension-tagged top-parent collider key, so sibling
+filtering does not depend on an engine transform hierarchy. Mixed mode can bind
+2D colliders under 3D colliders, or the reverse, without aliasing the separate
+collider ID tables. Use `ClearParent()` when a collider leaves the hierarchy
+without being deactivated.
+
+### Context And Grid
+
+Use `CreateOwned(...)` when Gravitas should own the `GridWorld` lifetime:
+
+```csharp
+using Gravitas;
+
+using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+```
+
+Use `Attach(...)` when the host creates and owns the `GridWorld`:
+
+```csharp
+using Gravitas;
+using GridForge.Grids;
+
+using GridWorld world = new();
+using GravitasWorldContext context = GravitasWorldContext.Attach(world);
+```
+
+Pass `takeOwnership: true` to `Attach(...)` only when disposing the context
+should also dispose the supplied world. One active `GridWorld` can be attached
+to only one active `GravitasWorldContext`.
+
+Colliders partition into existing GridForge voxels. Add grids that cover the
+simulation area before initializing bodies and colliders:
+
+```csharp
+using FixedMathSharp;
+using GridForge.Configuration;
+
+context.World.TryAddGrid(
+    new GridConfiguration(
+        new Vector3d(-16, -4, -16),
+        new Vector3d(16, 8, 16)),
+    out _);
+```
+
+If no voxel exists for a collider's bounds, the collider cannot be distributed
+into partitions and will not participate in partition-backed collision/query
+work for that area.
+
+### Collider Authoring And Adapter Boundary
+
+`LSCollider` and `LSCollider2D` are public polymorphic runtime types, not
+extension points for engine-owned geometry. Gravitas owns their concrete shape
+implementations and keeps their base constructors assembly-only so every
+registered collider has a supported deterministic geometry contract.
+
+Engine adapters should translate host collider assets into the data-only shape
+definitions, then create an unbound runtime collider:
+
+```csharp
+ColliderShapeDefinition shape =
+    ColliderShapeDefinition.Sphere(
+        Fixed64.Half,
+        PhysicsMaterial.Default);
+LSCollider collider = shape.CreateCollider();
+
+ColliderShapeDefinition2D shape2D =
+    ColliderShapeDefinition2D.Circle(Fixed64.Half);
+LSCollider2D collider2D = shape2D.CreateCollider();
+```
+
+The definitions snapshot mesh and polygon inputs and validate dimensions before
+creating the matching Gravitas-owned runtime shape. Direct construction of
+`LSSphereCollider`, `LSCircleCollider2D`, and the other concrete types remains
+available when an adapter already knows the exact shape. No engine reference,
+reflection, or custom collider subclass is required.
+
+### Dynamic 3D Body
+
+Dynamic 3D matter usually has a host agent, one `LSCollider`, and one
+`SolidBody`.
+
+```csharp
+using FixedMathSharp;
+using Gravitas;
+using Gravitas.Colliders;
+using Gravitas.Materials;
+
+FixedTransform transform = new(
+    Vector3d.Zero,
+    FixedQuaternion.Identity,
+    Vector3d.One);
+
+HostMatterAgent agent = new(context, transform);
+
+LSSphereCollider collider = new();
+collider.Material = new PhysicsMaterial(
+    staticFriction: Fixed64.One,
+    dynamicFriction: Fixed64.Half,
+    restitution: Fixed64.FromFraction(1, 4));
+
+SolidBody body = new(agent, collider)
+{
+    Mass = Fixed64.One
+};
+
+body.Initialize(
+    Vector3d.Zero,
+    FixedQuaternion.Identity,
+    BodyMotionType.Dynamic);
+```
+
+Initialization binds the body and collider to `agent.Context`, allocates
+context-local body/collider IDs, calculates runtime shape data, and partitions
+the collider. `FixedTransform` and Gravitas body admission both preserve a
+normalized orientation invariant. Scaled or extreme finite quaternion inputs are
+scale-safely normalized, and a zero quaternion resolves to identity before
+runtime shape state is published.
+
+### 2D Body
+
+2D scenes use the same host-agent shape, but select the 2D runtime path and
+create 2D body/collider types:
+
+```csharp
+context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+
+LSCircleCollider2D collider = new(Fixed64.Half);
+SolidBody2D body = new(agent, collider)
+{
+    Mass = Fixed64.One
+};
+
+body.Initialize(
+    agent.Transform.WorldPositionXZ,
+    motionType: BodyMotionType.Dynamic);
+```
+
+The 2D projection uses the LSF X/Z convention: world X maps to 2D X and world Z
+maps to 2D Y. World Y remains vertical height or mixed embedding metadata.
+Positive planar rotation turns `Vector2d.Right` toward `Vector2d.Forward` and is
+exposed as `WorldRotationXZRadians`; its 3D embedding is a negative Y-axis
+quaternion rotation. Gravitas canonicalizes authoritative 2D yaw to
+`[-Fixed64.Pi, Fixed64.Pi)`, including serialized and multi-turn inputs.
+
+`FixedTransform` distinguishes authored local components from hierarchy-aware
+world views. Host adapters should populate `LocalPosition`, `LocalRotation`, and
+`LocalScale` from their engine object, then use the explicit `World*` members
+when synchronizing physics. Gravitas kinematic readback and dynamic publication
+use world position/rotation and preserve a 2D host's world Y. A failed parent
+inverse is reported rather than silently writing the wrong local pose.
+
+### Bodyless Geometry
+
+Use `InitializeWithNoBody(...)` for static or trigger geometry that does not
+need body-owned state. `IsTrigger` is valid only on bodyless colliders; use a
+normal body-owned collider for the moving participant that should receive
+trigger callbacks:
+
+```csharp
+using Gravitas.Colliders;
+
+LSCuboidCollider floor = new();
+floor.InitializeWithNoBody(agent);
+```
+
+Non-trigger bodyless colliders block dynamic bodies in discrete response in both
+3D and pure 2D. They contribute collision geometry and material, with zero
+velocity, inverse mass and inverse inertia. Only the body-owned participant
+receives correction or impulse. Use an explicit `BodyMotionType.Static` body
+when the host needs body-owned state; it is not required for a solid floor.
+
+A body with all translation axes frozen is different from a static body or a
+bodyless collider. Select the runtime role explicitly:
+
+| Role                       | Ownership                                                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `BodyMotionType.Dynamic`   | Solver controlled. `FreezeAxes` independently constrains translation and rotation.                                   |
+| `BodyMotionType.Kinematic` | Host controlled. Gravitas samples deterministic host motion and CCD, but applies no solver impulse.                  |
+| `BodyMotionType.Static`    | Immobile and excluded from simulated-body iteration. Use explicit pose setters to reposition it between fixed steps. |
+
+For example, a rotating platform that must not translate is a `Dynamic` body
+with `BodyFreezeAxes3D.Position`; the 2D equivalent uses
+`BodyFreezeAxes2D.Position`. Freezing every axis does not silently change the
+body role. `LSCollider.IsStatic` and `LSCollider2D.IsStatic` report only an
+explicit `Static` body or bodyless ownership.
+
+Call `SetMotionType(...)` to change a registered body's role between fixed-step
+transactions. The transition preserves body, collider, pair, and joint identity,
+but clears incompatible motion, sleep, CCD, contact warm-start, and joint-solver
+state before repartitioning. It rejects calls before initialization, after
+deactivation or context reset, during an open fixed-step transaction, and from
+simulation callbacks. Ragdoll role changes use their atomic runtime operation
+rather than transitioning links individually.
+
+### Continuous Static Surfaces
+
+Declare continuity explicitly after registering the colliders. Use
+`context.Physics.CreateStaticSurface(ReadOnlySpan<LSMeshCollider>)` for 3D
+meshes using triangle-surface mode (`MeshColliderMode.Concave`), or
+`context.Physics2D.CreateStaticSurface(ReadOnlySpan<LSCollider2D>)` for 2D AABB
+and convex polygon pieces:
+
+```csharp
+// Each piece is already active and registered with this context.
+using StaticSurface floor = context.Physics.CreateStaticSurface(
+    new LSMeshCollider[] { leftMesh, rightMesh });
+using StaticSurface2D wall = context.Physics2D.CreateStaticSurface(
+    new LSCollider2D[] { leftPiece, rightPiece });
+
+// Replace the complete declaration when streaming pieces between fixed steps.
+floor.ReplaceMembers(new LSMeshCollider[] { rightMesh, nextMesh });
+```
+
+`Concave` names the collision policy, not a requirement that the geometry be
+nonconvex. A flat convex panel or closed convex-shaped shell can use this mode.
+Closed shells retain triangle-surface behavior rather than filled convex-volume
+behavior; see
+[mesh modes and closed topology](COLLIDER_SHAPE_REFERENCE.md#mesh-policy).
+
+Members must be distinct, independent colliders in the owning context, either
+bodyless or owned by explicit static bodies. A collider belongs to at most one
+surface. Dynamic and kinematic bodies, compound parts, convex 3D mesh volumes,
+and 2D circles or capsules are not eligible members. The handle declares which
+pieces may join; geometric validation decides which boundary spans actually do.
+See
+[continuous static surface geometry](COLLISION_PIPELINE.md#continuous-static-surfaces)
+for exact joins, genuine edges, materials, and deep-placement limits.
+
+Create, replace, load membership, and dispose only between complete fixed steps,
+after `LateSimulate()` and before the next `Simulate()`. `ReplaceMembers(...)`
+publishes the complete candidate set atomically; invalid membership leaves the
+previous declaration usable. Empty membership is allowed, so a host can retain
+the handle while all pieces are streamed out. Geometry and filtering changes
+invalidate dependent contacts and support; moving a piece can open a real gap.
+
+Deactivating or unregistering a member, or changing it away from static
+ownership, removes its membership. Reactivation requires an explicit declaration
+again. `Dispose()` removes the declaration without deactivating its colliders;
+repeated disposal is harmless. Context reset or disposal invalidates every owned
+surface handle. Create a new handle for the new context lifetime. Restore uses
+[host-created handles and typed collider links](SERIALIZATION.md#static-surface-membership).
+
+### Runtime mass changes
+
+Assign `SolidBody.Mass` or `SolidBody2D.Mass` between complete fixed steps. An
+actual change refreshes inertia from the committed collider shape and COM,
+clears contact and connected-joint impulse caches and CCD state, wakes the body,
+and immediately synchronizes awake membership in pure and mixed partitions. The
+body keeps its role, freeze axes, registration, pose, velocities, and already
+accepted accelerations. Queued force/torque inputs have already been converted
+to acceleration; changing mass does not retroactively rescale those inputs.
+
+Zero and negative mass disable applicable solver motion without converting a
+dynamic body into a static one. Restoring positive mass restores the unfrozen
+degrees of freedom and collision eligibility. Assigning the current value is a
+no-op, including for sleeping bodies and during a simulation callback.
+
+Changed values reject during an open fixed-step transaction, in simulation
+callbacks, or after a context registration reset. Inertia calculation completes
+before publishing the new mass, so a calculation failure preserves mass,
+inertia, sleep, and caches. Before initialization or after deactivation, mass is
+configuration only; initialization derives inertia from the committed shape.
+Recorded-state loading retains saved sleep and motion rather than applying the
+public setter's wake policy.
+
+Built-in primitive mass calculations use the effective shape dimensions before
+and after initialization. These dimensions also supply primitive compound
+contributions. Detached shapes use their authored dimensions and part scales;
+initialized shapes use committed owner and part scales. A sphere takes the
+largest radial scale across X/Y/Z, while a cone, cylinder, or 3D capsule uses
+X/Z for radius and Y for height.
+
+Primitive intrinsic inertia retains geometry and mass products through final
+rounding. Existing fixed coefficients retain their Q32.32 quantization,
+including the sphere's `2/5` coefficient. Capsules retain exact internal
+component weights; a 2D capsule includes both semicircular caps' complete polar
+moment about its center. A box rounds the sum of its axis contributions once.
+Primitive scalar formulas saturate only an unrepresentable final value, so a
+large intermediate radius square does not discard a representable final moment.
+
+Compounds retain volume or area weights, intrinsic moments and parallel-axis
+terms until parent mass is applied. Children do not receive rounded mass
+allocations. Polygon and mesh integrals include the first-moment residual when
+their published COM is rounded, and reference-point overrides participate in the
+same final calculation. An unrepresentable final compound tensor or moment
+throws before body mass is changed. Completed geometry is cached for mass and
+world-pose changes; changing owner scale, local offset or the requested
+reference refreshes it.
+
+3D tensor transport follows the same active rotation as collider geometry,
+including temporary CCD poses. Mesh public unit-tensor data remains a Q32.32
+projection. Runtime mesh inertia retains its integrals through mass application
+and reference translation, including the first-moment residual of a rounded
+published COM. Closed-volume and surface policies cache their own geometry; pose
+changes reuse it. Standalone results saturate only an unrepresentable final
+entry, while compound results remain checked. `PhysicsMesh` applies signed mass
+algebraically after geometry validation; collider APIs return zero for
+nonpositive mass. Public mass-property data objects continue to scale their
+published unit-tensor projections.
+
+Standalone 2D polygons likewise retain centered integrals and the first-moment
+residual through complete reference translation and final mass-applied rounding.
+References are body-local: host yaw does not affect the scalar moment, while an
+authored compound-part rotation rotates the residual into the parent's frame. An
+unrepresentable final standalone polygon moment saturates when its semantic
+center is representable; if both are outside the scalar domain, the request
+throws.
+
+### Explicit body pose changes
+
+Static bodies do not poll their host transforms. `SetPosition(...)`,
+`SetRotation(...)`, and 3D `UpdateRotation(...)` are the authoritative explicit
+repositioning surface; they refresh pure and mixed partition membership
+immediately so queries observe the new pose without a simulation step. A pose
+change first prepares the complete collider candidate, including exact scale,
+canonical geometry, bounds, and mass properties. If that candidate is invalid,
+the body pose, host transform, committed collider state, and partitions remain
+unchanged.
+
+Bodyless 3D and 2D colliders rebuild from their agent transform during the next
+fixed-step partition preparation. If the host mutates a bodyless collider's
+transform and needs query results before the next step, call
+`collider.Simulate()` after the mutation to refresh bounds and partition
+membership immediately. The bodyless 3D `LSCollider.Position` and `Rotation`
+setters are the transactional alternative: they validate the tentative world
+pose and publish the host transform, canonical geometry, mass properties, and
+partitions only after the whole candidate succeeds.
+
+### Reconfiguring A Registered Body
+
+Use `SolidBody.TryReconfigureCollider(...)` when a registered 3D agent changes
+physical profile without changing runtime identity: for example, standing to
+crouching, then returning to standing. The current focused surface supports
+sphere, capsule, and finite-cylinder bodies. A definition must stay in the
+collider's existing shape family; it cannot turn a capsule into a sphere or
+replace compound, cuboid, cone, or mesh geometry.
+
+Call it between fixed steps with the complete desired geometry, local offset,
+and authoritative body-root position:
+
+```csharp
+using FixedMathSharp;
+using Gravitas;
+using Gravitas.Colliders;
+
+ColliderReconfigurationStatus result = body.TryReconfigureCollider(
+    ColliderShapeDefinition.Capsule(
+        radius: Fixed64.Half,
+        height: Fixed64.One),
+    localOffset: Vector3d.Up * Fixed64.Half,
+    position: body.Position3d,
+    out LSCollider? blocker,
+    out System.Exception? notificationException,
+    publishSynchronizedState: null);
+```
+
+`Applied` means the geometry and pose were published together. `Unchanged` means
+the requested authored and committed state already matched. `Blocked` returns
+the first physically eligible collider, in stable registration order, that the
+candidate would positively penetrate. Exact touching at a support or floor
+contact is accepted, and trigger volumes do not block reconfiguration.
+
+The definition contributes geometry only. The existing collider keeps its
+material, filters, hierarchy, event subscriptions, rotation, service identity,
+and body motion state. An accepted change refreshes mass properties, pure and
+mixed broad-phase membership, and query visibility; it invalidates existing
+contact pairs, warm starts, CCD trajectories, and joint solver caches. A blocked
+or invalid attempt leaves the authored and committed shape, body and host pose,
+partitions, pairs, serialized payload, and replay hash unchanged. Default,
+unsupported, wrong-family, unrepresentable, and unsafe-lifecycle requests throw
+rather than partially publishing state.
+
+The native counterpart is `SolidBody2D.TryReconfigureCollider(...)`, with
+`ColliderShapeDefinition2D`, planar `Vector2d` offset/root position, and an
+`LSCollider2D` blocker. It supports circle-to-circle and capsule-to-capsule
+replacement in pure `TwoD` mode. A capsule with height `2 * radius` is a compact
+posture of the same collider, not a replacement identity. Host world Y and the
+accepted rotation are retained. Other runtime modes reject rather than omit
+potential cross-dimensional blockers.
+
+Both 2D and 3D admission distinguish exact touching from positive penetration
+before contact-depth rounding. Even a penetration smaller than one raw
+fixed-point unit rejects the transaction; a rounded solver depth of zero is not
+evidence that a replacement fits. Classification uses committed geometry and
+authoritative rigid frames for direct colliders and each compound part, without
+generating contact manifolds. In 3D, a closed convex mesh also blocks enclosure;
+open and concave meshes test their authored surfaces, not an invented filled
+interior.
+
+Both transactions test the whole replacement shape against physically eligible
+registered colliders, including blockers outside physics grids. This rare
+explicit operation can scan the registry and allocate. Semantic validation is
+completed before publication; this is not a promise to recover from
+process-level allocation failure. Hosts must prepare their own fallible
+navigation/controller state before calling, then publish that prepared state
+through the callback.
+
+Pair-separation callbacks from an accepted reconfiguration run after the new
+geometry, root pose, mass properties, and partitions are coherent. A
+coordinating adapter can supply `publishSynchronizedState`; Gravitas invokes it
+after physical publication (or confirmation of `Unchanged`) and before any
+separation callback, and does not invoke it for `Blocked`. The publisher must
+leave dependent state committed even if a host notification throws because the
+physical transaction cannot roll back at that point.
+
+Pair retirement continues in stable order if the publisher or a separation
+callback throws. Gravitas returns one failure directly through
+`notificationException`, or several as an `AggregateException`. That value
+reports a post-commit notification failure; it does not change `result` from
+`Applied` or `Unchanged`, and the host must not retry the accepted
+reconfiguration. A coordinating adapter should rethrow the returned exception
+with its original stack only after the call completes.
+
+If a callback deactivates and reinitializes a body, retirement from the old
+transaction cannot clear pairs belonging to the replacement registration.
+
+Authored `FixedTransform.LocalScale` may be signed or zero, but physical
+collider dimensions may not. Gravitas requires every consumed authored local
+axis throughout the transform ancestry to remain positive: X/Z for 2D colliders
+and X/Y/Z for 3D colliders. Gravitas then composes the hierarchy's strict
+local-to-world matrices and admits only a representable, nonsingular TRS
+decomposition. This rejects canceled reflections and genuine hierarchy shear
+instead of approximating either as a rotation plus diagonal scale. Pure 2D also
+requires the composed X/Z basis to remain in the simulation plane.
+Initialization and runtime rebuild reject invalid scale before changing body
+registration, host pose, canonical geometry, mass properties, or partition
+state.
+
+The host's authored local transforms remain untouched so an adapter or authoring
+tool can correct them explicitly.
+
+Owner scale and compound-part scale stay separate through shape preparation.
+Each final radius, axis length, half-extent, offset, mesh coordinate, or mass
+property is formed with an exact fused operation and rejected only when that
+final canonical value is not representable or physically valid. Intermediate
+Q32.32 saturation is never accepted as a plausible runtime dimension.
+
+Use `FixedTransform.TransformPoint(...)`, `InverseTransformPoint(...)`, and
+their explicit X/Z counterparts when converting through the current authored or
+presentation snapshot.
+
+Use `SolidBody.GetWorldPoint(...)` / `GetLocalPoint(...)`, or the matching
+`SolidBody2D` methods, for gameplay conversion through the authoritative physics
+pose. These body methods use the collider's last committed owner-scale snapshot,
+not a newly read host scale, so render interpolation or a pending adapter
+mutation cannot change simulation queries. Their `Try*` counterparts return
+`false` with a zero output before the first shape commit or when the final
+coordinate is outside the Q32.32 domain.
+
+Engine adapters should treat Gravitas as the sole simulation authority. Publish
+the visual pose to the engine transform, and disable native rigid-body
+simulation or interpolation that would apply a second motion source or
+double-interpolate the Gravitas result.
+
+### Representable Body Positions
+
+Gravitas rejects an unrepresentable authoritative position with
+`OverflowException` during integration, contact correction, or CCD trajectory
+publication. Frozen axes are projected before validation. A position exactly at
+`Fixed64.MinValue` or `Fixed64.MaxValue` is valid; movement beyond it is not
+silently shortened.
+
+Contact corrections prepare both participants' endpoints before moving either.
+CCD response also checks the outgoing trajectories before publishing body state
+or reserving candidate refresh. These checks protect the individual operation; a
+simulation step is not a rollback transaction. Earlier bodies, solver rows,
+clock advances, and force integration may already have run when an exception
+escapes. Stop the failed step and restore a known state before continuing.
+
+The scalar coordinate limits do not define playable-world boundaries or grid
+walls. Hosts remain responsible for their own world limits and explicit
+coordinate-frame changes. Valid ordinary integration keeps multiply-then-add
+rounding.
+
+## Common Configuration
+
+### Surface Materials
+
+`PhysicsMaterial` is deterministic collider surface data. Assign it before
+simulation when a surface needs explicit static friction, dynamic friction,
+restitution, or combine policies:
+
+```csharp
+collider.Material = PhysicsMaterial.Frictionless;
+```
+
+Shape definitions and compound parts can also carry materials:
+
+```csharp
+var compound = new LSCompoundCollider(
+    CompoundColliderPart.Sphere(
+        Fixed64.Half,
+        -Vector3d.Right,
+        PhysicsMaterial.Bouncy),
+    CompoundColliderPart.Cuboid(
+        Vector3d.One,
+        Vector3d.Right,
+        PhysicsMaterial.Default));
+```
+
+Compound parts without an explicit material use the owning compound collider's
+material when private part colliders are materialized.
+
+### Local Physical Filtering
+
+`IgnoredCollisionLayers` is a collider-owned physical filter:
+
+```csharp
+projectileCollider.Layer = new PhysicsLayer(3);
+ownerCollider.IgnoredCollisionLayers =
+    PhysicsLayerMask.FromLayer(projectileCollider.Layer);
+```
+
+The rule is symmetric at pair time: if either collider ignores the other
+collider's layer, the physical interaction is rejected. This affects discrete
+collision pairs, trigger pairs, internal CCD target eligibility, and
+grounding/support acceptance. Public query services use the caller's
+`PhysicsLayerMask` instead.
+
+### Settings And Environment
+
+Each context owns its own `PhysicsSettings` and `PhysicsEnvironment`.
+`ApplySettings` binds a mutable settings instance to one context; attaching it
+to another context throws until the first replaces it or is disposed. Create a
+separate settings instance for each simultaneous context.
+
+Apply settings and change `RuntimeMode` or `Mixed2DHalfThickness` between fixed
+steps. Those changes preflight every registered 2D collider's complete mixed
+envelope before assignment, respecting collider thickness overrides. A rejected
+change preserves the settings, clock and committed collider state. This scan
+belongs to explicit configuration changes and adds no unchanged-frame work. Pure
+2D modes do not impose a mixed-size budget on unused thickness.
+
+```csharp
+context.SetFrameRate(60);
+
+PhysicsSettings settings = PhysicsSettings.DefaultSettings();
+settings.PoolingEnabled = true;
+settings.RestitutionVelocityThreshold = Fixed64.FromFraction(1, 4);
+context.ApplySettings(settings);
+
+context.Environment.Gravity = Fixed64.FromFraction(49, 5);
+```
+
+Different contexts can run at different frame rates and settings in the same
+process. Timing values such as `DeltaTime`, `FrameCount`, and `ElapsedTime` are
+read through the context. Frame rates must stay between `1` and
+`PhysicsSettings.MaxResolvableFrameRate`; ordinary lockstep rates are far below
+that ceiling.
+
+`FrameCount` is a `long`; `ElapsedTime` is a Chronicler `ChronicleTimestamp`.
+Keep integration math in `Fixed64` using `DeltaTime`. For a measured interval,
+subtract two timestamps from the same context lifetime before converting the
+duration to `Fixed64`. See [Clock State](RUNTIME_ARCHITECTURE.md#clock-state)
+for waits, step changes, and reset behavior.
+
+Per-body gravity tuning lives on the body. `SolidBody.GravityScale` multiplies
+context gravity for that body; `Fixed64.Zero` disables environment-gravity
+acceleration and grounded weight. `SolidBody2D.GravityScale` applies the same
+policy to that body's planar gravity vector.
+
+## Constraints And Ragdolls
+
+`context.Constraints3D` owns deterministic 3D joints and ragdoll runtimes.
+`context.Constraints2D` owns deterministic 2D joints and ragdoll runtimes.
+
+| Domain | Runtime types                 | Joint shape                                         | Solved with                            |
+| ------ | ----------------------------- | --------------------------------------------------- | -------------------------------------- |
+| 3D     | `Joint3D`, `RagdollRuntime3D` | Local frames, angular axes, 3D motors/limits        | 3D contact islands in `LateSimulate()` |
+| 2D     | `Joint2D`, `RagdollRuntime2D` | Planar anchors, scalar angles, scalar motors/limits | 2D contact islands in `LateSimulate()` |
+
+3D example:
+
+```csharp
+using Gravitas.Constraints;
+
+Joint3D shoulder = context.Constraints3D.RegisterJoint(new JointDefinition3D(
+    upperArmBody,
+    torsoBody,
+    upperArmLocalFrame,
+    torsoLocalFrame,
+    JointType3D.ConeTwist,
+    JointLimit3D.ConeTwist(maxConeAngle, maxTwistAngle),
+    JointMotor3D.Disabled,
+    JointCollisionPolicy.SuppressLinked));
+```
+
+2D example:
+
+```csharp
+using Gravitas.Constraints;
+
+Joint2D hinge = context.Constraints2D.RegisterJoint(new JointDefinition2D(
+    forearmBody2D,
+    upperArmBody2D,
+    new JointFrame2D(Vector2d.Right * Fixed64.Half, Fixed64.Zero),
+    new JointFrame2D(-Vector2d.Right * Fixed64.Half, Fixed64.Zero),
+    JointType2D.Pin,
+    JointLimit2D.Angular(-Fixed64.HalfPi, Fixed64.HalfPi),
+    JointMotor2D.Disabled,
+    JointCollisionPolicy.SuppressLinked));
+```
+
+Enabled joints use `PhysicsSettings.DiscreteSolverIterations`. Linked sleep/wake
+behavior follows the island graph. Linked-collider collision suppression affects
+physical collision/CCD pair creation, not public query include-mask semantics.
+
+Ragdolls are authoring conveniences over the same joint model:
+
+```csharp
+RagdollRuntime3D ragdoll = context.Constraints3D.RegisterRagdoll(
+    new RagdollDefinition3D(
+        links,
+        joints,
+        RagdollSelfCollisionPolicy.SuppressAdjacentLinks));
+
+ragdoll.ActivateDynamic();
+ragdoll.DeactivateToKinematic();
+```
+
+Animation, IK, pose selection, engine animator hooks, and blending remain host
+or animation-package responsibilities. A deterministic animation package can
+compute motor payloads and pass them before the fixed step.
+
+## Fixed Loop
+
+A simple deterministic loop looks like this:
+
+```csharp
+while (running)
+{
+    ApplyOrderedCommandsForFrame();
+
+    context.Simulate();
+    context.LateSimulate();
+
+    context.Visualize();
+    context.LateVisualize();
+}
+```
+
+Most real hosts call `Simulate` and `LateSimulate` from a fixed-rate scheduler
+and call visualization phases from the render/update loop.
+
+The high-level order is:
+
+1. `context.Simulate()` advances the clock, runs simulate-phase services,
+   advances lockstep coroutines, and invokes simulate hooks.
+2. `context.LateSimulate()` integrates bodies, processes CCD, refreshes
+   partitions, distributes pairs, solves contacts and joints, refreshes
+   grounding/support, handles mixed contacts when enabled, and invokes
+   late-simulate hooks.
+3. `context.Visualize()` updates visual/presentation transforms for enabled
+   services and invokes visualize hooks.
+4. `context.LateVisualize()` invokes hooks only.
+
+For the 3D path, the fixed-step order is integrate-then-collide inside
+`LateSimulate`: queued forces affect motion before the discrete collision pass
+for that same frame.
+
+For kinematic CCD, hosts must write deterministic target transforms before
+`context.LateSimulate()`. Gravitas captures the body pose at the start of the
+late step, reads the host transform as the requested target, and sweeps between
+those two poses when continuous collision is enabled. The first static-style
+blocker clips the kinematic pose and writes the clipped transform back to the
+host binding.
+
+## Queries And Grounding
+
+2D, 3D, and mixed queries are explicit context services:
+
+```csharp
+using Gravitas.Queries;
+using Gravitas.Support;
+using SwiftCollections;
+
+PhysicsLayerMask layerMask = PhysicsLayerMask.FromLayer(0);
+
+bool rayHitFound = context.Query3D.Raycast(
+    origin,
+    direction,
+    maxDistance,
+    out Physics3DHit rayHit,
+    layerMask);
+
+SwiftList<Physics2DHit> planarHits = new();
+int planarHitCount = context.Query2D.RaycastAll(
+    start2D,
+    end2D,
+    layerMask,
+    planarHits);
+
+SwiftList<PhysicsMixedHit> mixedHits = new();
+int mixedHitCount = context.QueryMixed.SweepSphereAgainst2DAll(
+    origin,
+    origin + direction * maxDistance,
+    radius,
+    layerMask,
+    mixedHits,
+    excludedCollider: null);
+```
+
+All-hit APIs use caller-owned buffers. Batch APIs use typed request spans,
+caller-owned output spans or shared hit lists, and `PhysicsQueryHitRange`
+buffers.
+
+Ground checks use `context.Settings.GroundCheckLayerMask`; hosts should set this
+explicitly for their layer model. `SolidBody.GroundingMode` and
+`SolidBody2D.GroundingMode` can stay automatic or switch to manual host-owned
+support through `UseManualGrounding(...)`, `SetManualGrounding(...)`,
+`ClearManualGrounding()`, and `UseAutomaticGrounding(...)`. Automatic 3D support
+requires an upward normal; `SolidBody.GroundMinNormalDot` sets the minimum
+normalized dot product with world up, defaulting to one half (slopes through 60
+degrees). Horizontal and downward-facing candidate normals cannot ground a body.
+See the [grounding contracts](DIMENSIONS.md#3d-bodies-and-colliders) for probe
+selection and 2D support policy. `SolidBody2D.GroundMinNormalDot` applies the
+same limit range against planar resolved up for both probes and contact support.
+Actual changes to its limit or effective up direction invalidate automatic
+support and wake the body; manual grounding remains host-owned.
+
+An established solid contact is also a sleep dependency. Removing that contact,
+or changing the counterpart's committed shape, explicit pose, or material, wakes
+its sleeping participant. Automatic grounding is invalidated before the next
+motion step; manual grounding remains the host's responsibility. Trigger exits,
+equal assignments, and ordinary solver corrections do not invalidate an
+unchanged solid contact. Mixed contacts wake a 2D participant only when the old
+or replacement constraint couples to its planar motion.
+
+Automatic probes can also supply support without a physical contact. Their
+cached collider lifetime, committed geometry and current filtering are checked
+before sleeping motion is skipped. Changed dependencies or probe mode, radius,
+origin or reach trigger a fresh query. An identical ground point and normal
+preserve sleep; a changed or lost result wakes the body. Loading reconstructs
+this derived cache using the same rule. Triggers are excluded from automatic
+support in both dimensions; ordinary public queries retain their explicit
+trigger policy.
+
+Read [Query Services](QUERY_SERVICES.md) for the full query surface.
+
+## Replay Contract
+
+For deterministic runs, apply ordered commands before `context.Simulate()`.
+Given the same initial context, settings, world state, command order, and frame
+count, Gravitas should replay to the same authoritative body, collider, clock,
+and contact state.
+
+```csharp
+using Chronicler.Hashing;
+
+context.Simulate();
+context.LateSimulate();
+
+ChronicleHash hash = context.ComputeReplayHash();
+SendFrameHashToLockstepPeer(context.FrameCount, hash);
+```
+
+`ComputeReplayHash()` hashes context settings, physical environment values,
+clock state, body state, collider shape/filter state, retained
+continuation-affecting pair/contact state, and active CCD handoff state. It does
+not hash host object identity, delegates, diagnostics buffers, debug draw
+commands, query scratch buffers, or visualization interpolation caches.
+
+The returned `ChronicleHash` is a deterministic conformance signal, not a
+cryptographic hash and not a compatibility promise across package versions.
+
+## Deactivation And Disposal
+
+Deactivate runtime objects before pooling or destroying their host wrappers:
+
+```csharp
+body.Deactivate();
+floor.Deactivate();
+```
+
+`SolidBody.Deactivate()` deactivates the collider, removes the body from the
+physics service, and clears the dynamic ID. `LSCollider.Deactivate()` clears
+partition membership, removes collision-pair references, clears explicit parent
+binding, returns active pairs to the pool when enabled, and releases the
+collider ID.
+
+Use `context.Reset()` for a reusable session context. Reset detaches Gravitas
+partition payloads from GridForge voxels and clears context-local runtime state
+while preserving the world and its grids. Registration and simulation buffers
+release references from the ended session, including stale scratch slots beyond
+their current counts, while retaining reusable capacity. Caller-owned results
+and host references retain their own lifetimes. Use `context.Dispose()` when the
+context is finished.
+
+## Rules That Matter
+
+- Do not mutate authoritative physics state from visualization phases.
+- Do not read wall-clock time from runtime simulation logic.
+- Keep command ordering deterministic before `Simulate()`.
+- Add grid coverage before initializing colliders.
+- Keep public query buffers caller-owned in hot paths.
+- Use explicit runtime modes: `ThreeD`, `TwoD`, `Both`, or `Mixed`.
+- Use `Mixed` only when cross-dimensional contacts are intended.
+- Treat Chronicler as populate-existing-shell infrastructure, not an object
+  factory.
+
+## Source Map
+
+| Area                  | Source                                                                                                                                                                                                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Context and lifecycle | [`src/Gravitas/Runtime/GravitasWorldContext.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasWorldContext.cs), [`src/Gravitas/Runtime/GravitasClock.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasClock.cs)     |
+| Host boundary         | [`src/Gravitas/Core/IMatterAgent.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/IMatterAgent.cs)                                                                                                                                                           |
+| 3D body/service       | [`src/Gravitas/Core/3D/SolidBody.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/SolidBody.cs), [`src/Gravitas/Core/3D/GravitasPhysicsService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/GravitasPhysicsService.cs)         |
+| 2D body/service       | [`src/Gravitas/Core/2D/SolidBody2D.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/SolidBody2D.cs), [`src/Gravitas/Core/2D/GravitasPhysics2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/GravitasPhysics2DService.cs) |
+| Settings              | [`src/Gravitas/Settings/PhysicsSettings.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsSettings.cs), [`src/Gravitas/Settings/PhysicsRuntimeMode.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsRuntimeMode.cs) |
+| Constraints           | [`src/Gravitas/Constraints/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/3D), [`src/Gravitas/Constraints/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/2D)                                                           |
+| Query APIs            | [`src/Gravitas/Queries`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries)                                                                                                                                                                                     |
+| Replay hash           | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Determinism/GravitasReplayHashService.cs)                                                                                                                   |

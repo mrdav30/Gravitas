@@ -50,7 +50,8 @@ public sealed partial class MixedResponseTests
                 CompoundColliderPart2D.Circle(Fixed64.Quarter, Vector2d.Forward * Fixed64.Half, PhysicsMaterial.Frictionless),
                 CompoundColliderPart2D.Circle(Fixed64.Quarter, Vector2d.Backward * Fixed64.Half, PhysicsMaterial.Frictionless));
             body = new SolidBody2D(new TestMatterAgent(context,
-                new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), collider) { Mass = Fixed64.One };
+                new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), collider)
+            { Mass = Fixed64.One };
             body.Initialize(Vector2d.Zero);
             body.UseManualGrounding();
         }
@@ -137,7 +138,8 @@ public sealed partial class MixedResponseTests
         collider.LocalOffset = offset;
         collider.MixedHalfThicknessOverride = Fixed64.Half;
         var body = new SolidBody2D(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Down * Fixed64.Quarter, FixedQuaternion.Identity, Vector3d.One)), collider) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Down * Fixed64.Quarter, FixedQuaternion.Identity, Vector3d.One)), collider)
+        { Mass = Fixed64.One };
         body.Initialize(Vector2d.Zero);
         body.UseManualGrounding();
         return body;
@@ -159,7 +161,8 @@ public sealed partial class MixedResponseTests
             new Vector3d(x, (Fixed64)(-2), zMax), new Vector3d(x, (Fixed64)2, zMax)
         };
         var mesh = new LSMeshCollider(vertices, new[] { 0, 2, 1, 1, 2, 3 },
-            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = material };
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = material };
         mesh.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         return mesh;

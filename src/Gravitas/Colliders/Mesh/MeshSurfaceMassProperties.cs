@@ -5,9 +5,9 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
-using System;
 
 namespace Gravitas.Colliders;
 

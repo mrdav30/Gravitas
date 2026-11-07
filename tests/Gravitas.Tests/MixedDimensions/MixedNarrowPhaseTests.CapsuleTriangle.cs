@@ -1,8 +1,8 @@
+using System.Linq;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;

@@ -1,9 +1,9 @@
+using System.Collections;
+using System.Linq;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
-using System.Collections;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -11,13 +11,24 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class ContactManifold2DTests
 {
     [Theory]
-    [InlineData("")] [InlineData("EquivalentFrame")]
-    [InlineData("Count")] [InlineData("Groups")] [InlineData("GroupKey")]
-    [InlineData("Id")] [InlineData("FeatureA")] [InlineData("FeatureB")]
-    [InlineData("Normal")] [InlineData("Depth")] [InlineData("Clamped")]
-    [InlineData("Override")] [InlineData("MaterialA")] [InlineData("MaterialB")]
-    [InlineData("PointA.X")] [InlineData("PointA.Y")]
-    [InlineData("PointB.X")] [InlineData("PointB.Y")]
+    [InlineData("")]
+    [InlineData("EquivalentFrame")]
+    [InlineData("Count")]
+    [InlineData("Groups")]
+    [InlineData("GroupKey")]
+    [InlineData("Id")]
+    [InlineData("FeatureA")]
+    [InlineData("FeatureB")]
+    [InlineData("Normal")]
+    [InlineData("Depth")]
+    [InlineData("Clamped")]
+    [InlineData("Override")]
+    [InlineData("MaterialA")]
+    [InlineData("MaterialB")]
+    [InlineData("PointA.X")]
+    [InlineData("PointA.Y")]
+    [InlineData("PointB.X")]
+    [InlineData("PointB.Y")]
     [InlineData("Recovery")]
     public void ContactEquality_ShouldCompareTheCompletePhysicalConstraintAcrossAnchorFrames(string change)
     {

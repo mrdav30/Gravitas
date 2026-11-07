@@ -10,12 +10,18 @@ namespace Gravitas.Tests;
 public sealed class MixedContinuousSectionAdmissionTests
 {
     [Theory]
-    [InlineData("Sphere", false)] [InlineData("Sphere", true)]
-    [InlineData("Capsule", false)] [InlineData("Capsule", true)]
-    [InlineData("Cone", false)] [InlineData("Cone", true)]
-    [InlineData("Cylinder", false)] [InlineData("Cylinder", true)]
-    [InlineData("Box", false)] [InlineData("Box", true)]
-    [InlineData("Mesh", false)] [InlineData("Mesh", true)]
+    [InlineData("Sphere", false)]
+    [InlineData("Sphere", true)]
+    [InlineData("Capsule", false)]
+    [InlineData("Capsule", true)]
+    [InlineData("Cone", false)]
+    [InlineData("Cone", true)]
+    [InlineData("Cylinder", false)]
+    [InlineData("Cylinder", true)]
+    [InlineData("Box", false)]
+    [InlineData("Box", true)]
+    [InlineData("Mesh", false)]
+    [InlineData("Mesh", true)]
     public void RemoteFold_ShouldKeepItsRealEdgeWithoutRevokingTheCertifiedFloorJoin(string shape, bool reverse)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -73,7 +79,8 @@ public sealed class MixedContinuousSectionAdmissionTests
                     new(0, 0, 2), new(0, 0, -2), new(x, Fixed64.Zero, (Fixed64)2), new(x, Fixed64.Zero, -(Fixed64)2),
                     new(x, (Fixed64)4, (Fixed64)2), new(x, (Fixed64)4, -(Fixed64)2) },
                     new[] { 0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7, 6, 7, 8, 8, 7, 9 },
-                    MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+                    MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+                { Material = PhysicsMaterial.Frictionless };
                 scene.InitializeStaticCollider(monolithic, Vector3d.Zero);
                 members = new[] { monolithic };
             }
@@ -126,7 +133,8 @@ public sealed class MixedContinuousSectionAdmissionTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void JoinedCylinderOuterEndpoint_ShouldKeepTheTrueRimAcrossAuthoredVertexOrders(bool reverse)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -200,7 +208,8 @@ public sealed class MixedContinuousSectionAdmissionTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void DisconnectedDomainMembers_ShouldKeepTheirOwnMaterialsAndGroupsWhenCcdAggregatesOrdinaryContacts(bool compound)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -210,7 +219,7 @@ public sealed class MixedContinuousSectionAdmissionTests
         using var surface = scene.Context.Physics2D.CreateStaticSurface(new[] { left, right });
         LSCollider mover = compound
             ? new LSCompoundCollider(CompoundColliderPart.Sphere(Fixed64.Two, Vector3d.Zero, PhysicsMaterial.Frictionless))
-                { Material = PhysicsMaterial.Bouncy }
+            { Material = PhysicsMaterial.Bouncy }
             : new LSSphereCollider { Radius = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         scene.CreateBody(mover, new(Fixed64.Zero, Fixed64.Zero, Fixed64.Half), FixedQuaternion.Identity);
         Assert.True(CollisionDetectionMixed.TryBuildManifold(mover, left, new ContactManifold()));
@@ -246,7 +255,8 @@ public sealed class MixedContinuousSectionAdmissionTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void DeclaredDomain_ShouldNotCertifyAnEnclosurePastEitherScalarFace(bool upper)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -290,8 +300,10 @@ public sealed class MixedContinuousSectionAdmissionTests
     }
 
     [Theory]
-    [InlineData(false, false)] [InlineData(false, true)]
-    [InlineData(true, false)] [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
     public void CurvedEmptyCorner_ShouldExcludeOnlyAnEnclosureThatStillMissesTheActualTriangle(bool capsule, bool affine)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -327,7 +339,8 @@ public sealed class MixedContinuousSectionAdmissionTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void UnsupportedPaddedFootprints_ShouldStayUnresolved(bool compound)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -396,9 +409,11 @@ public sealed class MixedContinuousSectionAdmissionTests
                 rightPoints[index] = new(rightPoints[index].X, rightPoints[index].Z, -rightPoints[index].Y);
         }
         var left = new LSMeshCollider(leftPoints, new[] { 0, 1, 2, 2, 1, 3 },
-            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
         var right = new LSMeshCollider(rightPoints, new[] { 0, 1, 2, 2, 1, 3, 2, 3, 4, 4, 3, 5 },
-            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
         scene.InitializeStaticCollider(left, Vector3d.Zero); scene.InitializeStaticCollider(right, Vector3d.Zero);
         return (left, right);
     }

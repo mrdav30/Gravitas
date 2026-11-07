@@ -5,8 +5,8 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using Gravitas.Colliders;
 using System.Runtime.CompilerServices;
+using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 

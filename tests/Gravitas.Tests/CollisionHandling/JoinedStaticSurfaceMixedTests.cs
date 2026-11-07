@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
@@ -6,9 +9,6 @@ using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -219,7 +219,8 @@ public sealed class JoinedStaticSurfaceMixedTests
         var circle = new LSCircleCollider2D(Fixed64.Half) { Material = PhysicsMaterial.Frictionless };
         var body = new SolidBody2D(new TestMatterAgent(scene.Context), circle)
         {
-            Mass = Fixed64.One, SleepEnabled = false,
+            Mass = Fixed64.One,
+            SleepEnabled = false,
             // Removing a member exposes a real lateral rim. Freeze that axis so
             // this regression isolates carrier transfer from legitimate side motion.
             FreezeAxes = BodyFreezeAxes2D.Rotation | BodyFreezeAxes2D.PositionX
@@ -348,7 +349,8 @@ public sealed class JoinedStaticSurfaceMixedTests
         var circle = new LSCircleCollider2D(Fixed64.Half) { Material = PhysicsMaterial.Bouncy };
         var body = new SolidBody2D(new TestMatterAgent(scene.Context), circle)
         {
-            Mass = Fixed64.One, SleepEnabled = false,
+            Mass = Fixed64.One,
+            SleepEnabled = false,
             FreezeAxes = BodyFreezeAxes2D.PositionX | BodyFreezeAxes2D.Rotation
         };
         body.Initialize(new(Fixed64.Quarter, Fixed64.Quarter)); body.UseManualGrounding();

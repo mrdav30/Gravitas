@@ -21,8 +21,11 @@ public sealed class ConvexMeshCapsuleContactTests
         LSCollider wall = box ? new LSCuboidCollider() : MeshTestFixtures.CreateConvexCube();
         scenario.InitializeStaticCollider(wall, Vector3d.Zero);
         Vector3d center = new(Fixed64.Zero, (Fixed64)side * Fixed64.FromFraction(3, 2), -Fixed64.FromFraction(1, 8));
-        var capsule = new LSCapsuleCollider { Radius = Fixed64.FromFraction(1, 8),
-            Size = new Vector3d(Fixed64.Quarter, Fixed64.FromFraction(17, 4), Fixed64.Quarter) };
+        var capsule = new LSCapsuleCollider
+        {
+            Radius = Fixed64.FromFraction(1, 8),
+            Size = new Vector3d(Fixed64.Quarter, Fixed64.FromFraction(17, 4), Fixed64.Quarter)
+        };
         scenario.InitializeStaticCollider(capsule, center);
         foreach (bool reverse in new[] { false, true })
         {
@@ -59,8 +62,11 @@ public sealed class ConvexMeshCapsuleContactTests
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
         LSCollider wall = box ? new LSCuboidCollider() : MeshTestFixtures.CreateConvexCube();
         SolidBody hull = scenario.CreateBody(wall, Vector3d.Zero, FixedQuaternion.Identity).Body;
-        var capsule = new LSCapsuleCollider { Radius = Fixed64.FromFraction(1, 8),
-            Size = new Vector3d(Fixed64.Quarter, Fixed64.FromFraction(17, 4), Fixed64.Quarter) };
+        var capsule = new LSCapsuleCollider
+        {
+            Radius = Fixed64.FromFraction(1, 8),
+            Size = new Vector3d(Fixed64.Quarter, Fixed64.FromFraction(17, 4), Fixed64.Quarter)
+        };
         SolidBody curved = scenario.CreateBody(capsule,
             new Vector3d(Fixed64.Zero, (Fixed64)side * Fixed64.FromFraction(3, 2), -Fixed64.FromFraction(1, 8)),
             FixedQuaternion.Identity).Body;
@@ -109,8 +115,11 @@ public sealed class ConvexMeshCapsuleContactTests
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
         LSCollider wall = box ? new LSCuboidCollider() : MeshTestFixtures.CreateConvexCube();
         SolidBody solid = scenario.CreateBody(wall, Vector3d.Zero, FixedQuaternion.Identity, immovable: true).Body;
-        var capsule = new LSCapsuleCollider { Radius = Fixed64.FromFraction(1, 8),
-            Size = new Vector3d(Fixed64.Quarter, Fixed64.FromFraction(17, 4), Fixed64.Quarter) };
+        var capsule = new LSCapsuleCollider
+        {
+            Radius = Fixed64.FromFraction(1, 8),
+            Size = new Vector3d(Fixed64.Quarter, Fixed64.FromFraction(17, 4), Fixed64.Quarter)
+        };
         SolidBody body = scenario.CreateBody(capsule,
             new Vector3d(Fixed64.Zero, (Fixed64)side * Fixed64.FromFraction(3, 2), -Fixed64.FromFraction(1, 8)),
             FixedQuaternion.Identity).Body;

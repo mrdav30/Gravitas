@@ -1,3 +1,4 @@
+using System;
 using Chronicler.Hashing;
 using FixedMathSharp;
 using FluentAssertions;
@@ -6,7 +7,6 @@ using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -20,21 +20,22 @@ public sealed partial class ContinuousCollisionDetectionTests
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
-        Fixed64 upperY = Fixed64.FromFraction(1,10);
+        Fixed64 upperY = Fixed64.FromFraction(1, 10);
         Vector3d[] vertices = { new((Fixed64)(-2),upperY,(Fixed64)(-2)), new((Fixed64)2,upperY,(Fixed64)(-2)),
             new((Fixed64)2,upperY,(Fixed64)2), new((Fixed64)(-2),upperY,(Fixed64)2),
             new(-2,0,-2), new(2,0,-2), new(2,0,2), new(-2,0,2) };
-        int[] triangles = { 0,3,1, 1,3,2, 4,7,5, 5,7,6 };
+        int[] triangles = { 0, 3, 1, 1, 3, 2, 4, 7, 5, 5, 7, 6 };
         if (!includeLaterPlane)
         {
             Array.Resize(ref vertices, 4);
             Array.Resize(ref triangles, 6);
         }
         var mesh = new LSMeshCollider(vertices, triangles, MeshColliderMode.Concave,
-            MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+            MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
         scenario.CreateBody(mesh, Vector3d.Zero, FixedQuaternion.Identity, immovable: true);
         ScenarioBody<LSConeCollider> source = scenario.CreateBody(new LSConeCollider(),
-            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(13,20), Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(13, 20), Fixed64.Zero),
             FixedQuaternion.Identity, isKinematic: true);
         source.Collider.Material = PhysicsMaterial.Frictionless;
         source.Body.UseManualGrounding();

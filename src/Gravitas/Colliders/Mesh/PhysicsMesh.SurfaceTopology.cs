@@ -5,10 +5,10 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using FixedMathSharp;
-using SwiftCollections;
 using System;
 using System.Collections.Generic;
+using FixedMathSharp;
+using SwiftCollections;
 
 namespace Gravitas.Colliders;
 

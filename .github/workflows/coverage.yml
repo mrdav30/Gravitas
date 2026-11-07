@@ -66,6 +66,9 @@ jobs:
           test -f src/Gravitas/bin/Release/net10.0/Gravitas.xml
           dotnet tool run docfx docs/api/docfx.json --warningsAsErrors
           test -f docs/api/obj/_site/index.html
+          for guide in Home GETTING_STARTED OVERVIEW HOST_INTEGRATION RUNTIME_ARCHITECTURE DIMENSIONS SERIALIZATION COLLISION_PIPELINE COLLISION_BROAD_PHASE COLLIDER_SHAPE_REFERENCE COLLISION_RESPONSE CONTINUOUS_COLLISION_DETECTION QUERY_SERVICES QUERY_REFERENCE DIAGNOSTICS DIAGNOSTIC_ADAPTERS; do
+            test -f "docs/api/obj/_site/guides/${guide}.html"
+          done
           test -f docs/api/obj/_site/api/Gravitas.html
           test -f docs/api/obj/_site/api/Gravitas.Diagnostics.html
           test -f docs/api/obj/_site/assets/icon_128x128.png
@@ -150,6 +153,7 @@ jobs:
           cp -a docs/api/obj/_site/. artifacts/pages/
           cp -a artifacts/coverage-report/. artifacts/pages/coverage/
           test -f artifacts/pages/index.html
+          test -f artifacts/pages/guides/Home.html
           test -f artifacts/pages/api/Gravitas.html
           test -f artifacts/pages/assets/icon_128x128.png
           test -f artifacts/pages/public/main.css

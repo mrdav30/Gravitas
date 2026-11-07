@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -5,7 +6,6 @@ using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
@@ -253,11 +253,13 @@ public sealed partial class MixedResponseTests
         var spatialCollider = new LSCuboidCollider { Size = Vector3d.One, Material = PhysicsMaterial.Frictionless };
         Vector3d position = Vector3d.Up * Fixed64.FromFraction(3, 4);
         var spatial = new SolidBody(new TestMatterAgent(context,
-            new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One)), spatialCollider) { Mass = Fixed64.One };
+            new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One)), spatialCollider)
+        { Mass = Fixed64.One };
         spatial.Initialize(position, FixedQuaternion.Identity);
         var planarCollider = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)2) { Material = PhysicsMaterial.Frictionless };
         var planar = new SolidBody2D(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), planarCollider) { Mass = Fixed64.One };
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), planarCollider)
+        { Mass = Fixed64.One };
         planar.Initialize(Vector2d.Zero);
         spatialCollider.Simulate();
         planarCollider.Simulate();

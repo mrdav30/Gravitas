@@ -2,7 +2,6 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Materials;
-using Gravitas.Support;
 using Gravitas.Tests.Support;
 using Xunit;
 
@@ -77,7 +76,9 @@ public sealed class BodyDissipationParityTests
         };
         var body = new SolidBody2D(new TestMatterAgent(context), collider)
         {
-            Mass = Fixed64.One, Gravity = Vector2d.Zero, SleepEnabled = false
+            Mass = Fixed64.One,
+            Gravity = Vector2d.Zero,
+            SleepEnabled = false
         };
         body.Initialize(Vector2d.Zero);
         return body;

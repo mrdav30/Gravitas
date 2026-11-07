@@ -1,10 +1,10 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests;

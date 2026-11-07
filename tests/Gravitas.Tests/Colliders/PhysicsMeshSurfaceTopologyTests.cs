@@ -1,7 +1,7 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -164,8 +164,8 @@ public sealed class PhysicsMeshSurfaceTopologyTests
     {
         Vector3d[] vertices = { new(Fixed64.Zero, Fixed64.Zero, Fixed64.Quarter), new(-3,0,1),
             new(-2,0,-3), new(2,0,-3), new(3,0,1), Vector3d.Zero };
-        int[] faces = { 5,0,2, 5,2,4, 5,4,1, 5,1,3, 5,3,0 };
-        if (containingFaceFirst) faces = new[] { 5,4,1, 5,0,2, 5,2,4, 5,1,3, 5,3,0 };
+        int[] faces = { 5, 0, 2, 5, 2, 4, 5, 4, 1, 5, 1, 3, 5, 3, 0 };
+        if (containingFaceFirst) faces = new[] { 5, 4, 1, 5, 0, 2, 5, 2, 4, 5, 1, 3, 5, 3, 0 };
         PhysicsMesh mesh = Create(vertices, faces);
         for (int triangle = 0; triangle < mesh.TriangleCount; triangle++)
         {
@@ -243,7 +243,7 @@ public sealed class PhysicsMeshSurfaceTopologyTests
         // rim edge (-3,1)--(3,1). Welding does not turn a partial edge into a seam.
         Vector3d[] vertices = { new(0,0,1), new(-3,0,1), new(-2,0,-3),
             new(2,0,-3), new(3,0,1), Vector3d.Zero };
-        int[] faces = { 5,0,2, 5,2,4, 5,4,1, 5,1,3, 5,3,0 };
+        int[] faces = { 5, 0, 2, 5, 2, 4, 5, 4, 1, 5, 1, 3, 5, 3, 0 };
         if (reverse)
             for (int i = 0; i < faces.Length; i += 3) (faces[i + 1], faces[i + 2]) = (faces[i + 2], faces[i + 1]);
         PhysicsMesh mesh = Create(vertices, faces);
@@ -266,13 +266,13 @@ public sealed class PhysicsMeshSurfaceTopologyTests
         Vector3d[] vertices = { new(-4,0,-4), new(4,0,-4), new(4,0,4), new(-4,0,4),
             new(-2,0,-2), new(2,0,-2), new(2,0,2), new(-2,0,2),
             new(-1,0,-1), new(1,0,-1), new(1,0,1), new(-1,0,1) };
-        int[] corners = { 0,1,2,3, 4,7,6,5, 8,9,10,11 };
+        int[] corners = { 0, 1, 2, 3, 4, 7, 6, 5, 8, 9, 10, 11 };
         if (sameWinding) Array.Reverse(corners, 4, 4);
         if (reverse)
             for (int i = 0; i < corners.Length; i += 4) Array.Reverse(corners, i, 4);
         // This production predicate receives directed reduced cycles. A hole
         // and its island are valid; an equally wound inner cover reaches two.
-        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, corners, new[] { 0,4,8,12 }, 1, reverse ? -1 : 1)
+        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, corners, new[] { 0, 4, 8, 12 }, 1, reverse ? -1 : 1)
             .Should().Be(!sameWinding);
     }
 
@@ -281,10 +281,10 @@ public sealed class PhysicsMeshSurfaceTopologyTests
     {
         Vector3d[] vertices = { new(-4,0,-1), new(-2,0,-1), new(-2,0,1), new(-4,0,1),
             new(2,0,-1), new(4,0,-1), new(4,0,1), new(2,0,1) };
-        int[] corners = { 0,1,2,3, 4,5,6,7 };
-        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, corners, new[] { 0,4,8 }, 1, 1).Should().BeTrue();
+        int[] corners = { 0, 1, 2, 3, 4, 5, 6, 7 };
+        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, corners, new[] { 0, 4, 8 }, 1, 1).Should().BeTrue();
         Array.Reverse(corners, 4, 4);
-        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, corners, new[] { 0,4,8 }, 1, 1).Should().BeFalse();
+        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, corners, new[] { 0, 4, 8 }, 1, 1).Should().BeFalse();
     }
 
     [Theory]
@@ -296,11 +296,11 @@ public sealed class PhysicsMeshSurfaceTopologyTests
             new(0,0,-4), new(-1,0,-2), new(1,0,-2) };
         if (overlap)
         {
-            vertices[4] = new Vector3d(-1,0,-4);
-            vertices[5] = new Vector3d(0,0,-2);
-            vertices[6] = new Vector3d(1,0,-4);
+            vertices[4] = new Vector3d(-1, 0, -4);
+            vertices[5] = new Vector3d(0, 0, -2);
+            vertices[6] = new Vector3d(1, 0, -4);
         }
-        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, new[] { 0,1,2,3, 4,5,6 }, new[] { 0,4,7 }, 1, 1)
+        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, new[] { 0, 1, 2, 3, 4, 5, 6 }, new[] { 0, 4, 7 }, 1, 1)
             .Should().BeFalse();
     }
 
@@ -315,8 +315,8 @@ public sealed class PhysicsMeshSurfaceTopologyTests
         // are needed. Swapping cycles reverses which product rejects the pair.
         Vector3d[] vertices = { new(0,0,0), new(2,0,2), new(0,0,2),
             new(1,0,4), new(4,0,1), new(4,0,4) };
-        int[] corners = reverseCycles ? new[] { 3,4,5, 0,1,2 } : new[] { 0,1,2, 3,4,5 };
-        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, corners, new[] { 0,3,6 }, 1, 1).Should().BeTrue();
+        int[] corners = reverseCycles ? new[] { 3, 4, 5, 0, 1, 2 } : new[] { 0, 1, 2, 3, 4, 5 };
+        PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, corners, new[] { 0, 3, 6 }, 1, 1).Should().BeTrue();
     }
 
     [Theory]
@@ -326,9 +326,9 @@ public sealed class PhysicsMeshSurfaceTopologyTests
     [InlineData(3)] // Nonadjacent proper crossing.
     public void BoundaryCycles_ShouldRejectDegenerateAndSelfCrossingWalks(int example)
     {
-        Vector3d[] vertices = { new(0,0,0), new(2,0,0), new(1,0,0), new(1,0,2), new(0,0,2) };
-        int[] corners = example == 0 ? Array.Empty<int>() : example == 1 ? new[] { 0,1 }
-            : example == 2 ? new[] { 1,2,3,4,0 } : new[] { 0,3,1,4 };
+        Vector3d[] vertices = { new(0, 0, 0), new(2, 0, 0), new(1, 0, 0), new(1, 0, 2), new(0, 0, 2) };
+        int[] corners = example == 0 ? Array.Empty<int>() : example == 1 ? new[] { 0, 1 }
+            : example == 2 ? new[] { 1, 2, 3, 4, 0 } : new[] { 0, 3, 1, 4 };
         int[] offsets = example == 0 ? new[] { 0 } : new[] { 0, corners.Length };
         PhysicsMesh.IsEmbeddedSurfaceBoundary(vertices, corners, offsets, 1, 1).Should().BeFalse();
     }
@@ -342,17 +342,17 @@ public sealed class PhysicsMeshSurfaceTopologyTests
         {
             Fixed64 radius = (Fixed64)(ring == 0 ? 4 : 2);
             for (int side = 0; side < 4; side++)
-            for (int i = 0; i < sideSegments; i++)
-            {
-                Fixed64 along = -radius + radius * (Fixed64)(2 * i) / (Fixed64)sideSegments;
-                vertices[ring * count + side * sideSegments + i] = side switch
+                for (int i = 0; i < sideSegments; i++)
                 {
-                    0 => new Vector3d(along, Fixed64.Zero, -radius),
-                    1 => new Vector3d(radius, Fixed64.Zero, along),
-                    2 => new Vector3d(-along, Fixed64.Zero, radius),
-                    _ => new Vector3d(-radius, Fixed64.Zero, -along)
-                };
-            }
+                    Fixed64 along = -radius + radius * (Fixed64)(2 * i) / (Fixed64)sideSegments;
+                    vertices[ring * count + side * sideSegments + i] = side switch
+                    {
+                        0 => new Vector3d(along, Fixed64.Zero, -radius),
+                        1 => new Vector3d(radius, Fixed64.Zero, along),
+                        2 => new Vector3d(-along, Fixed64.Zero, radius),
+                        _ => new Vector3d(-radius, Fixed64.Zero, -along)
+                    };
+                }
         }
         for (int i = 0; i < count; i++)
         {

@@ -6,7 +6,6 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;

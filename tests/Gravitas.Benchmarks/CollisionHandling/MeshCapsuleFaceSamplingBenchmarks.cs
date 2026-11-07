@@ -1,8 +1,8 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System;
 
 namespace Gravitas.Benchmarks;
 
@@ -37,13 +37,13 @@ public class MeshCapsuleFaceSamplingBenchmarks
             vertices = new Vector3d[4 * sideSegments + 1];
             triangles = new int[12 * sideSegments];
             for (int side = 0; side < 4; side++)
-            for (int step = 0; step < sideSegments; step++)
-            {
-                int index = side * sideSegments + step;
-                vertices[index + 1] = Vector3d.Lerp(corners[side], corners[(side + 1) % 4], Fixed64.FromFraction(step, sideSegments));
-                triangles[3 * index + 1] = index + 1;
-                triangles[3 * index + 2] = (index + 1) % (4 * sideSegments) + 1;
-            }
+                for (int step = 0; step < sideSegments; step++)
+                {
+                    int index = side * sideSegments + step;
+                    vertices[index + 1] = Vector3d.Lerp(corners[side], corners[(side + 1) % 4], Fixed64.FromFraction(step, sideSegments));
+                    triangles[3 * index + 1] = index + 1;
+                    triangles[3 * index + 2] = (index + 1) % (4 * sideSegments) + 1;
+                }
         }
         _mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
         _admitted = new int[_mesh.TriangleCount];

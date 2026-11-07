@@ -5,8 +5,8 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using Chronicler;
 using System.Runtime.CompilerServices;
+using Chronicler;
 
 namespace Gravitas.Constraints;
 

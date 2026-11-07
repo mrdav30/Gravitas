@@ -1,10 +1,10 @@
+using System;
 using Chronicler.Hashing;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;

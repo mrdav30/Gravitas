@@ -283,42 +283,42 @@ physics-pose conversion.
       throwing wrappers, and warmed zero allocation.
 - [x] Run:
 
-      ```powershell
-          dotnet test tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj `
-            -c Release --no-restore `
-            --filter "FullyQualifiedName~FixedTransformTests"
-          ```
+```powershell
+dotnet test tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj `
+  -c Release --no-restore `
+  --filter "FullyQualifiedName~FixedTransformTests"
+```
 
-          Confirm the new tests fail because the point-conversion APIs are absent.
+Confirm the new tests fail because the point-conversion APIs are absent.
 
 - [x] Implement the throwing wrappers as direct delegates to their `Try*`
       counterparts:
 
-      ```csharp
-          public Vector3d TransformPoint(Vector3d point)
-          {
-              if (!TryTransformPoint(point, out Vector3d result))
-                  throw new InvalidOperationException(
-                      "The composed transform or final world point is not representable.");
-              return result;
-          }
-          ```
+```csharp
+public Vector3d TransformPoint(Vector3d point)
+{
+    if (!TryTransformPoint(point, out Vector3d result))
+        throw new InvalidOperationException(
+            "The composed transform or final world point is not representable.");
+    return result;
+}
+```
 
 - [x] Implement 3D `Try*` conversion through strict matrix composition and one
       exact affine-point materialization:
 
-      ```csharp
-          public bool TryTransformPoint(Vector3d point, out Vector3d result)
-          {
-              if (!TryGetLocalToWorldMatrix(out Fixed4x4 matrix))
-              {
-                  result = default;
-                  return false;
-              }
+```csharp
+public bool TryTransformPoint(Vector3d point, out Vector3d result)
+{
+    if (!TryGetLocalToWorldMatrix(out Fixed4x4 matrix))
+    {
+        result = default;
+        return false;
+    }
 
-              return Fixed4x4.TryTransformAffinePoint(matrix, point, out result);
-          }
-          ```
+    return Fixed4x4.TryTransformAffinePoint(matrix, point, out result);
+}
+```
 
 - [x] Make `TryGetWorldToLocalMatrix` obtain the strict composed matrix before
       verifying its inverse; it must not invert the saturating
@@ -353,14 +353,14 @@ with the existing canonical fixed-point error bound.
 
 - Produces:
 
-  ```csharp
-  public static bool TryInverseTransformScaledPoint(
-      Vector2d origin,
-      Vector2d worldPoint,
-      Vector2d scale,
-      Fixed64 angleInRadians,
-      out Vector2d localPoint);
-  ```
+```csharp
+public static bool TryInverseTransformScaledPoint(
+    Vector2d origin,
+    Vector2d worldPoint,
+    Vector2d scale,
+    Fixed64 angleInRadians,
+    out Vector2d localPoint);
+```
 
 - Consumes the existing `WideVector2dTransform`, `Signed192`, `Signed320`,
   `Signed576`, and `Fixed64.TryGetSignedRawRatio` owners without exposing wide
@@ -373,13 +373,13 @@ with the existing canonical fixed-point error bound.
       the operation under test.
 - [x] Run:
 
-      ```powershell
-          dotnet test tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj `
-            -c Release --no-restore `
-            --filter "FullyQualifiedName~ScaledCompositeTransformTests"
-          ```
+```powershell
+dotnet test tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj `
+  -c Release --no-restore `
+  --filter "FullyQualifiedName~ScaledCompositeTransformTests"
+```
 
-          Confirm failure occurs because the inverse planar API is absent.
+Confirm failure occurs because the inverse planar API is absent.
 
 - [x] Implement the public method as the narrow entry to the existing internal
       wide owner.
@@ -413,12 +413,12 @@ full-domain benchmark smoke rows report zero managed allocation.
 
 - Produces identical authoritative surfaces on both body types:
 
-  ```csharp
-  GetWorldPoint(localPoint)
-  TryGetWorldPoint(localPoint, out worldPoint)
-  GetLocalPoint(worldPoint)
-  TryGetLocalPoint(worldPoint, out localPoint)
-  ```
+```csharp
+GetWorldPoint(localPoint)
+TryGetWorldPoint(localPoint, out worldPoint)
+GetLocalPoint(worldPoint)
+TryGetLocalPoint(worldPoint, out localPoint)
+```
 
 - `SolidBody` uses `Vector3d`; `SolidBody2D` uses `Vector2d`.
 - Consumes committed owner scale through a focused internal collider
@@ -435,14 +435,14 @@ full-domain benchmark smoke rows report zero managed allocation.
       follows the current presentation snapshot.
 - [x] Run:
 
-      ```powershell
-          dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj `
-            -c Release --no-restore `
-            --filter "FullyQualifiedName~SolidBodyIntegrationTests|FullyQualifiedName~SolidBody2DPointTransformTests"
-          ```
+```powershell
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj `
+  -c Release --no-restore `
+  --filter "FullyQualifiedName~SolidBodyIntegrationTests|FullyQualifiedName~SolidBody2DPointTransformTests"
+```
 
-          Confirm the renamed/parity tests fail because the approved body APIs and
-          committed-scale accessors are absent.
+Confirm the renamed/parity tests fail because the approved body APIs and
+committed-scale accessors are absent.
 
 - [x] Add allocation-free internal committed-scale accessors that return `false`
       before the first shape commit rather than falling back to mutable host
@@ -450,22 +450,22 @@ full-domain benchmark smoke rows report zero managed allocation.
 - [x] Replace the legacy 3D `TransformPoint` surface with the authoritative
       `Get*Point` pairs and use the committed scale:
 
-      ```csharp
-          public bool TryGetWorldPoint(Vector3d point, out Vector3d result)
-          {
-              if (!Collider.TryGetCommittedOwnerScale(out Vector3d scale))
-              {
-                  result = default;
-                  return false;
-              }
+```csharp
+public bool TryGetWorldPoint(Vector3d point, out Vector3d result)
+{
+    if (!Collider.TryGetCommittedOwnerScale(out Vector3d scale))
+    {
+        result = default;
+        return false;
+    }
 
-              return Rotation.TryTransformScaledPoint(
-                  Position3d,
-                  point,
-                  scale,
-                  out result);
-          }
-          ```
+    return Rotation.TryTransformScaledPoint(
+        Position3d,
+        point,
+        scale,
+        out result);
+}
+```
 
 - [x] Add the 2D counterparts over `_position`, `_rotation`, committed planar
       owner scale, `Vector2d.TryTransformScaledPoint`, and the Task 2 inverse.

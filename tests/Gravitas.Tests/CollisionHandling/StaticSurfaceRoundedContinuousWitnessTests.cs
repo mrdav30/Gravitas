@@ -1,10 +1,10 @@
+using System.Numerics;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Materials;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -12,7 +12,9 @@ namespace Gravitas.Tests;
 public sealed class StaticSurfaceRoundedContinuousWitnessTests
 {
     [Theory]
-    [InlineData("Sphere")] [InlineData("ZeroCore")] [InlineData("Capsule")]
+    [InlineData("Sphere")]
+    [InlineData("ZeroCore")]
+    [InlineData("Capsule")]
     public void RoundedClosestWitnessAtRotatedSeam_ShouldNotExcludeTheRealFace(string shape)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -65,18 +67,18 @@ public sealed class StaticSurfaceRoundedContinuousWitnessTests
         // select using exact public-rotation geometry rather than assuming the
         // authored quaternion survived body normalization unchanged.
         for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
-        {
-            BigInteger cx = x + dx, cy = y + dy, tangent = tx * cx + ty * cy;
-            BigInteger divisor = denominator * denominator;
-            if (tangent <= 0 || 2 * BigInteger.Abs(tx * tangent) > divisor
-                || 2 * BigInteger.Abs(ty * tangent) > divisor) continue;
-            BigInteger outward = -ty * cx + tx * cy;
-            if (outward <= 0 || outward >= q * denominator) continue;
-            Assert.Equal(BigInteger.Zero, Round(tx * tangent, divisor));
-            Assert.Equal(BigInteger.Zero, Round(ty * tangent, divisor));
-            return new(Fixed64.FromRaw((long)cx), Fixed64.FromRaw((long)cy), Fixed64.Zero);
-        }
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                BigInteger cx = x + dx, cy = y + dy, tangent = tx * cx + ty * cy;
+                BigInteger divisor = denominator * denominator;
+                if (tangent <= 0 || 2 * BigInteger.Abs(tx * tangent) > divisor
+                    || 2 * BigInteger.Abs(ty * tangent) > divisor) continue;
+                BigInteger outward = -ty * cx + tx * cy;
+                if (outward <= 0 || outward >= q * denominator) continue;
+                Assert.Equal(BigInteger.Zero, Round(tx * tangent, divisor));
+                Assert.Equal(BigInteger.Zero, Round(ty * tangent, divisor));
+                return new(Fixed64.FromRaw((long)cx), Fixed64.FromRaw((long)cy), Fixed64.Zero);
+            }
         Assert.Fail("The bounded rotated-seam oracle did not find its required sub-raw projection.");
         return default;
     }

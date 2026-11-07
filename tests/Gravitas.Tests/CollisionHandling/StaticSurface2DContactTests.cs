@@ -1,10 +1,10 @@
+using System.Linq;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -12,7 +12,11 @@ namespace Gravitas.Tests;
 public sealed class StaticSurface2DContactTests
 {
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
     public void CachedContacts_ShouldFollowMemberIdentityMoverPoseGeometryAndMaterial(int change)
     {
         using var context = Physics2DTestWorld.CreateContext();
@@ -56,8 +60,12 @@ public sealed class StaticSurface2DContactTests
     }
 
     [Theory]
-    [InlineData(0, false)] [InlineData(1, false)] [InlineData(2, false)]
-    [InlineData(0, true)] [InlineData(1, true)] [InlineData(2, true)]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
     public void FilledConcaveCorner_ShouldRetainIndependentFiniteNormalsAndSupplierMaterials(int shape, bool reverse)
     {
         using var context = Physics2DTestWorld.CreateContext();
@@ -85,7 +93,9 @@ public sealed class StaticSurface2DContactTests
     }
 
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
     public void ExposingAJoinedRim_ShouldRebuildRowsAtAnUnchangedMoverPose(int change)
     {
         using var context = Physics2DTestWorld.CreateContext();

@@ -5,12 +5,12 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
 using Chronicler.Hashing;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Constraints;
 using SwiftCollections;
-using System;
 
 namespace Gravitas;
 

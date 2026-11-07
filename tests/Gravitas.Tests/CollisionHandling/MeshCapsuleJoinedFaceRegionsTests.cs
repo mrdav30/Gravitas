@@ -52,8 +52,8 @@ public sealed class MeshCapsuleJoinedFaceRegionsTests
         {
             reused.BuildJoined(members, center, FixedQuaternion.Identity, Fixed64.Zero, Fixed64.One);
             for (int region = 0; region < reused.RegionCount; region++)
-            for (int sample = 0; sample < reused.GetSampleCount(region); sample++)
-                Assert.True(reused.TryGetJoinedSample(region, sample, out _, out _));
+                for (int sample = 0; sample < reused.GetSampleCount(region); sample++)
+                    Assert.True(reused.TryGetJoinedSample(region, sample, out _, out _));
         }
         Assert.Equal(0, AllocationTestHelper.MeasureSteadyState(Rebuild, warmupIterations: 8, stabilizationIterations: 2, measurementIterations: 8));
 

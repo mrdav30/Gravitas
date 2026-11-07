@@ -3,7 +3,6 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using Gravitas.Support;
 using Gravitas.Tests.Support;
 using Xunit;
 
@@ -35,8 +34,11 @@ public sealed partial class MixedResponseTests
             ? new(Fixed64.Half, Fixed64.Half, -Fixed64.Half, Fixed64.Half)
             : FixedQuaternion.Identity;
         LSCollider curved = capsule
-            ? new LSCapsuleCollider { Radius = Fixed64.Quarter,
-                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(21, 2), Fixed64.Half) }
+            ? new LSCapsuleCollider
+            {
+                Radius = Fixed64.Quarter,
+                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(21, 2), Fixed64.Half)
+            }
             : new LSSphereCollider { Radius = Fixed64.FromFraction(3, 4) };
         curved.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
             capsule ? Fixed64.Zero : Fixed64.One, Fixed64.Zero);
@@ -46,7 +48,9 @@ public sealed partial class MixedResponseTests
         {
             spatial = new SolidBody(spatialAgent, curved)
             {
-                Mass = Fixed64.One, SleepEnabled = false, LinearDragCoefficient = Fixed64.Zero,
+                Mass = Fixed64.One,
+                SleepEnabled = false,
+                LinearDragCoefficient = Fixed64.Zero,
                 FreezeAxes = BodyFreezeAxes3D.RotationX | BodyFreezeAxes3D.RotationY
             };
             spatial.Initialize(center, rotation);
@@ -166,8 +170,11 @@ public sealed partial class MixedResponseTests
             ? new(Fixed64.Half, Fixed64.Half, -Fixed64.Half, Fixed64.Half)
             : FixedQuaternion.Identity;
         LSCollider curved = capsule
-            ? new LSCapsuleCollider { Radius = Fixed64.Quarter,
-                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(3, 2), Fixed64.Half) }
+            ? new LSCapsuleCollider
+            {
+                Radius = Fixed64.Quarter,
+                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(3, 2), Fixed64.Half)
+            }
             : new LSSphereCollider { Radius = Fixed64.Quarter };
         curved.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.Zero, Fixed64.Zero);
         var spatialAgent = new TestMatterAgent(context, new FixedTransform(start, rotation, Vector3d.One));
@@ -176,7 +183,9 @@ public sealed partial class MixedResponseTests
         {
             spatial = new SolidBody(spatialAgent, curved)
             {
-                Mass = Fixed64.One, SleepEnabled = false, FreezeAxes = BodyFreezeAxes3D.Rotation,
+                Mass = Fixed64.One,
+                SleepEnabled = false,
+                FreezeAxes = BodyFreezeAxes3D.Rotation,
                 LinearDragCoefficient = Fixed64.Zero
             };
             spatial.Initialize(start, rotation);
@@ -194,7 +203,9 @@ public sealed partial class MixedResponseTests
         {
             planar = new SolidBody2D(planarAgent, slab)
             {
-                Mass = Fixed64.One, SleepEnabled = false, FreezeAxes = BodyFreezeAxes2D.Rotation
+                Mass = Fixed64.One,
+                SleepEnabled = false,
+                FreezeAxes = BodyFreezeAxes2D.Rotation
             };
             planar.Initialize(Vector2d.Zero);
         }

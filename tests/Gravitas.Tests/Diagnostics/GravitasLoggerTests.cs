@@ -1,8 +1,8 @@
-using FluentAssertions;
-using Chronicler.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Chronicler.Diagnostics;
+using FluentAssertions;
 using Xunit;
 
 namespace Gravitas.Tests.Diagnostics;

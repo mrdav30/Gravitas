@@ -1,9 +1,9 @@
 using BenchmarkDotNet.Attributes;
+using Chronicler.Diagnostics;
 using Chronicler.Hashing;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Configuration;
-using Chronicler.Diagnostics;
 
 namespace Gravitas.Benchmarks;
 

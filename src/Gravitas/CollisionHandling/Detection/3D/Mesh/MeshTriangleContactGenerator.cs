@@ -1,19 +1,19 @@
 //=======================================================================
 // MeshTriangleContactGenerator.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.Materials;
 using SwiftCollections;
 using SwiftCollections.Query;
-using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
@@ -21,14 +21,9 @@ namespace Gravitas.CollisionHandling;
 /// Builds finite mesh manifolds, retaining closed convex solids where available
 /// and using triangle contacts for the remaining surface owners.
 /// </summary>
-internal static class MeshTriangleContactGenerator
+internal static partial class MeshTriangleContactGenerator
 {
-    internal readonly struct HullSample : IPlaneContactSample
-    {
-        internal HullSample(FixedContactAnchors contact) => Contact = contact;
-        internal readonly FixedContactAnchors Contact;
-        public Vector3d Point => Contact.FirstAnchor.LocalPoint;
-    }
+
 
     private static readonly IComparer<HullSample> HullSampleComparer = Comparer<HullSample>.Create(static (a, b) =>
     {

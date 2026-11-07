@@ -1,9 +1,9 @@
-using FixedMathSharp;
-using FixedMathSharp.Chronicler;
-using Chronicler.Timing;
-using FluentAssertions;
 using System;
 using System.Collections.Generic;
+using Chronicler.Timing;
+using FixedMathSharp;
+using FixedMathSharp.Chronicler;
+using FluentAssertions;
 using Xunit;
 
 namespace Gravitas.Tests.Runtime;

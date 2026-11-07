@@ -5,12 +5,11 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using SwiftCollections;
-using System;
 
 namespace Gravitas.Queries;
 
@@ -18,14 +17,7 @@ namespace Gravitas.Queries;
 /// <content>Owns shape views, source bounds and support feature selection.</content>
 internal readonly partial struct ConvexShape
 {
-    internal enum ConvexShapeKind
-    {
-        Collider,
-        Triangle,
-        CircleSlab,
-        Sphere,
-        ConvexPatch
-    }
+
 
     private readonly ConvexShapeKind _kind;
     private readonly LSCollider? _collider;

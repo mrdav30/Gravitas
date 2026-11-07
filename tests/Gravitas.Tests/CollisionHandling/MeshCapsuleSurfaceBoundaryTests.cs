@@ -125,7 +125,7 @@ public sealed class MeshCapsuleSurfaceBoundaryTests
             new(-2,0,-2), new(0,0,-2), new(2,0,-2), new(-2,0,0),
             Vector3d.Zero, new(2,0,0), new(-2,0,2), new(0,0,2)
         };
-        int[] authored = { 0,3,1, 1,3,4, 1,4,2, 2,4,5, 3,6,4, 4,6,7 };
+        int[] authored = { 0, 3, 1, 1, 3, 4, 1, 4, 2, 2, 4, 5, 3, 6, 4, 4, 6, 7 };
         var triangles = new System.Collections.Generic.List<int>();
         for (int index = 0; index < authored.Length; index += 3)
         {
@@ -136,13 +136,13 @@ public sealed class MeshCapsuleSurfaceBoundaryTests
             {
                 int middle = vertices.Count;
                 vertices.Add((vertices[a] + vertices[b] + vertices[c]) / 3);
-                triangles.AddRange(new[] { a,b,middle, b,c,middle, c,a,middle });
+                triangles.AddRange(new[] { a, b, middle, b, c, middle, c, a, middle });
             }
         }
         var mesh = new LSMeshCollider(vertices.ToArray(), triangles.ToArray(),
             MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         scenario.InitializeStaticCollider(mesh, Vector3d.Zero);
-        var capsule = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1,2,1) };
+        var capsule = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) };
         scenario.InitializeStaticCollider(capsule, Vector3d.Zero);
         CollisionPair pair = scenario.CreatePair(mesh, capsule);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
@@ -164,7 +164,7 @@ public sealed class MeshCapsuleSurfaceBoundaryTests
             }
         }
         foundCorner.Should().BeTrue("the genuine reflex corner retains its own constraint even when no perpendicular core ray is admitted");
-        var separated = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1,2,1) };
+        var separated = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) };
         scenario.InitializeStaticCollider(separated, Vector3d.Down * (Fixed64.One + Fixed64.FromRaw(1)));
         CollisionDetection.DoCollisionCheck(scenario.CreatePair(mesh, separated)).Should().BeFalse();
     }

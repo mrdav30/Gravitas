@@ -198,7 +198,8 @@ public sealed partial class MixedQueryCcdTests
                 CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)4, Fixed64.FromFraction(1, 5)),
                     Vector2d.Forward * Fixed64.FromFraction(2, 5), PhysicsMaterial.Frictionless));
             body2D = new SolidBody2D(new TestMatterAgent(context,
-                new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), walls) { Mass = Fixed64.One };
+                new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), walls)
+            { Mass = Fixed64.One };
             body2D.Initialize(Vector2d.Zero);
             body3D.ApplyCollisionLinearVelocityDelta((Vector3d.Right + Vector3d.Forward)
                 * (rejection == 2 ? -Fixed64.One : Fixed64.One));
@@ -503,7 +504,8 @@ public sealed partial class MixedQueryCcdTests
             CompoundColliderPart2D.AABBox(new Vector2d(Fixed64.FromFraction(1, 5), (Fixed64)4),
                 Vector2d.Right * Fixed64.FromFraction(2, 5)),
             CompoundColliderPart2D.AABBox(new Vector2d((Fixed64)4, Fixed64.FromFraction(1, 5)),
-                Vector2d.Forward * Fixed64.FromFraction(2, 5))) { Material = PhysicsMaterial.Frictionless };
+                Vector2d.Forward * Fixed64.FromFraction(2, 5)))
+        { Material = PhysicsMaterial.Frictionless };
         target.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         ScenarioBody<LSSphereCollider> source = CreateSphere3D(context, Vector3d.Zero);

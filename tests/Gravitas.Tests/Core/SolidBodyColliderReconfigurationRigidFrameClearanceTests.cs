@@ -1,8 +1,8 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -19,8 +19,8 @@ public sealed class SolidBodyColliderReconfigurationRigidFrameClearanceTests
     public static IEnumerable<object[]> SourceCases()
     {
         for (int family = 0; family < 3; family++)
-        for (long rawOffset = -1; rawOffset <= 1; rawOffset++)
-            yield return new object[] { family, rawOffset };
+            for (long rawOffset = -1; rawOffset <= 1; rawOffset++)
+                yield return new object[] { family, rawOffset };
     }
 
     [Theory]

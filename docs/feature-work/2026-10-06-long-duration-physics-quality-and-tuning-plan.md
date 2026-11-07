@@ -16,15 +16,16 @@ that the current solver needs replacement.
 
 The completed
 [discrete-response plan](done/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
-and [3D stress plan](done/2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
-cover warm starts, islands, resting contacts, chain/ragdoll stress and deterministic
-joint metrics. Reuse
+and
+[3D stress plan](done/2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
+cover warm starts, islands, resting contacts, chain/ragdoll stress and
+deterministic joint metrics. Reuse
 [`Constraint3DStressTests`](../../tests/Gravitas.Tests/Constraints/Constraint3DStressTests.cs),
 the dimensional constraint tests, sleep tests and
 [`Constraint3DBenchmarks`](../../tests/Gravitas.Benchmarks/Core/Constraint3DBenchmarks.cs).
-The [capacity/soak plan](2026-10-06-evolving-game-capacity-and-soak-plan.md) owns
-frame-time/memory collection; share its measurement contract rather than add a
-second runner or generic physics-quality framework.
+The [capacity/soak plan](2026-10-06-evolving-game-capacity-and-soak-plan.md)
+owns frame-time/memory collection; share its measurement contract rather than
+add a second runner or generic physics-quality framework.
 
 ## Phase 1: Physical Fixtures And Metrics
 
@@ -44,8 +45,9 @@ second runner or generic physics-quality framework.
       is a gate only in an appropriate conservative fixture; resting friction,
       damping and stabilization need their own explainable behavior bounds.
 - [ ] Keep physical comparisons deterministic and overflow-safe. Reuse neutral
-      upstream math when needed; do not move rigid-body policy into FixedMathSharp.
-      Wall-clock measurements and chart formatting remain outside physics logic.
+      upstream math when needed; do not move rigid-body policy into
+      FixedMathSharp. Wall-clock measurements and chart formatting remain
+      outside physics logic.
 
 Each fixture declares its expected physical behavior and numeric acceptance
 bounds before an optimization is accepted. Baseline observations help choose
@@ -62,12 +64,13 @@ scale-aware bounds; an unstable baseline does not become correct by definition.
       Verify the scene still contains the intended dynamic bodies and contacts.
 - [ ] Compare repeated command traces, then supported save/populate continuation
       into host-created matching shells and a matching clock timeline.
-- [ ] Respect the [serialization contract](../wiki/SERIALIZATION.md): body records
-      do not restore a world, arbitrary host/coroutine state or solver caches.
-      Compare exact traces only where continuation state is equivalent. If
-      population invalidates caches, use an equivalently cold-cache control and
-      separately measure the recovery transient against uninterrupted simulation.
-      Do not disguise a genuine supported-contract divergence as a quality tolerance.
+- [ ] Respect the [serialization contract](../api/guides/SERIALIZATION.md): body
+      records do not restore a world, arbitrary host/coroutine state or solver
+      caches. Compare exact traces only where continuation state is equivalent.
+      If population invalidates caches, use an equivalently cold-cache control
+      and separately measure the recovery transient against uninterrupted
+      simulation. Do not disguise a genuine supported-contract divergence as a
+      quality tolerance.
 
 Exit: long-duration quality curves, repeatable disturbances and supported
 continuation evidence. Record failures as focused issues with reproducing tests;
@@ -76,11 +79,12 @@ repair their owning layer before calling an affected configuration acceptable.
 ## Phase 3: Quality Versus Cost
 
 - [ ] Compare current default solver settings with a lower/higher iteration
-      setting, initially 2/6/12 iterations where supported. Add tuning dimensions
-      only when a fixture identifies a meaningful sensitivity.
+      setting, initially 2/6/12 iterations where supported. Add tuning
+      dimensions only when a fixture identifies a meaningful sensitivity.
 - [ ] Report quality and measured complete-step time together at each setting,
       including awake population, contact/island counts and relevant CCD work.
-      Changing frame rate requires equal simulated duration, not equal frame count.
+      Changing frame rate requires equal simulated duration, not equal frame
+      count.
 - [ ] Separate contact and joint metrics; distinguish physical effects from
       partition/query cost and presentation interpolation. Keep engine adapters
       outside the experiment.
@@ -102,9 +106,9 @@ APIs, clamping or alternate penetration kernels solely to fill a tuning table.
       upstream change is required.
 - [ ] Run focused quality/replay/allocation/resource checks, full Release/Lean
       suites, both target-framework builds and exact 100% reachable line/branch/
-      method coverage in every changed library. Validate unreleased siblings with
-      MSBuild and inherited `UseLocalLsfStack=true`; validate released packages
-      before release.
+      method coverage in every changed library. Validate unreleased siblings
+      with MSBuild and inherited `UseLocalLsfStack=true`; validate released
+      packages before release.
 - [ ] Archive completed evidence in `done/`; retain only concrete unresolved
       issues or explicitly evidence-gated follow-ups in coordination documents.
 

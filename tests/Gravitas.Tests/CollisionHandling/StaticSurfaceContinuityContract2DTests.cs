@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Reflection;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
@@ -6,8 +8,6 @@ using Gravitas.Materials;
 using Gravitas.Queries;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System.Collections.Generic;
-using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -37,7 +37,8 @@ public sealed class StaticSurfaceContinuityContract2DTests
         var circle = new LSCircleCollider2D(Fixed64.Half) { Material = PhysicsMaterial.Bouncy };
         var body = new SolidBody2D(new TestMatterAgent(context), circle)
         {
-            Mass = Fixed64.One, SleepEnabled = false,
+            Mass = Fixed64.One,
+            SleepEnabled = false,
             FreezeAxes = BodyFreezeAxes2D.PositionX | BodyFreezeAxes2D.Rotation
         };
         body.Initialize(new(floorCenter.X, Fixed64.FromFraction(19, 4)));

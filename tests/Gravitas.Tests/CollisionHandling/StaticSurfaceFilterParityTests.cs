@@ -4,7 +4,6 @@ using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -22,14 +21,16 @@ public sealed class StaticSurfaceFilterParityTests
         scene.Context.ApplySettings(new PhysicsSettings(16, new[,]
         {
             { true, true, true }, { true, true, true }, { true, true, true }
-        }) { RuntimeMode = PhysicsRuntimeMode.ThreeD });
+        })
+        { RuntimeMode = PhysicsRuntimeMode.ThreeD });
         LSMeshCollider left = Wall(-16, 0), right = Wall(0, 16);
         right.Layer = new PhysicsLayer(1); right.Material = PhysicsMaterial.Bouncy;
         var cube = MeshTestFixtures.CreateConvexCube();
         Vector3d[] vertices = cube.Mesh.LocalVertices.ToArray();
         for (int vertex = 0; vertex < vertices.Length; vertex++) vertices[vertex].X *= (Fixed64)10;
         var mover = new LSMeshCollider(vertices, cube.Mesh.Triangles.ToArray(), MeshColliderMode.Convex,
-            MeshInertiaPolicy.RequireClosedVolume) { Material = PhysicsMaterial.Frictionless };
+            MeshInertiaPolicy.RequireClosedVolume)
+        { Material = PhysicsMaterial.Frictionless };
         // A sheet has two exits. This side makes the nearer full-hull support
         // lie on the right sheet even though its plane crossing is on the left.
         SolidBody body = scene.CreateBody(mover, new(-Fixed64.FromFraction(19, 5), Fixed64.Zero, Fixed64.Half),
@@ -81,7 +82,8 @@ public sealed class StaticSurfaceFilterParityTests
         {
             var member = new LSMeshCollider(new[] { new Vector3d(from, -4, 0), new(to, -4, 0),
                 new(from, 4, 0), new(to, 4, 0) }, new[] { 0, 2, 1, 1, 2, 3 },
-                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+            { Material = PhysicsMaterial.Frictionless };
             scene.InitializeStaticCollider(member, Vector3d.Zero);
             return member;
         }
@@ -98,12 +100,14 @@ public sealed class StaticSurfaceFilterParityTests
         scene.Context.ApplySettings(new PhysicsSettings(16, new[,]
         {
             { true, true, true }, { true, true, true }, { true, true, true }
-        }) { RuntimeMode = PhysicsRuntimeMode.TwoD });
+        })
+        { RuntimeMode = PhysicsRuntimeMode.TwoD });
         LSCollider2D left = Rectangle(-8), right = Rectangle(8);
         right.Layer = new PhysicsLayer(1); right.Material = PhysicsMaterial.Bouncy;
         using var surface = scene.Context.Physics2D.CreateStaticSurface(new[] { left, right });
         var mover = new LSPolygonCollider2D(new(-(Fixed64)5, -Fixed64.Half), new((Fixed64)5, -Fixed64.Half),
-            new((Fixed64)5, Fixed64.Half), new(-(Fixed64)5, Fixed64.Half)) { Material = PhysicsMaterial.Frictionless };
+            new((Fixed64)5, Fixed64.Half), new(-(Fixed64)5, Fixed64.Half))
+        { Material = PhysicsMaterial.Frictionless };
         var body = new SolidBody2D(new TestMatterAgent(scene.Context), mover)
         { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.PositionY | BodyFreezeAxes2D.Rotation };
         body.Initialize(new(-Fixed64.FromFraction(19, 5), -Fixed64.Half), -FixedMath.DegToRad((Fixed64)30));

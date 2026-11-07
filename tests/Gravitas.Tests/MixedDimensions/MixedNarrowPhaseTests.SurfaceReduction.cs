@@ -1,3 +1,4 @@
+using System.Linq;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -6,7 +7,6 @@ using Gravitas.Materials;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
@@ -96,7 +96,8 @@ public sealed partial class MixedNarrowPhaseTests
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         Fixed64 eighth = Fixed64.FromFraction(1, 8);
         var embedded = new LSPolygonCollider2D(new(-eighth, -eighth), new(eighth, -eighth),
-            new(eighth, eighth), new(-eighth, eighth)) { MixedHalfThicknessOverride = eighth };
+            new(eighth, eighth), new(-eighth, eighth))
+        { MixedHalfThicknessOverride = eighth };
         embedded.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
@@ -584,7 +585,7 @@ public sealed partial class MixedNarrowPhaseTests
             new[] { new Vector3d(-4, 12, -4), new Vector3d(4, 4, -4),
                 new Vector3d(-4, -4, 4), new Vector3d(4, -12, 4) },
             new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
-            { Material = PhysicsMaterial.Frictionless };
+        { Material = PhysicsMaterial.Frictionless };
         mesh.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         SolidBody2D circle = CreateSurfaceReductionSlab(context, ColliderType2D.Circle, Vector2d.Zero);
@@ -707,60 +708,60 @@ public sealed partial class MixedNarrowPhaseTests
     {
         ManifoldContact? reference = null;
         foreach (int divisions in new[] { 1, 2 })
-        foreach (bool reversed in new[] { false, true })
-        {
-            using GravitasWorldContext context = CreateMixedContext();
-            var vertices = new System.Collections.Generic.List<Vector3d>();
-            var triangles = new System.Collections.Generic.List<int>();
-            int[] xs = { -4, 1, 3, 4 }, zs = { -4, -1, 1, 4 };
-            for (int z = 0; z < 3; z++)
-            for (int x = 0; x < 3; x++)
+            foreach (bool reversed in new[] { false, true })
             {
-                if (x == 1 && z == 1) continue; // A distant hole preserves a nonconvex finite owner.
-                for (int iz = 0; iz < divisions; iz++)
-                for (int ix = 0; ix < divisions; ix++)
-                {
-                    int first = vertices.Count;
-                    Fixed64 x0 = (Fixed64)xs[x] + Fixed64.FromFraction((xs[x + 1] - xs[x]) * ix, divisions);
-                    Fixed64 x1 = (Fixed64)xs[x] + Fixed64.FromFraction((xs[x + 1] - xs[x]) * (ix + 1), divisions);
-                    Fixed64 z0 = (Fixed64)zs[z] + Fixed64.FromFraction((zs[z + 1] - zs[z]) * iz, divisions);
-                    Fixed64 z1 = (Fixed64)zs[z] + Fixed64.FromFraction((zs[z + 1] - zs[z]) * (iz + 1), divisions);
-                    vertices.AddRange(new[] { new Vector3d(x0, -x0, z0), new Vector3d(x1, -x1, z0),
+                using GravitasWorldContext context = CreateMixedContext();
+                var vertices = new System.Collections.Generic.List<Vector3d>();
+                var triangles = new System.Collections.Generic.List<int>();
+                int[] xs = { -4, 1, 3, 4 }, zs = { -4, -1, 1, 4 };
+                for (int z = 0; z < 3; z++)
+                    for (int x = 0; x < 3; x++)
+                    {
+                        if (x == 1 && z == 1) continue; // A distant hole preserves a nonconvex finite owner.
+                        for (int iz = 0; iz < divisions; iz++)
+                            for (int ix = 0; ix < divisions; ix++)
+                            {
+                                int first = vertices.Count;
+                                Fixed64 x0 = (Fixed64)xs[x] + Fixed64.FromFraction((xs[x + 1] - xs[x]) * ix, divisions);
+                                Fixed64 x1 = (Fixed64)xs[x] + Fixed64.FromFraction((xs[x + 1] - xs[x]) * (ix + 1), divisions);
+                                Fixed64 z0 = (Fixed64)zs[z] + Fixed64.FromFraction((zs[z + 1] - zs[z]) * iz, divisions);
+                                Fixed64 z1 = (Fixed64)zs[z] + Fixed64.FromFraction((zs[z + 1] - zs[z]) * (iz + 1), divisions);
+                                vertices.AddRange(new[] { new Vector3d(x0, -x0, z0), new Vector3d(x1, -x1, z0),
                         new Vector3d(x0, -x0, z1), new Vector3d(x1, -x1, z1) });
-                    triangles.AddRange(reversed ? new[] { first + 1, first + 2, first, first + 3, first + 2, first + 1 }
-                        : new[] { first, first + 2, first + 1, first + 1, first + 2, first + 3 });
-                }
+                                triangles.AddRange(reversed ? new[] { first + 1, first + 2, first, first + 3, first + 2, first + 1 }
+                                    : new[] { first, first + 2, first + 1, first + 1, first + 2, first + 3 });
+                            }
+                    }
+                var mesh = new LSMeshCollider(vertices.ToArray(), triangles.ToArray(), MeshColliderMode.Concave,
+                    MeshInertiaPolicy.SurfaceApproximation);
+                var source = CreateMesh3D(context, mesh, Vector3d.Zero);
+                SolidBody2D slab = CreateSurfaceReductionSlab(context, ColliderType2D.Circle,
+                    Vector2d.Left * (Fixed64)2, Fixed64.Zero, (Fixed64)100);
+                var manifold = new ContactManifold();
+                CollisionDetectionMixed.TryBuildManifold(mesh, slab.Collider, manifold).Should().BeTrue();
+                manifold.Count.Should().Be(1, "neither the original section perimeter nor the remote cap projection provides a contact");
+                ManifoldContact row = manifold.PrimaryContact;
+                row.Normal.Should().Be(Vector3d.Left);
+                row.Depth.Should().Be(Fixed64.FromFraction(5, 2));
+                row.TryGetPointA(out _).Should().BeTrue();
+                row.TryGetPointB(out _).Should().BeTrue();
+                reference ??= row;
+                row.ContactId.Should().Be(reference.Value.ContactId);
+                row.AnchorA.Should().Be(reference.Value.AnchorA);
+                row.AnchorB.Should().Be(reference.Value.AnchorB);
+                context.Simulate();
+                Vector2d queryStart = Vector2d.Left * (Fixed64)2;
+                context.QueryMixed.SweepCircleAgainst3D(queryStart, queryStart + Vector2d.Left,
+                    Fixed64.Half, Fixed64.Zero, (Fixed64)100, PhysicsLayerMask.FromLayer(0), out PhysicsMixedHit hit)
+                    .Should().BeTrue("initial public queries use the same whole-owner fallback without a source collider");
+                hit.Distance.Should().Be(Fixed64.Zero);
+                hit.Collider3D.Should().BeSameAs(mesh);
+                Fixed64 margin = Fixed64.FromFraction(1, 1024);
+                source.Body.SetPosition(-row.Normal * (row.Depth - margin));
+                CollisionDetectionMixed.TryBuildManifold(mesh, slab.Collider, manifold).Should().BeTrue();
+                source.Body.SetPosition(-row.Normal * (row.Depth + margin));
+                CollisionDetectionMixed.TryBuildManifold(mesh, slab.Collider, manifold).Should().BeFalse();
             }
-            var mesh = new LSMeshCollider(vertices.ToArray(), triangles.ToArray(), MeshColliderMode.Concave,
-                MeshInertiaPolicy.SurfaceApproximation);
-            var source = CreateMesh3D(context, mesh, Vector3d.Zero);
-            SolidBody2D slab = CreateSurfaceReductionSlab(context, ColliderType2D.Circle,
-                Vector2d.Left * (Fixed64)2, Fixed64.Zero, (Fixed64)100);
-            var manifold = new ContactManifold();
-            CollisionDetectionMixed.TryBuildManifold(mesh, slab.Collider, manifold).Should().BeTrue();
-            manifold.Count.Should().Be(1, "neither the original section perimeter nor the remote cap projection provides a contact");
-            ManifoldContact row = manifold.PrimaryContact;
-            row.Normal.Should().Be(Vector3d.Left);
-            row.Depth.Should().Be(Fixed64.FromFraction(5, 2));
-            row.TryGetPointA(out _).Should().BeTrue();
-            row.TryGetPointB(out _).Should().BeTrue();
-            reference ??= row;
-            row.ContactId.Should().Be(reference.Value.ContactId);
-            row.AnchorA.Should().Be(reference.Value.AnchorA);
-            row.AnchorB.Should().Be(reference.Value.AnchorB);
-            context.Simulate();
-            Vector2d queryStart = Vector2d.Left * (Fixed64)2;
-            context.QueryMixed.SweepCircleAgainst3D(queryStart, queryStart + Vector2d.Left,
-                Fixed64.Half, Fixed64.Zero, (Fixed64)100, PhysicsLayerMask.FromLayer(0), out PhysicsMixedHit hit)
-                .Should().BeTrue("initial public queries use the same whole-owner fallback without a source collider");
-            hit.Distance.Should().Be(Fixed64.Zero);
-            hit.Collider3D.Should().BeSameAs(mesh);
-            Fixed64 margin = Fixed64.FromFraction(1, 1024);
-            source.Body.SetPosition(-row.Normal * (row.Depth - margin));
-            CollisionDetectionMixed.TryBuildManifold(mesh, slab.Collider, manifold).Should().BeTrue();
-            source.Body.SetPosition(-row.Normal * (row.Depth + margin));
-            CollisionDetectionMixed.TryBuildManifold(mesh, slab.Collider, manifold).Should().BeFalse();
-        }
     }
 
     private static void AssertFiniteSurfaceReductionRay(ManifoldContact row, ColliderType2D shape, Vector2d center)

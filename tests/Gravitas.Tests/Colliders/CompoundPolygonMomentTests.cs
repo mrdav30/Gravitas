@@ -1,9 +1,9 @@
+using System;
+using System.Numerics;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
-using System;
-using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;

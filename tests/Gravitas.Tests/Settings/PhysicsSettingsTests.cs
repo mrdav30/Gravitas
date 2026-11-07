@@ -1,9 +1,9 @@
+using System;
+using System.Collections.Generic;
 using Chronicler.Hashing;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Support;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Settings;
@@ -11,8 +11,13 @@ namespace Gravitas.Tests.Settings;
 public sealed class PhysicsSettingsTests
 {
     [Theory]
-    [InlineData(0, 0)] [InlineData(0, 32)] [InlineData(32, 0)]
-    [InlineData(1, 3)] [InlineData(3, 1)] [InlineData(32, 32)] [InlineData(35, 37)]
+    [InlineData(0, 0)]
+    [InlineData(0, 32)]
+    [InlineData(32, 0)]
+    [InlineData(1, 3)]
+    [InlineData(3, 1)]
+    [InlineData(32, 32)]
+    [InlineData(35, 37)]
     public void CollisionLayerSnapshots_ShouldMatchLiveEligibilityForRectangularAndEmptyTables(int rows, int columns)
     {
         using var context = GravitasWorldContext.CreateOwned();
@@ -22,19 +27,19 @@ public sealed class PhysicsSettingsTests
         var settings = new PhysicsSettings(16, matrix);
         context.ApplySettings(settings);
         foreach (int row in new[] { 0, 2, 31 })
-        foreach (int column in new[] { 0, 2, 31 })
-        for (int directions = 0; directions < 4; directions++)
-        {
-            bool watchRow = (directions & 1) != 0, watchColumn = (directions & 2) != 0;
-            ulong snapshot = settings.GetCollisionLayerMask(new(row), new(column), watchRow, watchColumn);
-            for (int layer = 0; layer < PhysicsSettings.MaxLayers; layer++)
-            {
-                Assert.Equal(watchRow && !context.Physics.IsLayerCollisionDisabled(new(row), new(layer)),
-                    (snapshot & (1UL << layer)) != 0);
-                Assert.Equal(watchColumn && !context.Physics.IsLayerCollisionDisabled(new(layer), new(column)),
-                    (snapshot & (1UL << (PhysicsSettings.MaxLayers + layer))) != 0);
-            }
-        }
+            foreach (int column in new[] { 0, 2, 31 })
+                for (int directions = 0; directions < 4; directions++)
+                {
+                    bool watchRow = (directions & 1) != 0, watchColumn = (directions & 2) != 0;
+                    ulong snapshot = settings.GetCollisionLayerMask(new(row), new(column), watchRow, watchColumn);
+                    for (int layer = 0; layer < PhysicsSettings.MaxLayers; layer++)
+                    {
+                        Assert.Equal(watchRow && !context.Physics.IsLayerCollisionDisabled(new(row), new(layer)),
+                            (snapshot & (1UL << layer)) != 0);
+                        Assert.Equal(watchColumn && !context.Physics.IsLayerCollisionDisabled(new(layer), new(column)),
+                            (snapshot & (1UL << (PhysicsSettings.MaxLayers + layer))) != 0);
+                    }
+                }
     }
 
     [Fact]

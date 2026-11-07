@@ -163,16 +163,3 @@ jobs:
         # Each artifact retains its lane directory instead of merging files.
         run: |
           python3 .github/scripts/compare_replay_captures.py --captures artifacts/replay --fixtures tests/Gravitas.Tests/Determinism/Fixtures
-
-  validate-wiki-sync:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Validate wiki link rewrite helper
-        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/rewrite_wiki_links_for_github_wiki_tests.py

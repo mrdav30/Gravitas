@@ -9,7 +9,8 @@ namespace Gravitas.Tests;
 public sealed class StaticSurfaceFiniteBoundaryContinuationTests
 {
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void RotatingCapsule_ShouldHonorALaterWallAfterResolvingADeclaredSpatialFloor(bool separateSpatialSurface)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -43,14 +44,17 @@ public sealed class StaticSurfaceFiniteBoundaryContinuationTests
             Fixed64 x = Fixed64.FromFraction(3, 4);
             var wall = new LSMeshCollider(new[] { new Vector3d(x, -(Fixed64)2, -Fixed64.One), new(x, (Fixed64)2, -Fixed64.One),
                 new(x, -(Fixed64)2, (Fixed64)3), new(x, (Fixed64)2, (Fixed64)3) }, new[] { 0, 1, 2, 2, 1, 3 },
-                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+            { Material = PhysicsMaterial.Frictionless };
             scene.InitializeStaticCollider(wall, Vector3d.Zero);
             return wall;
         }
     }
 
     [Theory]
-    [InlineData(false, false)] [InlineData(false, true)] [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
     public void RotatingCompound_ShouldKeepEarlierLeafContactsWhenTheFinalLeafChangesItsLocalSupplierGraph(bool finalLeafMisses, bool nearby)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -111,7 +115,8 @@ public sealed class StaticSurfaceFiniteBoundaryContinuationTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void RotatingPlanarFootprint_ShouldNotIgnoreTheFarExposedEdgeAcrossAFiniteHole(bool polygon)
     {
         var ordinary = Run(joined: false, polygon);
@@ -171,7 +176,8 @@ public sealed class StaticSurfaceFiniteBoundaryContinuationTests
     {
         var mesh = new LSMeshCollider(new[] { new Vector3d(minX, -2, 0), new(minX, 2, 0),
             new(maxX, -2, 0), new(maxX, 2, 0) }, new[] { 0, 1, 2, 2, 1, 3 },
-            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
         scene.InitializeStaticCollider(mesh, Vector3d.Zero);
         return mesh;
     }

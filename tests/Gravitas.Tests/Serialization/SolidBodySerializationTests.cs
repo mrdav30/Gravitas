@@ -1,11 +1,11 @@
+using System;
+using System.Collections.Generic;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Spatial;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;

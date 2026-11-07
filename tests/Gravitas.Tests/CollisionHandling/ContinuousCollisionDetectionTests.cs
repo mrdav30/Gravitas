@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using FluentAssertions;
@@ -8,7 +9,6 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using SwiftCollections.Query;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -3026,14 +3026,5 @@ public sealed partial class ContinuousCollisionDetectionTests
         body.GroundDownDistanceOnAir = Fixed64.Zero;
     }
 
-    public enum TestColliderShape
-    {
-        Sphere,
-        Capsule,
-        Cuboid,
-        Cylinder,
-        Cone,
-        ConvexMesh,
-        Compound
-    }
+
 }

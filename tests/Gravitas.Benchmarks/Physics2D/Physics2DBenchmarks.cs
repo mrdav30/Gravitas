@@ -1,3 +1,5 @@
+using System;
+using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
@@ -6,8 +8,6 @@ using Gravitas.Materials;
 using Gravitas.Queries;
 using GridForge.Configuration;
 using SwiftCollections;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.Benchmarks;
 

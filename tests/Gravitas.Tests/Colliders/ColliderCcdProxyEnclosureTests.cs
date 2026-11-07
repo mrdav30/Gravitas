@@ -87,31 +87,31 @@ public sealed class ColliderCcdProxyEnclosureTests
         Vector3d publishedPivot = GetPublishedPivot(placement);
 
         for (int axis = 0; axis < 2; axis++)
-        for (int step = -12; step <= 12; step++)
-        {
-            Fixed64.TryMultiplyDivide(
-                Fixed64.Pi, (Fixed64)step, (Fixed64)12, out Fixed64 angle).Should().BeTrue();
-            Vector3d rotationAxis = axis == 0 ? Vector3d.Up : Vector3d.One.Normalized;
-            FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(rotationAxis, angle);
-            collider.TryPrepareBodyPose(publishedPivot, rotation).Should().BeTrue();
-            collider.PublishPreparedBodyPose();
-            body.Position3d.Should().Be(Vector3d.Zero);
-
-            int count = compound ? ((LSCompoundCollider)collider).PartCount : 1;
-            for (int index = 0; index < count; index++)
+            for (int step = -12; step <= 12; step++)
             {
-                var leaf = (LSSphereCollider)(compound
-                    ? ((LSCompoundCollider)collider).GetPartCollider(index)
-                    : collider);
-                (leaf.Center - publishedPivot).TryGetMagnitudeCeiling(
-                    out Fixed64 centerReach).Should().BeTrue();
-                Fixed64 required = centerReach + leaf.ScaledRadius;
-                frameRadius.Should().BeGreaterThanOrEqualTo(required,
-                    "the frame proxy must enclose leaf {0} at axis {1}, angle step {2}", index, axis, step);
-                body.ResolveContinuousCollisionProxyRadius().Should().BeGreaterThanOrEqualTo(required,
-                    "a published pose must use its own pivot even when the body pose lags");
+                Fixed64.TryMultiplyDivide(
+                    Fixed64.Pi, (Fixed64)step, (Fixed64)12, out Fixed64 angle).Should().BeTrue();
+                Vector3d rotationAxis = axis == 0 ? Vector3d.Up : Vector3d.One.Normalized;
+                FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(rotationAxis, angle);
+                collider.TryPrepareBodyPose(publishedPivot, rotation).Should().BeTrue();
+                collider.PublishPreparedBodyPose();
+                body.Position3d.Should().Be(Vector3d.Zero);
+
+                int count = compound ? ((LSCompoundCollider)collider).PartCount : 1;
+                for (int index = 0; index < count; index++)
+                {
+                    var leaf = (LSSphereCollider)(compound
+                        ? ((LSCompoundCollider)collider).GetPartCollider(index)
+                        : collider);
+                    (leaf.Center - publishedPivot).TryGetMagnitudeCeiling(
+                        out Fixed64 centerReach).Should().BeTrue();
+                    Fixed64 required = centerReach + leaf.ScaledRadius;
+                    frameRadius.Should().BeGreaterThanOrEqualTo(required,
+                        "the frame proxy must enclose leaf {0} at axis {1}, angle step {2}", index, axis, step);
+                    body.ResolveContinuousCollisionProxyRadius().Should().BeGreaterThanOrEqualTo(required,
+                        "a published pose must use its own pivot even when the body pose lags");
+                }
             }
-        }
     }
 
     [Theory]
@@ -175,29 +175,29 @@ public sealed class ColliderCcdProxyEnclosureTests
         Vector3d publishedPivot = new(10, -7, 5);
 
         for (int axis = 0; axis < 2; axis++)
-        for (int step = -12; step <= 12; step++)
-        {
-            Fixed64.TryMultiplyDivide(
-                Fixed64.Pi, (Fixed64)step, (Fixed64)12, out Fixed64 angle).Should().BeTrue();
-            Vector3d rotationAxis = axis == 0 ? Vector3d.Up : Vector3d.One.Normalized;
-            FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(rotationAxis, angle);
-            collider.TryPrepareBodyPose(publishedPivot, rotation).Should().BeTrue();
-            collider.PublishPreparedBodyPose();
-            Vector3d halfExtents = cuboid.OrientedBox.HalfExtents;
-            for (int corner = 0; corner < 8; corner++)
+            for (int step = -12; step <= 12; step++)
             {
-                Vector3d localCorner = new(
-                    (corner & 1) == 0 ? -halfExtents.X : halfExtents.X,
-                    (corner & 2) == 0 ? -halfExtents.Y : halfExtents.Y,
-                    (corner & 4) == 0 ? -halfExtents.Z : halfExtents.Z);
-                cuboid.CanonicalRotation.TryTransformScaledPoint(
-                    cuboid.CanonicalCenter, localCorner, Vector3d.One, out Vector3d witness).Should().BeTrue();
-                (witness - publishedPivot).TryGetMagnitudeCeiling(out Fixed64 required).Should().BeTrue();
-                frameRadius.Should().BeGreaterThanOrEqualTo(required,
-                    "the frame proxy must enclose cuboid corner {0} at axis {1}, angle step {2}", corner, axis, step);
-                body.ResolveContinuousCollisionProxyRadius().Should().BeGreaterThanOrEqualTo(required);
+                Fixed64.TryMultiplyDivide(
+                    Fixed64.Pi, (Fixed64)step, (Fixed64)12, out Fixed64 angle).Should().BeTrue();
+                Vector3d rotationAxis = axis == 0 ? Vector3d.Up : Vector3d.One.Normalized;
+                FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(rotationAxis, angle);
+                collider.TryPrepareBodyPose(publishedPivot, rotation).Should().BeTrue();
+                collider.PublishPreparedBodyPose();
+                Vector3d halfExtents = cuboid.OrientedBox.HalfExtents;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3d localCorner = new(
+                        (corner & 1) == 0 ? -halfExtents.X : halfExtents.X,
+                        (corner & 2) == 0 ? -halfExtents.Y : halfExtents.Y,
+                        (corner & 4) == 0 ? -halfExtents.Z : halfExtents.Z);
+                    cuboid.CanonicalRotation.TryTransformScaledPoint(
+                        cuboid.CanonicalCenter, localCorner, Vector3d.One, out Vector3d witness).Should().BeTrue();
+                    (witness - publishedPivot).TryGetMagnitudeCeiling(out Fixed64 required).Should().BeTrue();
+                    frameRadius.Should().BeGreaterThanOrEqualTo(required,
+                        "the frame proxy must enclose cuboid corner {0} at axis {1}, angle step {2}", corner, axis, step);
+                    body.ResolveContinuousCollisionProxyRadius().Should().BeGreaterThanOrEqualTo(required);
+                }
             }
-        }
     }
 
     [Theory]

@@ -1,11 +1,15 @@
+//=======================================================================
+// StaticSurface.Mixed.cs
+//=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System;
-using SwiftCollections.Query;
 
 namespace Gravitas;
 

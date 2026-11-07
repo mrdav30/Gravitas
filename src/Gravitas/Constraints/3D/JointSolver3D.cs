@@ -5,9 +5,9 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
-using System;
 
 namespace Gravitas.Constraints;
 

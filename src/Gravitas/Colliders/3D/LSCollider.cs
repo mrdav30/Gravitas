@@ -1,10 +1,12 @@
 //=======================================================================
 // LSCollider.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
+using System.Runtime.CompilerServices;
 using Chronicler;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
@@ -15,8 +17,6 @@ using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 

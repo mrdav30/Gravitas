@@ -1,10 +1,10 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -481,7 +481,8 @@ public sealed class BodyPositionDomainTests
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         var actor = new SolidBody2D(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)),
-            new LSCircleCollider2D(radius)) { Mass = Fixed64.MaxValue, SleepEnabled = false };
+            new LSCircleCollider2D(radius))
+        { Mass = Fixed64.MaxValue, SleepEnabled = false };
         actor.Initialize(Vector2d.Zero);
         Fixed64 depth = radius * Fixed64.Two;
         var pair = new CollisionPair2D(fixedCollider, actor.Collider);
@@ -512,7 +513,8 @@ public sealed class BodyPositionDomainTests
     {
         Vector3d position = Vector3d.Right * x;
         var body = new SolidBody(new TestMatterAgent(context, new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One)),
-            new LSSphereCollider { Radius = radius ?? Fixed64.Half }) { Mass = Fixed64.One, SleepEnabled = false };
+            new LSSphereCollider { Radius = radius ?? Fixed64.Half })
+        { Mass = Fixed64.One, SleepEnabled = false };
         body.Initialize(position, FixedQuaternion.Identity);
         return body;
     }
@@ -521,7 +523,8 @@ public sealed class BodyPositionDomainTests
     {
         Vector2d position = Vector2d.Right * x;
         var body = new SolidBody2D(new TestMatterAgent(context, new FixedTransform(position.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One)),
-            new LSCircleCollider2D(radius ?? Fixed64.Half)) { Mass = Fixed64.One, SleepEnabled = false };
+            new LSCircleCollider2D(radius ?? Fixed64.Half))
+        { Mass = Fixed64.One, SleepEnabled = false };
         body.Initialize(position);
         return body;
     }

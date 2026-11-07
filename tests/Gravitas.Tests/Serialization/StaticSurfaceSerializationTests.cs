@@ -1,10 +1,10 @@
+using System;
 using Chronicler;
 using Chronicler.Serialization;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Tests.Determinism;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;
@@ -55,15 +55,24 @@ public sealed class StaticSurfaceSerializationTests
     }
 
     [Theory]
-    [InlineData(false, 0)] [InlineData(true, 0)]
-    [InlineData(false, 1)] [InlineData(true, 1)]
-    [InlineData(false, 2)] [InlineData(true, 2)]
-    [InlineData(false, 3)] [InlineData(true, 3)]
-    [InlineData(false, 4)] [InlineData(true, 4)]
-    [InlineData(false, 5)] [InlineData(true, 5)]
-    [InlineData(false, 6)] [InlineData(true, 6)]
-    [InlineData(false, 7)] [InlineData(true, 7)]
-    [InlineData(false, 8)] [InlineData(true, 8)]
+    [InlineData(false, 0)]
+    [InlineData(true, 0)]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    [InlineData(false, 3)]
+    [InlineData(true, 3)]
+    [InlineData(false, 4)]
+    [InlineData(true, 4)]
+    [InlineData(false, 5)]
+    [InlineData(true, 5)]
+    [InlineData(false, 6)]
+    [InlineData(true, 6)]
+    [InlineData(false, 7)]
+    [InlineData(true, 7)]
+    [InlineData(false, 8)]
+    [InlineData(true, 8)]
     public void RejectedRecord_ShouldKeepThePreviousMembership(bool planar, int invalid)
     {
         using var scene = PhysicsScenarioBuilder.Create();

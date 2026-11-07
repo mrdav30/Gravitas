@@ -5,11 +5,11 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using FixedMathSharp;
-using FixedMathSharp.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using FixedMathSharp;
+using FixedMathSharp.Geometry;
 
 namespace Gravitas.Queries;
 
@@ -63,37 +63,7 @@ internal sealed partial class ConvexSweepQueryWorker
         }
     }
 
-    internal readonly struct GjkResult
-    {
-        public GjkResult(
-            bool intersects,
-            Fixed64 distance,
-            FixedPointAnchor pointA,
-            FixedPointAnchor pointB,
-            Vector3d normal)
-        {
-            Intersects = intersects;
-            Distance = distance;
-            PointA = pointA;
-            PointB = pointB;
-            Normal = normal;
-        }
 
-        public bool Intersects { get; }
-
-        public Fixed64 Distance { get; }
-
-        public FixedPointAnchor PointA { get; }
-
-        public FixedPointAnchor PointB { get; }
-
-        public Vector3d Normal { get; }
-
-        public static GjkResult CreateIntersection(
-            FixedPointAnchor pointA,
-            FixedPointAnchor pointB) =>
-            new(true, Fixed64.Zero, pointA, pointB, Vector3d.Zero);
-    }
 
     private readonly struct ClosestSimplexResult
     {
@@ -189,19 +159,5 @@ internal sealed partial class ConvexSweepQueryWorker
         }
     }
 
-    internal readonly struct TriangleWeights
-    {
-        public TriangleWeights(Fixed64 a, Fixed64 b, Fixed64 c)
-        {
-            A = a;
-            B = b;
-            C = c;
-        }
 
-        public Fixed64 A { get; }
-
-        public Fixed64 B { get; }
-
-        public Fixed64 C { get; }
-    }
 }

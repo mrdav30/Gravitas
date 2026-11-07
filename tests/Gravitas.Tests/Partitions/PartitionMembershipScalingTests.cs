@@ -1,6 +1,6 @@
+using System;
 using FluentAssertions;
 using SwiftCollections;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests;

@@ -21,7 +21,7 @@ public sealed class UntouchedPairDimensionParityTests
         var moverCollider = new LSCircleCollider2D(Fixed64.Half);
         var mover = new SolidBody2D(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), moverCollider)
-            { Mass = Fixed64.One };
+        { Mass = Fixed64.One };
         mover.Initialize(new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero));
         mover.UseManualGrounding();
         mover.SleepEnabled = false;

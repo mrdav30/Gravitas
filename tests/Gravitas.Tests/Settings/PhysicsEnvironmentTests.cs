@@ -1,6 +1,6 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Settings;

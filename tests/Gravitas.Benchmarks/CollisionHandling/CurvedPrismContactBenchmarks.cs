@@ -1,8 +1,8 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System;
 
 namespace Gravitas.Benchmarks;
 
@@ -144,8 +144,11 @@ public class CurvedPrismContactBenchmarks
     private (LSCollider Curved, LSCollider2D Slab) CreateFiniteWitnessPair(bool capsule)
     {
         LSCollider curved = capsule
-            ? new LSCapsuleCollider { Radius = Fixed64.Quarter,
-                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(21, 2), Fixed64.Half) }
+            ? new LSCapsuleCollider
+            {
+                Radius = Fixed64.Quarter,
+                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(21, 2), Fixed64.Half)
+            }
             : new LSSphereCollider { Radius = Fixed64.FromFraction(3, 4) };
         var agent = new BenchmarkMatterAgent(_context, capsule ? Vector3d.Up * Fixed64.Half : Vector3d.Zero);
         if (capsule)
@@ -176,8 +179,11 @@ public class CurvedPrismContactBenchmarks
     private (LSCollider Curved, LSCollider2D Slab) CreateContained(bool capsule)
     {
         LSCollider curved = capsule
-            ? new LSCapsuleCollider { Radius = Fixed64.Quarter,
-                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(3, 2), Fixed64.Half) }
+            ? new LSCapsuleCollider
+            {
+                Radius = Fixed64.Quarter,
+                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(3, 2), Fixed64.Half)
+            }
             : new LSSphereCollider { Radius = Fixed64.Quarter };
         var agent = new BenchmarkMatterAgent(_context, Vector3d.Up * Fixed64.Half);
         if (capsule)

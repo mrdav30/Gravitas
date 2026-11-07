@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -6,7 +7,6 @@ using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -19,9 +19,9 @@ public sealed class SleepingGroundProbeInvalidationTests
         {
             var cases = new TheoryData<bool, bool, int>();
             foreach (bool bodyless in new[] { false, true })
-            foreach (bool mixed in new[] { false, true })
-            for (int change = 0; change < 8; change++)
-                if (bodyless || change != 3) cases.Add(bodyless, mixed, change);
+                foreach (bool mixed in new[] { false, true })
+                    for (int change = 0; change < 8; change++)
+                        if (bodyless || change != 3) cases.Add(bodyless, mixed, change);
             return cases;
         }
     }
@@ -372,7 +372,9 @@ public sealed class SleepingGroundProbeInvalidationTests
         private readonly bool _bodyless;
         internal LSCuboidCollider Floor { get; } = new()
         {
-            Size = new Vector3d(8, 1, 8), Material = PhysicsMaterial.Frictionless, Layer = new PhysicsLayer(1)
+            Size = new Vector3d(8, 1, 8),
+            Material = PhysicsMaterial.Frictionless,
+            Layer = new PhysicsLayer(1)
         };
 
         internal SupportedProbe(bool bodyless, bool mixed)
@@ -388,7 +390,9 @@ public sealed class SleepingGroundProbeInvalidationTests
             AddFloor(Vector3d.Down * Fixed64.Half);
             var sphere = new LSSphereCollider
             {
-                Radius = Fixed64.Half, LocalOffset = Vector3d.Up, Material = PhysicsMaterial.Frictionless
+                Radius = Fixed64.Half,
+                LocalOffset = Vector3d.Up,
+                Material = PhysicsMaterial.Frictionless
             };
             Body = _scene.CreateBody(sphere, Vector3d.Zero, FixedQuaternion.Identity, preventAngularForces: true).Body;
             Body.SleepEnabled = false;

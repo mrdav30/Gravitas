@@ -1,9 +1,9 @@
+using System;
+using System.Collections.Generic;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Settings;
@@ -102,9 +102,9 @@ public sealed class SettingsGeometryRangeTests
         {
             0 => () => context.Settings.Mixed2DHalfThickness = (Fixed64)1000,
             1 => () => context.ApplySettings(new PhysicsSettings(60, null)
-                { RuntimeMode = PhysicsRuntimeMode.Mixed, Mixed2DHalfThickness = (Fixed64)1000 }),
+            { RuntimeMode = PhysicsRuntimeMode.Mixed, Mixed2DHalfThickness = (Fixed64)1000 }),
             _ => () => new PhysicsSettingsSaver
-                { FrameRate = 60, RuntimeMode = PhysicsRuntimeMode.Mixed, Mixed2DHalfThickness = (Fixed64)1000 }
+            { FrameRate = 60, RuntimeMode = PhysicsRuntimeMode.Mixed, Mixed2DHalfThickness = (Fixed64)1000 }
                 .ApplyTo(context)
         };
 

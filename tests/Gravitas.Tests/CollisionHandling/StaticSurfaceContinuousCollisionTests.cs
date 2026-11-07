@@ -1,3 +1,5 @@
+using System;
+using System.Numerics;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -6,8 +8,6 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System;
-using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -51,21 +51,27 @@ public sealed class StaticSurfaceContinuousCollisionTests
         {
             var member = new LSMeshCollider(new[] { new Vector3d(left, -2, 2), new(left, 2, -2),
                 new(right, -2, 2), new(right, 2, -2) }, new[] { 0, 1, 2, 2, 1, 3 },
-                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+            { Material = PhysicsMaterial.Frictionless };
             scene.InitializeStaticCollider(member, Vector3d.Zero);
             return member;
         }
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void OffsetSphere_InsideTheProxySeam_ShouldStillHitTheLaterPhysicalSurface(bool joined)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context, PhysicsRuntimeMode.Mixed);
         var left = Rectangle(scene, -8, 0); var right = Rectangle(scene, 0, 8);
         using var surface = joined ? scene.Context.Physics2D.CreateStaticSurface(new[] { left, right }) : null;
-        var sphere = new LSSphereCollider { Radius = Fixed64.Half, LocalOffset = Vector3d.Forward * Fixed64.Two,
-            Material = PhysicsMaterial.Frictionless };
+        var sphere = new LSSphereCollider
+        {
+            Radius = Fixed64.Half,
+            LocalOffset = Vector3d.Forward * Fixed64.Two,
+            Material = PhysicsMaterial.Frictionless
+        };
         SolidBody body = scene.CreateBody(sphere, new(-Fixed64.Quarter, Fixed64.Zero, -Fixed64.Half), FixedQuaternion.Identity).Body;
         body.FreezeAxes = BodyFreezeAxes3D.Rotation; body.SleepEnabled = false; body.UseManualGrounding();
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
@@ -91,7 +97,10 @@ public sealed class StaticSurfaceContinuousCollisionTests
     }
 
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
     public void PublicInitialOverlap_ShouldKeepBothMemberIdentitiesAndZeroDistance(int dimension)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -142,7 +151,8 @@ public sealed class StaticSurfaceContinuousCollisionTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void RotatingPlanarCapsule_ShouldKeepTangentialVelocityAcrossTheJoin(bool mixed)
     {
         var monolithic = Run(joined: false);
@@ -256,10 +266,14 @@ public sealed class StaticSurfaceContinuousCollisionTests
     }
 
     [Theory]
-    [InlineData(false, false, false)] [InlineData(true, false, false)]
-    [InlineData(false, true, false)] [InlineData(true, true, false)]
-    [InlineData(false, false, true)] [InlineData(true, false, true)]
-    [InlineData(false, true, true)] [InlineData(true, true, true)]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
     public void SolvedPlane_ShouldNotHideADisconnectedLowerCornerWithinTheRetainedOverlap(bool joined, bool bridged, bool sameHeight)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context, PhysicsRuntimeMode.Mixed);
@@ -293,7 +307,8 @@ public sealed class StaticSurfaceContinuousCollisionTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void SolvedCap_ShouldKeepTheRealRimAcrossAHoleInAConnectedCoplanarSurface(bool joined)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context, PhysicsRuntimeMode.Mixed);
@@ -324,7 +339,8 @@ public sealed class StaticSurfaceContinuousCollisionTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void MixedRoundedFiniteRimEntry_ShouldKeepTheNonclosingFilledFace(bool planar)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context, PhysicsRuntimeMode.Mixed);
@@ -352,35 +368,35 @@ public sealed class StaticSurfaceContinuousCollisionTests
             Assert.Contains(hits, hit => hit.Collider2D == left && hit.Distance == entry);
         }
         using (declaration)
-        if (planar)
-        {
-            var circle = new LSCircleCollider2D(Fixed64.Half)
-            { Material = PhysicsMaterial.Frictionless, MixedHalfThicknessOverride = Fixed64.Half };
-            var body = new SolidBody2D(new TestMatterAgent(scene.Context), circle)
-            { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation, SleepEnabled = false };
-            body.Initialize(new(Fixed64.Quarter, height)); body.UseManualGrounding();
-            body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-            body.AddLinearImpulse(new((Fixed64)(-8), Fixed64.Zero));
-            scene.Context.Simulate(); scene.Context.LateSimulate();
-            Assert.Equal((Fixed64)(-8), body.LinearVelocity.X);
-            Assert.Equal(Fixed64.Zero, body.LinearVelocity.Y);
-            Assert.True(body.Position.X < Fixed64.Zero);
-            Assert.Equal(height, body.Position.Y);
-        }
-        else
-        {
-            SolidBody body = scene.CreateBody(new LSSphereCollider { Radius = Fixed64.Half, Material = PhysicsMaterial.Frictionless },
-                new(Fixed64.Quarter, Fixed64.Zero, height), FixedQuaternion.Identity).Body;
-            body.FreezeAxes = BodyFreezeAxes3D.Rotation | BodyFreezeAxes3D.PositionY;
-            body.SleepEnabled = false; body.UseManualGrounding();
-            body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-            body.AddLinearImpulse(Vector3d.Left * (Fixed64)8);
-            scene.Context.Simulate(); scene.Context.LateSimulate();
-            Assert.Equal((Fixed64)(-8), body.LinearVelocity.X);
-            Assert.Equal(Fixed64.Zero, body.LinearVelocity.Z);
-            Assert.True(body.Position3d.X < Fixed64.Zero);
-            Assert.Equal(height, body.Position3d.Z);
-        }
+            if (planar)
+            {
+                var circle = new LSCircleCollider2D(Fixed64.Half)
+                { Material = PhysicsMaterial.Frictionless, MixedHalfThicknessOverride = Fixed64.Half };
+                var body = new SolidBody2D(new TestMatterAgent(scene.Context), circle)
+                { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation, SleepEnabled = false };
+                body.Initialize(new(Fixed64.Quarter, height)); body.UseManualGrounding();
+                body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+                body.AddLinearImpulse(new((Fixed64)(-8), Fixed64.Zero));
+                scene.Context.Simulate(); scene.Context.LateSimulate();
+                Assert.Equal((Fixed64)(-8), body.LinearVelocity.X);
+                Assert.Equal(Fixed64.Zero, body.LinearVelocity.Y);
+                Assert.True(body.Position.X < Fixed64.Zero);
+                Assert.Equal(height, body.Position.Y);
+            }
+            else
+            {
+                SolidBody body = scene.CreateBody(new LSSphereCollider { Radius = Fixed64.Half, Material = PhysicsMaterial.Frictionless },
+                    new(Fixed64.Quarter, Fixed64.Zero, height), FixedQuaternion.Identity).Body;
+                body.FreezeAxes = BodyFreezeAxes3D.Rotation | BodyFreezeAxes3D.PositionY;
+                body.SleepEnabled = false; body.UseManualGrounding();
+                body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+                body.AddLinearImpulse(Vector3d.Left * (Fixed64)8);
+                scene.Context.Simulate(); scene.Context.LateSimulate();
+                Assert.Equal((Fixed64)(-8), body.LinearVelocity.X);
+                Assert.Equal(Fixed64.Zero, body.LinearVelocity.Z);
+                Assert.True(body.Position3d.X < Fixed64.Zero);
+                Assert.Equal(height, body.Position3d.Z);
+            }
     }
 
     [Theory]
@@ -399,7 +415,9 @@ public sealed class StaticSurfaceContinuousCollisionTests
             { Material = PhysicsMaterial.Frictionless, MixedHalfThicknessOverride = Fixed64.Half };
             var body = new SolidBody2D(new TestMatterAgent(scene.Context), circle)
             {
-                Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation, SleepEnabled = false
+                Mass = Fixed64.One,
+                FreezeAxes = BodyFreezeAxes2D.Rotation,
+                SleepEnabled = false
             };
             body.Initialize(new(-Fixed64.Two, Fixed64.Half)); body.UseManualGrounding();
             for (int frame = 0; frame < 32; frame++) Step();
@@ -515,8 +533,12 @@ public sealed class StaticSurfaceContinuousCollisionTests
             var circle = new LSCircleCollider2D(Fixed64.Half)
             { Material = PhysicsMaterial.Frictionless, MixedHalfThicknessOverride = Fixed64.Half };
             var body = new SolidBody2D(new TestMatterAgent(scene.Context), circle)
-            { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation, SleepEnabled = false,
-                ContinuousCollisionMode = ContinuousCollisionMode.Continuous };
+            {
+                Mass = Fixed64.One,
+                FreezeAxes = BodyFreezeAxes2D.Rotation,
+                SleepEnabled = false,
+                ContinuousCollisionMode = ContinuousCollisionMode.Continuous
+            };
             body.Initialize(new((Fixed64)(-9), Fixed64.Zero)); body.UseManualGrounding();
             body.AddLinearImpulse(Vector2d.Right * (Fixed64)512);
             scene.Context.Simulate(); scene.Context.LateSimulate();

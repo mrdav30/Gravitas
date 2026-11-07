@@ -1,8 +1,8 @@
+using System;
+using System.Reflection;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
-using System;
-using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.Partitions;

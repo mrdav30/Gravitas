@@ -1,17 +1,11 @@
-//=======================================================================
-// MeshConeSurfaceManifoldTests.cs
-//=======================================================================
-// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
-// See LICENSE file in the project root for full license information.
-//=======================================================================
+using System;
+using System.Linq;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -113,7 +107,7 @@ public sealed class MeshConeSurfaceManifoldTests
         scenario.InitializeStaticCollider(baseline, Vector3d.Zero);
         scenario.InitializeStaticCollider(shiftedOrigin, Vector3d.Zero);
         var cone = new LSConeCollider();
-        scenario.InitializeStaticCollider(cone, new(Fixed64.FromFraction(3,10), Fixed64.Zero, Fixed64.FromFraction(3,10)));
+        scenario.InitializeStaticCollider(cone, new(Fixed64.FromFraction(3, 10), Fixed64.Zero, Fixed64.FromFraction(3, 10)));
         CollisionPair original = scenario.CreatePair(baseline, cone), changed = scenario.CreatePair(shiftedOrigin, cone);
         Assert.NotEqual(baseline.Mesh.LocalBounds.Center, shiftedOrigin.Mesh.LocalBounds.Center);
         Assert.True(CollisionDetection.DoCollisionCheck(original));
@@ -140,15 +134,15 @@ public sealed class MeshConeSurfaceManifoldTests
         // regional exits, including opposite normals.
         Vector3d[] vertices = { new(-2,0,-2), new(-1,0,-2), new(-1,0,1), new(-1,0,2), new(-2,0,2),
             new(1,0,-2), new(2,0,-2), new(2,0,2), new(1,0,2), new(1,0,1) };
-        int[] triangles = { 0,1,2, 0,2,4, 2,3,4, 5,6,9, 6,7,9, 7,8,9, 2,9,8, 2,8,3 };
+        int[] triangles = { 0, 1, 2, 0, 2, 4, 2, 3, 4, 5, 6, 9, 6, 7, 9, 7, 8, 9, 2, 9, 8, 2, 8, 3 };
         var mesh = new LSMeshCollider(vertices, triangles, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         scenario.InitializeStaticCollider(mesh, Vector3d.Zero);
         for (int triangle = 0; triangle < mesh.Mesh.TriangleCount; triangle++)
             Assert.Equal(0, mesh.Mesh.GetManifoldSurfaceOwner(triangle));
         // R=1 gives a plane-section X extent near 1.79; R=1/2 would miss
         // both arms. The section still cannot reach the bridge at Z>=1.
-        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2,1000,2) };
-        FixedQuaternion tilt = new(Fixed64.Zero, Fixed64.Zero, Fixed64.FromFraction(3,5), Fixed64.FromFraction(4,5));
+        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2, 1000, 2) };
+        FixedQuaternion tilt = new(Fixed64.Zero, Fixed64.Zero, Fixed64.FromFraction(3, 5), Fixed64.FromFraction(4, 5));
         cone.InitializeWithNoBody(new TestMatterAgent(scenario.Context,
             new FixedTransform(Vector3d.Zero, tilt, Vector3d.One)));
         CollisionPair pair = scenario.CreatePair(mesh, cone);
@@ -181,8 +175,8 @@ public sealed class MeshConeSurfaceManifoldTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         LSMeshCollider mesh = MeshTestFixtures.CreateConvexQuadFloor(MeshColliderMode.Concave);
         scenario.InitializeStaticCollider(mesh, Vector3d.Zero);
-        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2,1000,2) };
-        FixedQuaternion tilt = new(Fixed64.Zero, Fixed64.Zero, Fixed64.FromFraction(3,5), Fixed64.FromFraction(4,5));
+        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2, 1000, 2) };
+        FixedQuaternion tilt = new(Fixed64.Zero, Fixed64.Zero, Fixed64.FromFraction(3, 5), Fixed64.FromFraction(4, 5));
         cone.InitializeWithNoBody(new TestMatterAgent(scenario.Context,
             new FixedTransform(Vector3d.Zero, tilt, Vector3d.One)));
         CollisionPair pair = scenario.CreatePair(mesh, cone);
@@ -209,7 +203,7 @@ public sealed class MeshConeSurfaceManifoldTests
         }
         // Same bounds as the exact face-region regression: the midpoint ray
         // is roughly half the required maximum near the lateral boundary.
-        Assert.InRange(deepest.Depth.m_rawValue, Fixed64.One.m_rawValue, Fixed64.FromFraction(11,10).m_rawValue);
+        Assert.InRange(deepest.Depth.m_rawValue, Fixed64.One.m_rawValue, Fixed64.FromFraction(11, 10).m_rawValue);
         Assert.True(FixedMath.Abs(deepest.PointA.X) > Fixed64.One);
     }
 
@@ -223,10 +217,10 @@ public sealed class MeshConeSurfaceManifoldTests
         Vector3d[] vertices = { new(Fixed64.Quarter,-Fixed64.Half,-Fixed64.One),
             new(-Fixed64.Quarter,Fixed64.Half,-Fixed64.One), new(-Fixed64.Quarter,Fixed64.Half,Fixed64.One),
             new(Fixed64.Quarter,-Fixed64.Half,Fixed64.One) };
-        var mesh = new LSMeshCollider(vertices, new[] { 0,1,2, 0,2,3 }, MeshColliderMode.Concave,
+        var mesh = new LSMeshCollider(vertices, new[] { 0, 1, 2, 0, 2, 3 }, MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
         scenario.InitializeStaticCollider(mesh, new(Fixed64.Half + Fixed64.FromRaw(offsetRaw), Fixed64.Zero, Fixed64.Zero));
-        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2,2,2) };
+        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2, 2, 2) };
         scenario.InitializeStaticCollider(cone, Vector3d.Zero);
         CollisionPair pair = scenario.CreatePair(mesh, cone);
         Assert.Equal(offsetRaw <= 0, CollisionDetection.DoCollisionCheck(pair));
@@ -260,7 +254,7 @@ public sealed class MeshConeSurfaceManifoldTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         LSMeshCollider mesh = MeshTestFixtures.CreateConvexQuadFloor(MeshColliderMode.Concave);
         scenario.InitializeStaticCollider(mesh, new(Fixed64.Zero, -Fixed64.One + Fixed64.FromRaw(offsetRaw), Fixed64.Zero));
-        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2,2,2) };
+        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2, 2, 2) };
         scenario.InitializeStaticCollider(cone, Vector3d.Zero);
         CollisionPair pair = scenario.CreatePair(mesh, cone);
         Assert.Equal(offsetRaw >= 0, CollisionDetection.DoCollisionCheck(pair));
@@ -326,8 +320,9 @@ public sealed class MeshConeSurfaceManifoldTests
             new(side,Fixed64.Zero,-tab), new(extensionEnd,Fixed64.Zero,-tab),
             new(extensionEnd,Fixed64.Zero,tab), new(side,Fixed64.Zero,tab),
             new(side,Fixed64.Zero,side), new(-side,Fixed64.Zero,side) };
-        var mesh = new LSMeshCollider(vertices, new[] { 0,1,2, 0,2,5, 0,5,6, 0,6,7, 2,3,4, 2,4,5 },
-            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+        var mesh = new LSMeshCollider(vertices, new[] { 0, 1, 2, 0, 2, 5, 0, 5, 6, 0, 6, 7, 2, 3, 4, 2, 4, 5 },
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
         scenario.CreateBody(mesh, Vector3d.Zero, FixedQuaternion.Identity, immovable: true);
         SolidBody body = scenario.CreateCone(Vector3d.Down * Fixed64.Quarter, preventAngularForces: true).Body;
         body.Collider.Material = PhysicsMaterial.Frictionless;
@@ -377,7 +372,7 @@ public sealed class MeshConeSurfaceManifoldTests
         var vertices = new[] { new Vector3d(-2,0,-2), new Vector3d(2,0,-2),
             new Vector3d(2,0,2), new Vector3d(-2,0,2), new Vector3d(-1,0,-1),
             new Vector3d(1,0,-1), new Vector3d(1,0,1), new Vector3d(-1,0,1) };
-        int[] triangles = { 0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6, 3,0,4, 3,4,7 };
+        int[] triangles = { 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7 };
         if (reverse)
             for (int index = 0; index < triangles.Length; index += 3)
                 (triangles[index + 1], triangles[index + 2]) = (triangles[index + 2], triangles[index + 1]);
@@ -458,7 +453,7 @@ public sealed class MeshConeSurfaceManifoldTests
         LSMeshCollider mesh = CreateWalls(false);
         scenario.InitializeStaticCollider(mesh, Vector3d.Zero);
         var cone = new LSConeCollider();
-        scenario.InitializeStaticCollider(cone, new Vector3d(Fixed64.FromFraction(3,10), Fixed64.Zero, Fixed64.FromFraction(3,10)));
+        scenario.InitializeStaticCollider(cone, new Vector3d(Fixed64.FromFraction(3, 10), Fixed64.Zero, Fixed64.FromFraction(3, 10)));
         CollisionPair pair = scenario.CreatePair(mesh, cone);
         long allocated = AllocationTestHelper.MeasureSteadyState(() =>
         {
@@ -526,13 +521,17 @@ public sealed class MeshConeSurfaceManifoldTests
         scenario.Context.Environment.MinSpeed = Fixed64.Zero;
         Vector3d[] vertices = { new(0,0,-2), new(4,0,-2), new(4,0,2), new(0,0,2),
             new(0,4,-2), new(0,4,2) };
-        mesh = new(vertices, new[] { 0,3,1, 1,3,2, 0,4,3, 3,4,5 },
-            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+        mesh = new(vertices, new[] { 0, 3, 1, 1, 3, 2, 0, 4, 3, 3, 4, 5 },
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
         scenario.CreateBody(mesh, Vector3d.Zero, FixedQuaternion.Identity, immovable: true);
         // Put the host body origin at its feet, matching automatic grounding's
         // height contract, while the cone's base exactly touches the floor.
-        var cone = new LSConeCollider { LocalOffset = Vector3d.Up * Fixed64.Half,
-            Material = PhysicsMaterial.Frictionless };
+        var cone = new LSConeCollider
+        {
+            LocalOffset = Vector3d.Up * Fixed64.Half,
+            Material = PhysicsMaterial.Frictionless
+        };
         body = scenario.CreateBody(cone, Vector3d.Right * Fixed64.Half, FixedQuaternion.Identity,
             preventAngularForces: true).Body;
         body.SleepFrameThreshold = 2;
@@ -541,11 +540,11 @@ public sealed class MeshConeSurfaceManifoldTests
 
     private static LSMeshCollider CreateDisconnectedSupports()
     {
-        Fixed64 near = Fixed64.Quarter, far = Fixed64.FromFraction(3,4);
+        Fixed64 near = Fixed64.Quarter, far = Fixed64.FromFraction(3, 4);
         Vector3d[] vertices = { new(-far,Fixed64.Zero,-near), new(-near,Fixed64.Zero,-near),
             new(-near,Fixed64.Zero,near), new(-far,Fixed64.Zero,near), new(near,Fixed64.Zero,-near),
             new(far,Fixed64.Zero,-near), new(far,Fixed64.Zero,near), new(near,Fixed64.Zero,near) };
-        return new(vertices, new[] { 0,1,2, 0,2,3, 4,5,6, 4,6,7 },
+        return new(vertices, new[] { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 },
             MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
     }
 
@@ -558,8 +557,8 @@ public sealed class MeshConeSurfaceManifoldTests
         int[] triangles = { 0, 1, 2, 0, 2, 3, 0, 4, 5, 0, 5, 1 };
         if (remoteBoundsTriangle)
         {
-            vertices = vertices.Concat(new[] { new Vector3d(12,12,12), new Vector3d(14,12,12), new Vector3d(12,12,14) }).ToArray();
-            triangles = triangles.Concat(new[] { 6,7,8 }).ToArray();
+            vertices = vertices.Concat(new[] { new Vector3d(12, 12, 12), new Vector3d(14, 12, 12), new Vector3d(12, 12, 14) }).ToArray();
+            triangles = triangles.Concat(new[] { 6, 7, 8 }).ToArray();
         }
         if (wall >= 0)
         {

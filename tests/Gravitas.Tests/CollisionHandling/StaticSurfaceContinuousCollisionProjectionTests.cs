@@ -1,14 +1,14 @@
+using System.Numerics;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Queries;
-using Gravitas.Tests.Support;
 using Gravitas.Support;
+using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using SwiftCollections;
-using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -26,8 +26,12 @@ public sealed class StaticSurfaceContinuousCollisionProjectionTests
         using var surface = scene.Context.Physics2D.CreateStaticSurface(new[] { wall });
         var circle = new LSCircleCollider2D(Fixed64.One) { Material = PhysicsMaterial.Frictionless };
         var body = new SolidBody2D(new TestMatterAgent(scene.Context), circle)
-        { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation, SleepEnabled = false,
-            ContinuousCollisionMode = ContinuousCollisionMode.Continuous };
+        {
+            Mass = Fixed64.One,
+            FreezeAxes = BodyFreezeAxes2D.Rotation,
+            SleepEnabled = false,
+            ContinuousCollisionMode = ContinuousCollisionMode.Continuous
+        };
         body.Initialize(Vector2d.Zero);
         body.SetManualGrounding(-Vector2d.Forward, Vector2d.Forward);
         body.UseAutomaticGrounding(checkGroundImmediately: false);
@@ -106,7 +110,7 @@ public sealed class StaticSurfaceContinuousCollisionProjectionTests
         probe.Deactivate();
 
         SolidBody body = scene.CreateBody(new LSSphereCollider
-            { Radius = Fixed64.Half, Material = PhysicsMaterial.Frictionless }, start, FixedQuaternion.Identity).Body;
+        { Radius = Fixed64.Half, Material = PhysicsMaterial.Frictionless }, start, FixedQuaternion.Identity).Body;
         body.FreezeAxes = BodyFreezeAxes3D.Rotation | BodyFreezeAxes3D.PositionY;
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         body.SleepEnabled = false; body.UseManualGrounding(); body.AddLinearImpulse(-normal * (Fixed64)32);
@@ -159,8 +163,10 @@ public sealed class StaticSurfaceContinuousCollisionProjectionTests
     }
 
     [Theory]
-    [InlineData(-1, false)] [InlineData(1, false)]
-    [InlineData(-1, true)] [InlineData(1, true)]
+    [InlineData(-1, false)]
+    [InlineData(1, false)]
+    [InlineData(-1, true)]
+    [InlineData(1, true)]
     public void RoundedSourceStraddlingDeclaredPlane_ShouldFollowItsNativeMinimumExit(int sign, bool capsule)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context, PhysicsRuntimeMode.ThreeD);
@@ -201,10 +207,14 @@ public sealed class StaticSurfaceContinuousCollisionProjectionTests
     }
 
     [Theory]
-    [InlineData("Vertical", true)] [InlineData("ZeroCore", true)]
-    [InlineData("TiltX", false)] [InlineData("TiltZ", false)]
-    [InlineData("OutsideStart", false)] [InlineData("OutsideEnd", false)]
-    [InlineData("Box", false)] [InlineData("UnrepresentableEnd", false)]
+    [InlineData("Vertical", true)]
+    [InlineData("ZeroCore", true)]
+    [InlineData("TiltX", false)]
+    [InlineData("TiltZ", false)]
+    [InlineData("OutsideStart", false)]
+    [InlineData("OutsideEnd", false)]
+    [InlineData("Box", false)]
+    [InlineData("UnrepresentableEnd", false)]
     public void ExactSphereSourceProjection_ShouldRequireTheWholePhysicalCapsuleChord(string shape, bool expected)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context, PhysicsRuntimeMode.Mixed);
@@ -228,8 +238,10 @@ public sealed class StaticSurfaceContinuousCollisionProjectionTests
     }
 
     [Theory]
-    [InlineData("CurrentAngular", false)] [InlineData("PreparedAngular", false)]
-    [InlineData("KinematicGoal", false)] [InlineData("KinematicTranslation", true)]
+    [InlineData("CurrentAngular", false)]
+    [InlineData("PreparedAngular", false)]
+    [InlineData("KinematicGoal", false)]
+    [InlineData("KinematicTranslation", true)]
     public void ExactSphereSourceProjection_ShouldRejectAnyRetainedOrAuthoredAngularArc(string motion, bool expected)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context, PhysicsRuntimeMode.Mixed);
@@ -272,7 +284,10 @@ public sealed class StaticSurfaceContinuousCollisionProjectionTests
     }
 
     [Theory]
-    [InlineData(false, false)] [InlineData(true, false)] [InlineData(false, true)] [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
     public void HullCrossingDeclaredConcaveFaces_ShouldKeepItsExactTriangleAdmission(bool meshSource, bool fromBelow)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context, PhysicsRuntimeMode.ThreeD);
@@ -313,7 +328,8 @@ public sealed class StaticSurfaceContinuousCollisionProjectionTests
     }
 
     [Theory]
-    [InlineData(false)] [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true)]
     public void RotationalSearchPaddingAtScalarFaces_ShouldRemainConservative(bool maximum)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context, PhysicsRuntimeMode.Mixed);

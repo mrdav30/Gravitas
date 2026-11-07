@@ -1,8 +1,8 @@
+using System.Numerics;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Materials;
-using System.Numerics;
 
 namespace Gravitas.Benchmarks;
 
@@ -49,7 +49,8 @@ public class BodyDissipationBenchmarks
             var collider = new LSCuboidCollider { Size = frozen ? new Vector3d(1, 2, 3) : Vector3d.One, Material = material };
             var body = new SolidBody(new BenchmarkMatterAgent(_context, _positions[i]), collider)
             {
-                Mass = Fixed64.One, SleepEnabled = false,
+                Mass = Fixed64.One,
+                SleepEnabled = false,
                 LinearDragCoefficient = _linear ? Fixed64.One : Fixed64.Zero,
                 FreezeAxes = frozen ? BodyFreezeAxes3D.RotationY : BodyFreezeAxes3D.None
             };
@@ -123,4 +124,3 @@ public class BodyDissipationBenchmarks
         * body.Collider.CalculateInertiaTensor(body.Mass, body.LocalCenterOfMassOffset) * body.Rotation.ToMatrix3x3();
     [GlobalCleanup] public void Cleanup() => _context?.Dispose();
 }
-

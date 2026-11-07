@@ -1,10 +1,10 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
 using GridForge.Configuration;
-using System;
 
 namespace Gravitas.Benchmarks;
 

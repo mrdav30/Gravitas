@@ -1,10 +1,9 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -17,9 +16,9 @@ public sealed class BodylessStaticResponseTests
         {
             var cases = new TheoryData<int, bool, bool>();
             foreach (int shape in new[] { 0, 1, 2 })
-            foreach (bool mesh in new[] { false, true })
-            foreach (bool floorFirst in new[] { false, true })
-                cases.Add(shape, mesh, floorFirst);
+                foreach (bool mesh in new[] { false, true })
+                    foreach (bool floorFirst in new[] { false, true })
+                        cases.Add(shape, mesh, floorFirst);
             return cases;
         }
     }

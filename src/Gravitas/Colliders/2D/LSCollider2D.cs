@@ -1,10 +1,11 @@
 //=======================================================================
-// LSCCollider2D.cs
+// LSCollider2D.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System.Runtime.CompilerServices;
 using Chronicler;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
@@ -12,26 +13,10 @@ using Gravitas.Materials;
 using Gravitas.Support;
 using GridForge.Spatial;
 using SwiftCollections;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-internal readonly struct ColliderLifetimeToken2D
-{
-    internal ColliderLifetimeToken2D(LSCollider2D collider)
-    {
-        Collider = collider;
-        LifetimeVersion = collider.LifetimeVersion;
-    }
 
-    internal LSCollider2D Collider { get; }
-
-    internal long LifetimeVersion { get; }
-
-    internal bool IsActive => Collider.IsActive && IsCurrentLifetime;
-
-    internal bool IsCurrentLifetime => Collider.LifetimeVersion == LifetimeVersion;
-}
 
 /// <summary>
 /// Common runtime type for the closed set of Gravitas-owned pure 2D collider
@@ -74,12 +59,9 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private ColliderPairState<CollisionPair2D> _pairState;
     private ColliderHierarchyState _hierarchyState;
 
-    /// <summary>Handles a pure 2D contact notification for the other body.</summary>
-    public delegate void Body2DCollisionFunc(SolidBody2D other);
-    /// <summary>Handles a pure 2D trigger notification for the other collider.</summary>
-    public delegate void Trigger2DCollisionFunc(LSCollider2D other);
-    /// <summary>Handles a mixed contact or trigger notification for the other 3D collider.</summary>
-    public delegate void Mixed2DCollisionFunc(LSCollider other);
+
+
+
 
     /// <summary>
     /// Raised while this collider is touching another collider that owns a 2D body.

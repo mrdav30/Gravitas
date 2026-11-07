@@ -1,15 +1,15 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Chronicler;
 using FixedMathSharp;
 using Gravitas.Colliders;
-using Gravitas.Constraints;
 using Gravitas.CollisionHandling;
+using Gravitas.Constraints;
 using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.Determinism;
@@ -308,25 +308,35 @@ internal sealed class ReplayFixtureRunner : IDisposable
             if (_bodies3D.TryGetValue(actor.Id, out SolidBody? body))
                 bodies.Add(new ReplayBodyState
                 {
-                    Actor = actor.Id, PositionRaw = Raw(body.Position3d), VelocityRaw = Raw(body.LinearVelocity),
-                    AngularVelocityRaw = Raw(body.AngularVelocity), Sleeping = body.IsSleeping,
+                    Actor = actor.Id,
+                    PositionRaw = Raw(body.Position3d),
+                    VelocityRaw = Raw(body.LinearVelocity),
+                    AngularVelocityRaw = Raw(body.AngularVelocity),
+                    Sleeping = body.IsSleeping,
                     RotationRaw = new[] { body.Rotation.X.m_rawValue, body.Rotation.Y.m_rawValue, body.Rotation.Z.m_rawValue, body.Rotation.W.m_rawValue },
                     ToiIterations = body.LastContinuousCollisionToiIterationCount
                 });
             else if (_bodies2D.TryGetValue(actor.Id, out SolidBody2D? planar))
                 bodies.Add(new ReplayBodyState
                 {
-                    Actor = actor.Id, PositionRaw = Raw(planar.Position), VelocityRaw = Raw(planar.LinearVelocity),
-                    AngularVelocityRaw = new[] { planar.AngularVelocity.m_rawValue }, Sleeping = planar.IsSleeping,
-                    RotationRaw = new[] { planar.Rotation.m_rawValue }, ToiIterations = planar.LastContinuousCollisionToiIterationCount
+                    Actor = actor.Id,
+                    PositionRaw = Raw(planar.Position),
+                    VelocityRaw = Raw(planar.LinearVelocity),
+                    AngularVelocityRaw = new[] { planar.AngularVelocity.m_rawValue },
+                    Sleeping = planar.IsSleeping,
+                    RotationRaw = new[] { planar.Rotation.m_rawValue },
+                    ToiIterations = planar.LastContinuousCollisionToiIterationCount
                 });
         }
         return new ReplayFrame
         {
-            FrameCount = Context.FrameCount, LateToken = Context.LateSimulateToken,
+            FrameCount = Context.FrameCount,
+            LateToken = Context.LateSimulateToken,
             Authoritative = Context.ComputeReplayHash().ToString(),
             SolverCaches = _fixture.Expected[0].SolverCaches == null ? null : Context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches).ToString(),
-            Bodies = bodies.ToArray(), Events = _events.ToArray(), Queries = _queries.ToArray()
+            Bodies = bodies.ToArray(),
+            Events = _events.ToArray(),
+            Queries = _queries.ToArray()
         };
     }
 

@@ -9,11 +9,7 @@ using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
-internal enum ContinuousCollisionRotationPath3D : byte
-{
-    IntegratedAngularVelocity,
-    KinematicSlerp
-}
+
 
 /// <summary>
 /// One immutable, normalized-time piece of a 3D body's prepared CCD trajectory.

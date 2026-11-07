@@ -1,10 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace Gravitas.Tests.Runtime;
@@ -165,8 +165,12 @@ public sealed class ContextResetLifetimeTests
                 var agent = new TestMatterAgent(context);
                 var collider = new LSSphereCollider { Material = PhysicsMaterial.Frictionless };
                 var body = new SolidBody(agent, collider)
-                { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes3D.Rotation, SleepEnabled = false,
-                    ContinuousCollisionMode = ContinuousCollisionMode.Continuous };
+                {
+                    Mass = Fixed64.One,
+                    FreezeAxes = BodyFreezeAxes3D.Rotation,
+                    SleepEnabled = false,
+                    ContinuousCollisionMode = ContinuousCollisionMode.Continuous
+                };
                 body.Initialize(new Vector3d(x, Fixed64.Zero, Fixed64.Quarter), FixedQuaternion.Identity);
                 body.UseManualGrounding();
                 Track(agent, collider, body);
@@ -184,8 +188,12 @@ public sealed class ContextResetLifetimeTests
                 var agent = new TestMatterAgent(context);
                 var collider = new LSCircleCollider2D(Fixed64.Half) { Material = PhysicsMaterial.Frictionless };
                 var body = new SolidBody2D(agent, collider)
-                { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation, SleepEnabled = false,
-                    ContinuousCollisionMode = ContinuousCollisionMode.Continuous };
+                {
+                    Mass = Fixed64.One,
+                    FreezeAxes = BodyFreezeAxes2D.Rotation,
+                    SleepEnabled = false,
+                    ContinuousCollisionMode = ContinuousCollisionMode.Continuous
+                };
                 body.Initialize(new Vector2d(x, (Fixed64)4.25m));
                 Track(agent, collider, body);
                 deactivate.Add(body.Deactivate);

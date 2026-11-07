@@ -1,10 +1,11 @@
 //=======================================================================
 // GravitasWorldContext.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
 using Chronicler.Hashing;
 using Chronicler.Timing;
 using FixedMathSharp;
@@ -15,7 +16,6 @@ using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Grids.Topology;
 using SwiftCollections;
-using System;
 
 namespace Gravitas;
 
@@ -335,7 +335,7 @@ public sealed partial class GravitasWorldContext : IDisposable
     /// <summary>
     /// Creates a context with an owned <see cref="GridWorld"/>.
     /// </summary>
-    /// <param name="spatialGridCellSize">Spatial hash cell size for the created world.</param>
+    /// <param name="spatialGridCellSize">Ordinary-grid spatial lookup cell size for the created world.</param>
     /// <returns>A context that owns its created world.</returns>
     public static GravitasWorldContext CreateOwned(
         int spatialGridCellSize = GridWorld.DefaultSpatialGridCellSize)

@@ -1,10 +1,10 @@
+using System;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -12,8 +12,12 @@ namespace Gravitas.Tests;
 public sealed class StaticSurface2DRecoveryTests
 {
     [Theory]
-    [InlineData(0, false)] [InlineData(1, false)] [InlineData(2, false)]
-    [InlineData(0, true)] [InlineData(1, true)] [InlineData(2, true)]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
     public void CompleteHostStep_ShouldPublishTheCertifiedRecoveryAndKeepInitialOverlapEvents(int shape, bool moverFirst)
     {
         using var context = Physics2DTestWorld.CreateContext();
@@ -72,7 +76,10 @@ public sealed class StaticSurface2DRecoveryTests
     }
 
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
     public void DeepObservations_ShouldNotRequireMovableBodyRecovery(int kind)
     {
         using var context = Physics2DTestWorld.CreateContext();
@@ -106,7 +113,12 @@ public sealed class StaticSurface2DRecoveryTests
     }
 
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)] [InlineData(5)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
     public void ChangingAPreparedRecoveryBeforeResponse_ShouldNeverPublishAnUncertifiedPose(int change)
     {
         using var context = Physics2DTestWorld.CreateContext();
@@ -175,7 +187,10 @@ public sealed class StaticSurface2DRecoveryTests
     }
 
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)] [InlineData(3)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
     public void PolygonRecovery_ShouldInspectActualPrimitiveAndCompoundBlockers(int kind)
     {
         using var context = Physics2DTestWorld.CreateContext();
@@ -233,7 +248,9 @@ public sealed class StaticSurface2DRecoveryTests
     }
 
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
     public void Recovery_ShouldCertifyTheCompleteFinalNeighborhoodWithoutPublishingTheProposal(int shape)
     {
         using var context = Physics2DTestWorld.CreateContext();

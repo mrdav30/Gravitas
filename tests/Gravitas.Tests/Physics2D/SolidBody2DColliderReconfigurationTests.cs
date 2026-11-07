@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -6,7 +7,6 @@ using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -65,54 +65,54 @@ public sealed partial class SolidBody2DColliderReconfigurationTests
         int targetFamily, bool compound)
     {
         foreach (bool capsuleSource in new[] { false, true })
-        foreach (int offset in new[] { -1, 0, 1 })
-        {
-            using GravitasWorldContext context = CreateContext(withGrid: false);
-            bool radialTarget = targetFamily < 2;
-            Fixed64 radius = radialTarget ? (Fixed64)2 : (Fixed64)5;
-            Fixed64 axisLength = capsuleSource ? (Fixed64)2 : Fixed64.Zero;
-            Fixed64 raw = Fixed64.FromRaw(offset);
-            Vector2d position = new((Fixed64)3 + raw, (Fixed64)4 - raw + axisLength * Fixed64.Half);
-            LSCollider2D source = capsuleSource
-                ? new LSCapsuleCollider2D(radius - Fixed64.One, axisLength + (radius - Fixed64.One) * Fixed64.Two)
-                : new LSCircleCollider2D(radius - Fixed64.One);
-            SolidBody2D body = CreateBody(context, source, position);
-            Vector2d[] vertices = { new(-2, -2), new(0, -2), new(0, 0), new(-2, 0) };
-            var shape = targetFamily switch
+            foreach (int offset in new[] { -1, 0, 1 })
             {
-                0 => ColliderShapeDefinition2D.Circle((Fixed64)3),
-                1 => ColliderShapeDefinition2D.Capsule((Fixed64)3, (Fixed64)8),
-                2 => ColliderShapeDefinition2D.AABBox(new Vector2d(2, 2)),
-                _ => ColliderShapeDefinition2D.ConvexPolygon(vertices)
-            };
-            Vector2d targetPosition = targetFamily == 1 ? new Vector2d(0, -1)
-                : targetFamily == 2 ? new Vector2d(-1, -1) : Vector2d.Zero;
-            LSCollider2D obstacle = compound
-                ? new LSCompoundCollider2D(new CompoundColliderPart2D(shape, targetPosition))
-                : shape.CreateRuntimeCollider();
-            CreateObstacle(context, obstacle, compound ? Vector2d.Zero : targetPosition);
-            var replacement = capsuleSource
-                ? ColliderShapeDefinition2D.Capsule(radius, axisLength + radius * Fixed64.Two)
-                : ColliderShapeDefinition2D.Circle(radius);
-            var before = context.ComputeReplayHash();
-            int publications = 0;
+                using GravitasWorldContext context = CreateContext(withGrid: false);
+                bool radialTarget = targetFamily < 2;
+                Fixed64 radius = radialTarget ? (Fixed64)2 : (Fixed64)5;
+                Fixed64 axisLength = capsuleSource ? (Fixed64)2 : Fixed64.Zero;
+                Fixed64 raw = Fixed64.FromRaw(offset);
+                Vector2d position = new((Fixed64)3 + raw, (Fixed64)4 - raw + axisLength * Fixed64.Half);
+                LSCollider2D source = capsuleSource
+                    ? new LSCapsuleCollider2D(radius - Fixed64.One, axisLength + (radius - Fixed64.One) * Fixed64.Two)
+                    : new LSCircleCollider2D(radius - Fixed64.One);
+                SolidBody2D body = CreateBody(context, source, position);
+                Vector2d[] vertices = { new(-2, -2), new(0, -2), new(0, 0), new(-2, 0) };
+                var shape = targetFamily switch
+                {
+                    0 => ColliderShapeDefinition2D.Circle((Fixed64)3),
+                    1 => ColliderShapeDefinition2D.Capsule((Fixed64)3, (Fixed64)8),
+                    2 => ColliderShapeDefinition2D.AABBox(new Vector2d(2, 2)),
+                    _ => ColliderShapeDefinition2D.ConvexPolygon(vertices)
+                };
+                Vector2d targetPosition = targetFamily == 1 ? new Vector2d(0, -1)
+                    : targetFamily == 2 ? new Vector2d(-1, -1) : Vector2d.Zero;
+                LSCollider2D obstacle = compound
+                    ? new LSCompoundCollider2D(new CompoundColliderPart2D(shape, targetPosition))
+                    : shape.CreateRuntimeCollider();
+                CreateObstacle(context, obstacle, compound ? Vector2d.Zero : targetPosition);
+                var replacement = capsuleSource
+                    ? ColliderShapeDefinition2D.Capsule(radius, axisLength + radius * Fixed64.Two)
+                    : ColliderShapeDefinition2D.Circle(radius);
+                var before = context.ComputeReplayHash();
+                int publications = 0;
 
-            var result = body.TryReconfigureCollider(replacement, Vector2d.Zero, position,
-                out var blocker, out var failure, () => publications++);
+                var result = body.TryReconfigureCollider(replacement, Vector2d.Zero, position,
+                    out var blocker, out var failure, () => publications++);
 
-            // Both radial and corner fixtures reduce to (3+e)^2+(4-e)^2 vs 25.
-            bool penetrates = offset > 0;
-            result.Should().Be(penetrates ? ColliderReconfigurationStatus.Blocked : ColliderReconfigurationStatus.Applied);
-            failure.Should().BeNull();
-            publications.Should().Be(penetrates ? 0 : 1);
-            if (penetrates)
-            {
-                blocker.Should().BeSameAs(obstacle);
-                context.ComputeReplayHash().Should().Be(before);
+                // Both radial and corner fixtures reduce to (3+e)^2+(4-e)^2 vs 25.
+                bool penetrates = offset > 0;
+                result.Should().Be(penetrates ? ColliderReconfigurationStatus.Blocked : ColliderReconfigurationStatus.Applied);
+                failure.Should().BeNull();
+                publications.Should().Be(penetrates ? 0 : 1);
+                if (penetrates)
+                {
+                    blocker.Should().BeSameAs(obstacle);
+                    context.ComputeReplayHash().Should().Be(before);
+                }
+                else
+                    blocker.Should().BeNull();
             }
-            else
-                blocker.Should().BeNull();
-        }
     }
 
     [Theory]

@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using FluentAssertions;
@@ -6,7 +7,6 @@ using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Queries;

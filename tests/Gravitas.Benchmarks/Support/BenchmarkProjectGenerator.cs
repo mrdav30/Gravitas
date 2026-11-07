@@ -1,12 +1,9 @@
-using BenchmarkDotNet.Loggers;
-using BenchmarkDotNet.Running;
-using BenchmarkDotNet.Toolchains;
-using BenchmarkDotNet.Toolchains.CsProj;
 using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Xml.Linq;
+using BenchmarkDotNet.Loggers;
+using BenchmarkDotNet.Toolchains.CsProj;
 
 namespace Gravitas.Benchmarks;
 

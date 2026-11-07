@@ -1,10 +1,10 @@
+using System;
+using Chronicler.Diagnostics;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using GridForge.Configuration;
-using Chronicler.Diagnostics;
-using System;
 
 namespace Gravitas.Tests.Support;
 
@@ -191,18 +191,4 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
         Context.Dispose();
         _disposed = true;
     }
-}
-
-internal readonly struct ScenarioBody<TCollider>
-    where TCollider : LSCollider
-{
-    public ScenarioBody(SolidBody body, TCollider collider)
-    {
-        Body = body;
-        Collider = collider;
-    }
-
-    public SolidBody Body { get; }
-
-    public TCollider Collider { get; }
 }

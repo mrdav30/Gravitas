@@ -109,7 +109,7 @@ public sealed class TerrainChunkMigrationTests
         {
             var mesh = new LSMeshCollider(vertices, new[] { 0, 3, 1, 1, 3, 4, 1, 4, 2, 2, 4, 5 },
                 MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
-                { Material = PhysicsMaterial.Frictionless };
+            { Material = PhysicsMaterial.Frictionless };
             InitializeFloor(scene, mesh, staticBodies);
             return;
         }
@@ -117,7 +117,7 @@ public sealed class TerrainChunkMigrationTests
         {
             var mesh = new LSMeshCollider(new[] { vertices[i], vertices[i + 1], vertices[i + 3], vertices[i + 4] },
                 new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
-                { Material = PhysicsMaterial.Frictionless };
+            { Material = PhysicsMaterial.Frictionless };
             InitializeFloor(scene, mesh, staticBodies);
         }
     }

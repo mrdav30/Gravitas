@@ -1,27 +1,22 @@
 //=======================================================================
 // ContinuousCollisionMath.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
-internal static class ContinuousCollisionMath
+internal static partial class ContinuousCollisionMath
 {
     public const int RotationalIntervalMaxDepth = 12;
     public const int RotationalIntervalNodeBudget = 64;
 
-    public enum IntervalSearchStatus : byte
-    {
-        CertifiedNoHit,
-        ExactHit,
-        Unresolved,
-    }
+
 
     // Pose reconstruction uses normalized fixed-point rotations. Cover both
     // absolute operation rounding and its radius-scaled positional effect;
@@ -32,21 +27,7 @@ internal static class ContinuousCollisionMath
     private static readonly Fixed64 ClosestFeatureRelativeUncertainty =
         Fixed64.MinIncrement * 128;
 
-    public readonly struct RotationalInterval
-    {
-        public RotationalInterval(Fixed64 lowerTime, Fixed64 upperTime, int depth)
-        {
-            LowerTime = lowerTime;
-            UpperTime = upperTime;
-            Depth = depth;
-        }
 
-        public Fixed64 LowerTime { get; }
-
-        public Fixed64 UpperTime { get; }
-
-        public int Depth { get; }
-    }
 
     public static bool TryResolveRotationalSearchLimit(
         RotationalInterval interval,

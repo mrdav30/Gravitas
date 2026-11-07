@@ -1,8 +1,8 @@
+using System;
+using Chronicler.Timing;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Support;
-using System;
-using Chronicler.Timing;
 using Xunit;
 
 namespace Gravitas.Tests.Support.Coroutines;

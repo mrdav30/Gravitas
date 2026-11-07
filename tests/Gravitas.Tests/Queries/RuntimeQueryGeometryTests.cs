@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -5,8 +7,6 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Queries;
@@ -115,8 +115,11 @@ public sealed class RuntimeQueryGeometryTests
         }
         else
         {
-            var collider = new LSSphereCollider { Radius = Fixed64.One,
-                LocalOffset = new Vector3d(4095, 0, 0) };
+            var collider = new LSSphereCollider
+            {
+                Radius = Fixed64.One,
+                LocalOffset = new Vector3d(4095, 0, 0)
+            };
             var body = new SolidBody(new TestMatterAgent(context), collider);
             body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
             Fixed64 proxy = body.ResolveContinuousCollisionProxyRadius();

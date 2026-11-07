@@ -1,9 +1,9 @@
+using System;
+using System.Reflection;
 using Chronicler;
 using Chronicler.Timing;
 using FixedMathSharp;
 using Gravitas.Tests.Support;
-using System;
-using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;

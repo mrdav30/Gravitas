@@ -1,10 +1,10 @@
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -183,7 +183,7 @@ public sealed class MeshConeSurfaceBoundaryTests
     public void ApexFamily_UsesActualCornerFanAndWorldAnchors(bool reverse)
     {
         var mesh = Create(new[] { Vector3d.Zero, Vector3d.Right, Vector3d.Forward },
-            reverse ? new[] { 0,2,1 } : new[] { 0,1,2 });
+            reverse ? new[] { 0, 2, 1 } : new[] { 0, 1, 2 });
         // Standalone geometry is recentered: keep the authored first corner
         // at the cone apex rather than confusing mesh origin with this vertex.
         mesh.UpdatePosition(new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.Half), FixedQuaternion.Identity);
@@ -230,7 +230,7 @@ public sealed class MeshConeSurfaceBoundaryTests
         Assert.Throws<IndexOutOfRangeException>(() => boundary.GetFamilySampleContact(-1));
         Assert.False(boundary.TryGetFamilySampleWorldAnchors(-1, out _, out _));
         Assert.False(boundary.TryGetFamilySampleWorldAnchors(boundary.FamilySampleCount, out _, out _));
-        boundary.Build(mesh, 0, new Vector3d(0,10,0), FixedQuaternion.Identity, Fixed64.Two, Fixed64.One);
+        boundary.Build(mesh, 0, new Vector3d(0, 10, 0), FixedQuaternion.Identity, Fixed64.Two, Fixed64.One);
         Assert.Equal(0, boundary.FamilySampleCount);
     }
 
@@ -243,7 +243,7 @@ public sealed class MeshConeSurfaceBoundaryTests
         Vector3d[] vertices = axis == 0 ? new[] { Vector3d.Zero, Vector3d.Up, Vector3d.Forward }
             : axis == 1 ? new[] { Vector3d.Zero, Vector3d.Right, Vector3d.Forward }
             : new[] { Vector3d.Zero, Vector3d.Right, Vector3d.Up };
-        var mesh = Create(vertices, new[] { 0,1,2 });
+        var mesh = Create(vertices, new[] { 0, 1, 2 });
         var boundary = new MeshConeSurfaceBoundary();
         boundary.Build(mesh, 0, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, (Fixed64)4);
         Assert.True(boundary.IsolatedCount + boundary.FamilySampleCount > 0);
@@ -305,8 +305,8 @@ public sealed class MeshConeSurfaceBoundaryTests
     [InlineData(true)]
     public void ReflexCorner_WithOppositeCollinearIncidentRayKeepsOnlyPlaneSupport(bool reverseDiscovery)
     {
-        int[] triangles = reverseDiscovery ? new[] { 3,6,0, 3,5,6, 3,4,5, 3,0,1, 3,1,2 }
-            : new[] { 3,0,1, 3,1,2, 3,4,5, 3,5,6, 3,6,0 };
+        int[] triangles = reverseDiscovery ? new[] { 3, 6, 0, 3, 5, 6, 3, 4, 5, 3, 0, 1, 3, 1, 2 }
+            : new[] { 3, 0, 1, 3, 1, 2, 3, 4, 5, 3, 5, 6, 3, 6, 0 };
         var mesh = Create(new[] { new Vector3d(-2,0,-2), new Vector3d(2,0,-2),
             new Vector3d(2,0,0), Vector3d.Zero, new Vector3d(0,0,2),
             new Vector3d(-2,0,2), new Vector3d(-2,0,0) }, triangles);
@@ -338,7 +338,7 @@ public sealed class MeshConeSurfaceBoundaryTests
     public void CoveredDiagonal_IsNotAnExposedContactFeature()
     {
         var mesh = Create(new[] { new Vector3d(-4,0,-4), new Vector3d(4,0,-4),
-            new Vector3d(4,0,4), new Vector3d(-4,0,4) }, new[] { 0,1,2, 0,2,3 });
+            new Vector3d(4,0,4), new Vector3d(-4,0,4) }, new[] { 0, 1, 2, 0, 2, 3 });
         var boundary = new MeshConeSurfaceBoundary();
         boundary.Build(mesh, 0, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, (Fixed64)2);
         Assert.Equal(0, boundary.IsolatedCount);
@@ -352,7 +352,7 @@ public sealed class MeshConeSurfaceBoundaryTests
     {
         Vector3d[] vertices = { new(-2,0,-2), new(2,0,-2), new(2,0,2), new(-2,0,2),
             new(-1,0,-1), new(1,0,-1), new(1,0,1), new(-1,0,1) };
-        int[] triangles = { 0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6, 3,0,4, 3,4,7 };
+        int[] triangles = { 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7 };
         if (reverse)
             for (int i = 0; i < triangles.Length; i += 3)
                 (triangles[i + 1], triangles[i + 2]) = (triangles[i + 2], triangles[i + 1]);
@@ -383,11 +383,11 @@ public sealed class MeshConeSurfaceBoundaryTests
     [Fact]
     public void DeclinedOwners_DoNotBorrowAnotherTrianglesFan()
     {
-        Vector3d[] vertices = { new(-1,0,-1), new(1,0,-1), new(-1,0,1), new(0,1,0) };
-        var single = Create(vertices[..3], new[] { 0,1,2 });
+        Vector3d[] vertices = { new(-1, 0, -1), new(1, 0, -1), new(-1, 0, 1), new(0, 1, 0) };
+        var single = Create(vertices[..3], new[] { 0, 1, 2 });
         // Overlapping duplicates are declined; the vertical triangle sharing
         // a boundary vertex must likewise remain a separate physical owner.
-        var declined = Create(vertices, new[] { 0,1,2, 0,1,2, 0,2,3 });
+        var declined = Create(vertices, new[] { 0, 1, 2, 0, 1, 2, 0, 2, 3 });
         // PhysicsMesh positions its bounds center. Keep the tested triangle
         // at the same world plane despite the added vertical owner's bounds.
         declined.UpdatePosition(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero), FixedQuaternion.Identity);
@@ -407,7 +407,7 @@ public sealed class MeshConeSurfaceBoundaryTests
     [Fact]
     public void ReusedBoundary_ClearsOldContactsAndAllocatesZeroAfterWarmup()
     {
-        var mesh = Create(new[] { new Vector3d(-1,0,-1), new Vector3d(1,0,-1), new Vector3d(-1,0,1) }, new[] { 0,1,2 });
+        var mesh = Create(new[] { new Vector3d(-1, 0, -1), new Vector3d(1, 0, -1), new Vector3d(-1, 0, 1) }, new[] { 0, 1, 2 });
         var boundary = new MeshConeSurfaceBoundary();
         for (int i = 0; i < 8; i++)
             boundary.Build(mesh, 0, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, (Fixed64)4);
@@ -419,7 +419,7 @@ public sealed class MeshConeSurfaceBoundaryTests
             for (int j = 0; j < boundary.IsolatedCount; j++) _ = boundary.GetIsolatedContact(j);
         }
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
-        boundary.Build(mesh, 0, new Vector3d(0,10,0), FixedQuaternion.Identity, (Fixed64)4, (Fixed64)4);
+        boundary.Build(mesh, 0, new Vector3d(0, 10, 0), FixedQuaternion.Identity, (Fixed64)4, (Fixed64)4);
         Assert.Equal(0, boundary.IsolatedCount);
         Assert.Equal(0, boundary.FamilyCount);
         Assert.Throws<IndexOutOfRangeException>(() => boundary.GetIsolatedContact(0));

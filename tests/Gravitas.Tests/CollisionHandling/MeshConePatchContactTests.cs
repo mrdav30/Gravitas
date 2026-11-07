@@ -1,13 +1,13 @@
+using System;
+using System.Linq;
 using FixedMathSharp;
-using FixedMathSharp.Geometry;
 using FixedMathSharp.Assertions;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests;

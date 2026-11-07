@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -8,7 +9,6 @@ using GridForge.Configuration;
 using GridForge.Grids;
 using GridForge.Grids.Topology;
 using SwiftCollections;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Queries;
@@ -40,19 +40,19 @@ public sealed class GravitasQuery3DServiceConeTests
         var hits = new SwiftList<Physics3DHit>();
 
         foreach (bool baseCap in new[] { false, true })
-        foreach (Fixed64 gap in new[] { Fixed64.Zero, Fixed64.FromFraction(1, 64) })
-        {
-            Fixed64 axial = baseCap ? (Fixed64)(4 * scale) + radius + gap : -radius - gap;
-            transform.LocalPosition = rotation * (Vector3d.Up * axial);
-            target.Simulate();
-            bool found = context.Query3D.OverlapCone(Vector3d.Zero, rotation * Vector3d.Up,
-                (Fixed64)(4 * scale), (Fixed64)(2 * scale), out _, IncludeLayerZero);
-            int count = context.Query3D.OverlapConeAll(Vector3d.Zero, rotation * Vector3d.Up,
-                (Fixed64)(4 * scale), (Fixed64)(2 * scale), IncludeLayerZero, hits);
+            foreach (Fixed64 gap in new[] { Fixed64.Zero, Fixed64.FromFraction(1, 64) })
+            {
+                Fixed64 axial = baseCap ? (Fixed64)(4 * scale) + radius + gap : -radius - gap;
+                transform.LocalPosition = rotation * (Vector3d.Up * axial);
+                target.Simulate();
+                bool found = context.Query3D.OverlapCone(Vector3d.Zero, rotation * Vector3d.Up,
+                    (Fixed64)(4 * scale), (Fixed64)(2 * scale), out _, IncludeLayerZero);
+                int count = context.Query3D.OverlapConeAll(Vector3d.Zero, rotation * Vector3d.Up,
+                    (Fixed64)(4 * scale), (Fixed64)(2 * scale), IncludeLayerZero, hits);
 
-            found.Should().Be(gap == Fixed64.Zero, "the cap has axial gap {0} at scale {1}", gap, scale);
-            count.Should().Be(gap == Fixed64.Zero ? 1 : 0);
-        }
+                found.Should().Be(gap == Fixed64.Zero, "the cap has axial gap {0} at scale {1}", gap, scale);
+                count.Should().Be(gap == Fixed64.Zero ? 1 : 0);
+            }
     }
 
     [Theory]

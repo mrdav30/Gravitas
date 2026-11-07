@@ -1,25 +1,50 @@
 items:
   - name: Home
     href: index.md
+  - name: Guides
+    href: guides/Home.md
+    items:
+      - name: Getting Started
+        href: guides/GETTING_STARTED.md
+      - name: Technical Overview
+        href: guides/OVERVIEW.md
+      - name: Host and Runtime
+        items:
+          - name: Host Integration
+            href: guides/HOST_INTEGRATION.md
+          - name: Runtime Architecture
+            href: guides/RUNTIME_ARCHITECTURE.md
+          - name: 2D, 3D, and Runtime Modes
+            href: guides/DIMENSIONS.md
+          - name: Serialization and Replay
+            href: guides/SERIALIZATION.md
+      - name: Collision
+        items:
+          - name: Collision Pipeline
+            href: guides/COLLISION_PIPELINE.md
+          - name: Collision Broad Phase
+            href: guides/COLLISION_BROAD_PHASE.md
+          - name: Collider Shape Reference
+            href: guides/COLLIDER_SHAPE_REFERENCE.md
+          - name: Collision Response
+            href: guides/COLLISION_RESPONSE.md
+          - name: Continuous Collision Detection
+            href: guides/CONTINUOUS_COLLISION_DETECTION.md
+      - name: Queries and Diagnostics
+        items:
+          - name: Query Services
+            href: guides/QUERY_SERVICES.md
+          - name: Query Reference
+            href: guides/QUERY_REFERENCE.md
+          - name: Diagnostics
+            href: guides/DIAGNOSTICS.md
+          - name: Diagnostic Adapters
+            href: guides/DIAGNOSTIC_ADAPTERS.md
   - name: API Reference
     href: obj/api/
     homepage: obj/api/Gravitas.yml
-  - name: Guides
-    items:
-      - name: Getting Started
-        href: https://github.com/mrdav30/Gravitas/wiki/GETTING_STARTED
-      - name: Host Integration
-        href: https://github.com/mrdav30/Gravitas/wiki/HOST_INTEGRATION
-      - name: Runtime Modes
-        href: https://github.com/mrdav30/Gravitas/wiki/DIMENSIONS
-      - name: Collision Pipeline
-        href: https://github.com/mrdav30/Gravitas/wiki/COLLISION_PIPELINE
-      - name: Query Services
-        href: https://github.com/mrdav30/Gravitas/wiki/QUERY_SERVICES
   - name: Resources
     items:
-      - name: Wiki
-        href: https://github.com/mrdav30/Gravitas/wiki
       - name: Source
         href: https://github.com/mrdav30/Gravitas
       - name: Core Test Coverage

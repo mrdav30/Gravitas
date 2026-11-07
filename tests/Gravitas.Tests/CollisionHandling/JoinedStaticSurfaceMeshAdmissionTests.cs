@@ -1,9 +1,9 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests;

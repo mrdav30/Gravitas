@@ -10,44 +10,45 @@ step with 64 sleeping movers and 64 static floors in one dimension. Automatic
 grounding crosses a physical gap, so support comes from queries rather than
 contact manifolds. Both 3D-only and 2D-only populations run in their pure mode
 and in Mixed mode. Setup and cleanup check stable supported sleep and an empty
-opposite-dimensional registry. Run with `--filter '*MixedEmptyDimensionBenchmarks*'`.
+opposite-dimensional registry. Run with
+`--filter '*MixedEmptyDimensionBenchmarks*'`.
 
 `curved-prism-contact` includes separated and penetrating cone/cylinder pairs,
-plus exactly touching cone apex, cone generator and horizontal cylinder side. The
-touching fixtures validate zero depth, normal orientation and coincident finite
-witnesses in setup. An exactly representable rotation preserves the cylinder's
-horizontal axis through transform preparation, keeping its supporting plane
-exact. Contained sphere and positive-core capsule controls require depth `3/4`,
-a Down normal and finite paired witnesses for their nearest upward exit. Run all
-fourteen cases together when comparing contact optimizations so touching gains,
-containment and penetrating/separated controls remain visible.
+plus exactly touching cone apex, cone generator and horizontal cylinder side.
+The touching fixtures validate zero depth, normal orientation and coincident
+finite witnesses in setup. An exactly representable rotation preserves the
+cylinder's horizontal axis through transform preparation, keeping its supporting
+plane exact. Contained sphere and positive-core capsule controls require depth
+`3/4`, a Down normal and finite paired witnesses for their nearest upward exit.
+Run all fourteen cases together when comparing contact optimizations so touching
+gains, containment and penetrating/separated controls remain visible.
 
 The off-center crossing capsule and contained sphere opposing-face cases require
 finite paired supports in setup: shared capsule/prism tangential coordinates,
-the sphere's opposing prism face, and exact normal-times-depth displacement.
-The sphere horizontal-rim case additionally checks the finite edge point,
-diagonal normal and nearest-even rounded depth `2-sqrt(2)`.
+the sphere's opposing prism face, and exact normal-times-depth displacement. The
+sphere horizontal-rim case additionally checks the finite edge point, diagonal
+normal and nearest-even rounded depth `2-sqrt(2)`.
 
-`body-motion-type-transition` also measures registered 2D/3D mass changes.
-Each `ChangeMass` invocation assigns `0`, `2`, then `1` kilogram, including
-inertia refresh, cache/CCD invalidation, and awake membership synchronization.
-These timings represent the complete three-assignment mutation cycle.
+`body-motion-type-transition` also measures registered 2D/3D mass changes. Each
+`ChangeMass` invocation assigns `0`, `2`, then `1` kilogram, including inertia
+refresh, cache/CCD invalidation, and awake membership synchronization. These
+timings represent the complete three-assignment mutation cycle.
 
 `static-population-refresh` isolates unchanged static population from local
-contact density. One frictionless circle or sphere crosses a 16-unit floor;
-the 64-static rows add 63 remote loaded two-unit pieces in the same world
-bounds as the one-static rows. Bodyless and explicit-static owners are compared
-in pure 2D, pure 3D and mixed mode (a spatial sphere against planar slabs).
-`FullStep` reports one complete frame from a 64-frame invocation at 16 Hz,
-including the drive, `Simulate`, `LateSimulate` and physical assertions.
-`RefreshStaticShapes` reports one pass over all static colliders, without the
-moving-body step. No static surface membership is declared.
+contact density. One frictionless circle or sphere crosses a 16-unit floor; the
+64-static rows add 63 remote loaded two-unit pieces in the same world bounds as
+the one-static rows. Bodyless and explicit-static owners are compared in pure
+2D, pure 3D and mixed mode (a spatial sphere against planar slabs). `FullStep`
+reports one complete frame from a 64-frame invocation at 16 Hz, including the
+drive, `Simulate`, `LateSimulate` and physical assertions. `RefreshStaticShapes`
+reports one pass over all static colliders, without the moving-body step. No
+static surface membership is declared.
 
 `joined-static-surface-mixed-simulation` measures one moving circle, stadium or
-polygon against a vertical 3D wall represented by one continuous mesh or
-2/16/64 joined pieces. All layouts cover the same 16-unit wall. Each invocation
-runs 64 complete host frames at 16 Hz, with inward planar impulses and driven
-seam crossings; setup and every frame verify preserved tangential velocity.
+polygon against a vertical 3D wall represented by one continuous mesh or 2/16/64
+joined pieces. All layouts cover the same 16-unit wall. Each invocation runs 64
+complete host frames at 16 Hz, with inward planar impulses and driven seam
+crossings; setup and every frame verify preserved tangential velocity.
 `OperationsPerInvoke` reports time/allocation per complete frame. A horizontal
 floor alone would not exercise a 2D participant's planar mixed response.
 
@@ -56,24 +57,29 @@ floor alone would not exercise a 2D participant's planar mixed response.
 continuous embedded 2D wall or 2/16/64 declared pieces of the same wall.
 `Shape=OpenMesh, Layout=Continuous` isolates ordinary certified patch/prism
 contact; `ConcaveMesh` retains the general nonconvex surface path. It uses the
-same 64-frame, 16 Hz host loop,
-inward impulses and tangential-velocity guard. Values are per complete frame;
-these fixtures measure contact lifecycle cost rather than game capacity.
+same 64-frame, 16 Hz host loop, inward impulses and tangential-velocity guard.
+Values are per complete frame; these fixtures measure contact lifecycle cost
+rather than game capacity.
 
 `convex-mesh-cylinder-containment` measures one complete 16 Hz host step with
-one moving cylinder or sphere and one closed convex cube. Each invocation
-resets the body to its fixture position, then calls `Simulate` and
-`LateSimulate`. Contained, exterior-overlap and separated-cylinder cases plus
-a contained sphere distinguish newly corrected volume response from existing
-surface and control costs. Values are per reset-and-step invocation.
+one moving cylinder or sphere and one closed convex cube. Each invocation resets
+the body to its fixture position, then calls `Simulate` and `LateSimulate`.
+Contained, exterior-overlap and separated-cylinder cases plus a contained sphere
+distinguish whole-hull containment, exterior surface response and separated
+controls. Values are per reset-and-step invocation.
 
-`convex-mesh-curved-slab-containment` measures the corresponding mixed path:
-one planar mover and one bodyless closed convex cube, with circle, zero-core
+`convex-mesh-curved-slab-containment` measures the corresponding mixed path: one
+planar mover and one bodyless closed convex cube, with circle, zero-core
 capsule, aligned positive-core capsule and yawed positive-core capsule cases.
 Odd authored vertices with odd source scale also exercise the affine path.
-Exterior and separated controls retain the surface path. Every invocation
-resets position and runs both host phases; the original contained payload
-misses response and therefore performs different work from the corrected one.
+Exterior and separated controls retain the surface path. Every invocation resets
+position and runs both host phases. Compare identical geometry and
+classifications across revisions; a baseline that misses the contained contact
+performs different work. The
+[mixed containment closeout](../../docs/feature-work/done/2026-10-30-mixed-curved-slab-containment-closeout.md)
+and
+[cylinder containment closeout](../../docs/feature-work/done/2026-10-30-convex-mesh-cylinder-containment-closeout.md)
+retain the implementation history.
 
 ## Requirements
 
@@ -149,7 +155,7 @@ When validating unreleased sibling libraries, build the runner explicitly in
 source mode:
 
 ```powershell
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0 -p:UseLocalLsfStack=true -p:BuildInParallel=false -m:1
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0 -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true -p:BuildInParallel=false -m:1
 dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll world-context --filter '*RunEmptySimulationFrame*' --job Dry
 ```
 
@@ -158,18 +164,19 @@ disables implicit transitive project references that bypass the explicitly
 versioned source edges, and serializes those project builds. No launch-time
 environment variable is required. Generated jobs retain the runner's build
 configuration: to check Lean, replace `Release` with `ReleaseLean` in both
-commands. CLI job choices such as `Dry` still apply. Dry runs validate execution,
-not throughput. Package mode remains the default and is a separate release gate.
+commands. CLI job choices such as `Dry` still apply. Dry runs validate
+execution, not throughput. Package mode remains the default and is a separate
+release gate.
 
 For ordinary .NET 10 jobs and explicit `--runtimes net10.0`, the generated host
-uses the project path recorded when the runner was built. Archived projects
-with the same name therefore do not affect discovery. Source mode also supplies
+uses the project path recorded when the runner was built. Archived projects with
+the same name therefore do not affect discovery. Source mode also supplies
 explicit compile/runtime references to the dependencies resolved by the runner,
-while retaining the versioned source graph and stock SDK/JIT validation.
-`--cli` and `--packages` retain their normal meanings. In-process, CoreRun and
-other explicitly selected runtime toolchains remain under BenchmarkDotNet's
-control, including their own project-discovery behavior. Rebuild the runner
-after relocating its source project.
+while retaining the versioned source graph and stock SDK/JIT validation. `--cli`
+and `--packages` retain their normal meanings. In-process, CoreRun and other
+explicitly selected runtime toolchains remain under BenchmarkDotNet's control,
+including their own project-discovery behavior. Rebuild the runner after
+relocating its source project.
 
 ### Fast development check
 
@@ -188,20 +195,20 @@ Do not treat short-run numbers as canonical measurements.
 The `circle-contact-simulation` selection measures 64, 256 and 1024 independent
 dynamic/static circle pairs with axis-aligned, diagonal and rotated geometry.
 `CellSize` selects one- or 16-unit X/Z cells with one-unit Y cells; pair spacing
-stays at 16 units. The full matrix has 36 rows across both measured methods.
-Use 16-unit cells for sustained contact controls and unit cells to expose
-coverage fanout. PairCount is half the total number of colliders.
+stays at 16 units. The full matrix has 36 rows across both measured methods. Use
+16-unit cells for sustained contact controls and unit cells to expose coverage
+fanout. PairCount is half the total number of colliders.
 `ResetAndFullSimulationStep` runs both context `Simulate` and `LateSimulate`,
 including broad phase, contact generation, response and bookkeeping. Each
-invocation resets dynamic pose and all accumulated motion; sleep is disabled
-so repeated invocations retain the same contact workload. Setup verifies known
+invocation resets dynamic pose and all accumulated motion; sleep is disabled so
+repeated invocations retain the same contact workload. Setup verifies known
 contact depths/normals, one active contact per pair, candidate counts and
 repeatable post-response body state across warmed frames.
 
 `ResetAndDetectContacts` measures the same pose reset plus direct dispatcher
 queries over those pairs. Both rows include reset cost; their difference is
-useful attribution evidence, not an exact measurement of any single stage.
-The `circle-contact` selection remains the individual-query geometry baseline.
+useful attribution evidence, not an exact measurement of any single stage. The
+`circle-contact` selection remains the individual-query geometry baseline.
 
 ```powershell
 dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll circle-contact-simulation --filter '*CellSize: 16)*' --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 500 --affinity 3 --exporters json --artifacts artifacts/circle-contact-coarse
@@ -219,8 +226,8 @@ contact/candidate per pair.
 `RegisterCirclePairs` constructs and registers bodies/colliders into a fresh
 context once per iteration. Context/grid and array creation happen outside the
 measurement; registration allocations are intentional and exclude grid setup.
-Cleanup validates the registered scene and disposes it outside measurement.
-The warmed rows separate translated pose reset plus partition refresh, forced
+Cleanup validates the registered scene and disposes it outside measurement. The
+warmed rows separate translated pose reset plus partition refresh, forced
 automatic grounding probes, and retained-candidate distribution. These ground
 probes run at reset poses and find no support from the above-body targets.
 `DistributeRetainedCandidates` retains processed pair keys to isolate partition
@@ -231,25 +238,26 @@ narrow phase and response. Use `circle-contact-simulation` for full-step costs.
 dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll cold-circle-registration circle-partition-maintenance --filter '*' --exporters json
 ```
 
-These are manual scaling selections. Fine-cell cold registration can be very
-expensive before retained-partition scaling fixes; use filtered small counts
-when capturing the historical baseline. Compare allocation results per stage,
-and retain the cell size and collider count beside timing results.
+These are manual scaling selections. Fine-cell cold registration has high
+voxel-membership fanout; start with filtered small counts and retain cell size,
+collider count, per-stage allocation and timing beside results.
 
 `circle-automatic-grounding` isolates automatic probes at corrected poses after
 one full simulation step. `PairCount` is 64 or 1024 dynamic/static pairs, twice
-as many colliders, with 16-unit X/Z cells. Correction retains slop, so the paired
-target remains an initial full-radius overlap whose normal rejects support.
-Subsequent grid rows can find the preceding row's circle below them. Setup checks
-`PairCount - 32` supported bodies and stable results across repeated probes.
-The measured operation includes no pose reset or simulation step.
+as many colliders, with 16-unit X/Z cells. Correction retains slop, so the
+paired target remains an initial full-radius overlap whose normal rejects
+support. Subsequent grid rows can find the preceding row's circle below them.
+Setup checks `PairCount - 32` supported bodies and stable results across
+repeated probes. The measured operation includes no pose reset or simulation
+step.
 
 `circle-ground-query-selection` compares collect/sort/filter with nearest
 accepted grounding selection on those same corrected poses. Both paths reuse
 prepared segments and apply the body's support policy. Setup compares every
 complete hit witness and the 32/992 supported bodies at 64/1024 pairs. Timed
 methods return the selected-owner/count checksum and include query selection
-only; ground-state writes and diagnostics belong to `circle-automatic-grounding`.
+only; ground-state writes and diagnostics belong to
+`circle-automatic-grounding`.
 
 `planar-scale-capture` compares the existing scale/admission capture with and
 without materializing host yaw at zero and one radian. Both paths use the same
@@ -262,15 +270,15 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll cir
 
 `partition-membership` compares existing sparse, hash and packed collection
 owners at 1, 8 and 64 local IDs starting at global ID 65536. It measures one
-add/remove plus sorted copy after warmup, with no managed allocations. Hash
-membership avoids global-ID-sized storage and wins the one-ID row; sparse
-membership is faster in the denser microbenchmarks. Keep this tradeoff visible
-when interpreting integrated partition results.
+add/remove plus sorted copy after warmup. Compare time, retained storage and
+managed allocation at each density; the winner of one microbenchmark row does
+not establish integrated partition performance.
 
 Publish geometry, cell size, pair/collider counts, coverage memberships and
 emitted/accepted candidates beside matched timing and allocation results.
 GRV-Benchmark-023 uses predictable scaling and published costs as its closure
-criterion, with no fixed-Hz target. Experiment history and uncertainty belong in the
+criterion, with no fixed-Hz target. Experiment history and uncertainty belong in
+the
 [benchmark backlog](../../docs/feature-work/benchmark-signal-hardening-backlog.md#grv-benchmark-023--circle-workload-partition-and-grounding-scaling)
 rather than these runner instructions. Use `UseLocalLsfStack=true` for the
 unreleased coordinated stack, and identical job settings with separate artifact
@@ -304,30 +312,31 @@ The paired `CylinderContact` rows use equivalent 3D cylinders to check whether
 expensive geometry affects both paths. They compare complete wrappers: the 3D
 path also validates inputs and updates its manifold, so their difference is not
 an isolated measurement of mixed integration overhead. Setup verifies both
-classifications, depth agreement and the independently known quarter-unit depths.
-Historical selected-axis results include false contacts and nonminimum depths;
-their timings are implementation costs, not equivalent-correctness targets.
-These are individual narrow-phase queries, not complete simulation frames.
+classifications, depth agreement and the independently known quarter-unit
+depths. Historical selected-axis results include false contacts and nonminimum
+depths; their timings are implementation costs, not equivalent-correctness
+targets. These are individual narrow-phase queries, not complete simulation
+frames.
 
 ### Sphere/capsule mesh contacts
 
 The `convex-mesh-sphere-contact` selection compares spheres with equivalent
-zero-core capsules against a closed convex cube: containment, exterior face
-and edge overlap, and separation. Setup verifies the single volume contact and
-known cardinal depths. These fixtures measure complete whole-shape contacts;
-concave surface contacts remain a separate workload.
+zero-core capsules against a closed convex cube: containment, exterior face and
+edge overlap, and separation. Setup verifies the single volume contact and known
+cardinal depths. These fixtures measure complete whole-shape contacts; concave
+surface contacts remain a separate workload.
 
 The `curved-mesh-surface-contact` selection measures sphere and capsule contacts
 against a two-triangle concave quad, with interior and exposed-edge poses. Each
 row includes direct narrow-phase dispatch, exact contact admission, covered-seam
-filtering and manifold construction. It measures one contact query rather than
-a complete simulation frame; compare the same shape and pose across revisions.
+filtering and manifold construction. It measures one contact query rather than a
+complete simulation frame; compare the same shape and pose across revisions.
 
 ### Mesh/cone contacts
 
 The `mesh-cone-contact` selection measures base, side, apex, oblique-rim,
-interior stationary-rim, touching/separated and full-domain contacts through mesh
-dispatch. Setup verifies classification and the known exact depths before
+interior stationary-rim, touching/separated and full-domain contacts through
+mesh dispatch. Setup verifies classification and the known exact depths before
 timing; the unrepresentable-relative-center case checks intersection without
 forcing a narrowed center. Compare individual rows rather than averaging
 ordinary face contacts with curved-feature work.
@@ -369,8 +378,9 @@ or circles find a candidate but the real mover shape rejects the contact.
 
 Use `continuous-collision-toi-iteration` when comparing the bounded same-frame
 TOI solver. The selection runs pure 2D and pure 3D two-contact static scenes
-with `ContinuousCollisionMaxToiIterations` values of `1`, `2`, and `4`, so the
-old first-hit clamp shape remains measurable as the `1`-iteration configuration:
+with `ContinuousCollisionMaxToiIterations` values of `1`, `2`, and `4`. The
+one-iteration setting is the single-TOI control for the two- and four-iteration
+configurations:
 
 ```bash
 dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll continuous-collision-toi-iteration --filter "*ToiIteration*" --exporters json
@@ -463,20 +473,20 @@ to add or tighten explicit allocation tests before changing the algorithm.
 | `query-projection-scaling`               | X/Z `OverlapCircleAll` scaling across dense and sparse grids as the semantically irrelevant world Y range grows.                                                                                                                                                                        |
 | `dynamic-candidate-index-update-scaling` | Translation-only update and update-plus-query cost for the unique widest 3D and planar candidate as index population grows.                                                                                                                                                             |
 | `radial-raycast`                         | Direct sphere, capsule, and finite-cylinder segment intervals; swept-sphere capsule/cylinder reduction; and mixed circle-slab reduction at ordinary and saturation-prone Q32.32 scales.                                                                                                 |
-| `mixed-curved-scalar-limit` | Mixed circle-slab admission against capsules, cylinders and cones at ordinary coordinates and both X scalar limits, with contained and entering starts. Setup verifies contact admission; measurement isolates the reducer from grid traversal. |
+| `mixed-curved-scalar-limit`              | Mixed circle-slab admission against capsules, cylinders and cones at ordinary coordinates and both X scalar limits, with contained and entering starts. Setup verifies contact admission; measurement isolates the reducer from grid traversal.                                         |
 | `simulation-allocation`                  | `SolidBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation.                                                                                                                                                                  |
 | `continuous-collision`                   | Discrete fast body movement baseline and opt-in CCD sweep/clamp against thin static geometry.                                                                                                                                                                                           |
 | `kinematic-active-ccd-scaling`           | host-driven kinematic active-source CCD rows for no-hit, first-hit, dense-hit, rotational, and mixed source scenarios.                                                                                                                                                                  |
 | `collision-partition`                    | dynamic/static registration and partitioning, partitioned simulation, and reset plus dynamic re-registration churn.                                                                                                                                                                     |
 | `collision-detection`                    | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, cuboid/capsule, mesh/capsule, mesh/cylinder, mesh/cuboid, mesh/mesh, and compound/primitive checks.                                                      |
-| `mesh-cylinder-contact`                  | One-triangle finite-cylinder and mixed circle-slab contacts: cap, side, off-center cap intrusion, oblique rim, exact rim touch, and separated rim. Setup checks contact classification and independently known depths before measurement. |
-| `capsule-slab-contact` | Mixed capsule/nonzero-core stadium-slab contacts: cap, side, straight rim, separated rim, rounded end, containment, and oblique negative/positive/irrational rim winners plus an analytic winner with nonwinning curved roots. Setup checks independently derived whole-shape depths. |
+| `mesh-cylinder-contact`                  | One-triangle finite-cylinder and mixed circle-slab contacts: cap, side, off-center cap intrusion, oblique rim, exact rim touch, and separated rim. Setup checks contact classification and independently known depths before measurement.                                               |
+| `capsule-slab-contact`                   | Mixed capsule/nonzero-core stadium-slab contacts: cap, side, straight rim, separated rim, rounded end, containment, and oblique negative/positive/irrational rim winners plus an analytic winner with nonwinning curved roots. Setup checks independently derived whole-shape depths.   |
 | `collision-response`                     | manifold response solver cost across single-contact, face-manifold, resting face-manifold, cylinder-contact, and mesh-contact prepared pairs, with pair-count scaling.                                                                                                                  |
 | `mixed-collision-response`               | constrained mixed 3D/2D response cost for prepared sphere/circle contacts, including single-pass pairs and bounded mixed-iteration loops.                                                                                                                                               |
 | `diagnostics`                            | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture.                                                                                                                                                                     |
 | `partition-culling`                      | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement.                                                                                                                                                        |
 | `physics-2d`                             | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, direct two-contact manifold response, convex/convex two-contact manifold detection, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
-| `circle-contact` | Direct pure-2D circle contacts: axis-aligned, diagonal, rotated, coincident, large-coordinate overlap and bounds-admitted separation. Setup checks known classification, normal, depth and clamping before measurement. |
+| `circle-contact`                         | Direct pure-2D circle contacts: axis-aligned, diagonal, rotated, coincident, large-coordinate overlap and bounds-admitted separation. Setup checks known classification, normal, depth and clamping before measurement.                                                                 |
 | `replay-hash`                            | deterministic authoritative replay hash cost for sparse 3D, dense 3D, pure 2D, mixed, and cache-inclusive solver/hash modes.                                                                                                                                                            |
 
 `continuous-collision-evidence` and `continuous-collision-toi-iteration` are
@@ -502,8 +512,8 @@ four same-normal samples, and two independent normal groups. Frozen rotation
 isolates linear constraints under the same material and solver settings. Each
 iteration starts with fresh motion and zero cached impulses; detection and setup
 are outside the response measurement. Results are batches of `PairCount` solves,
-not per-pair times. The single row uses one solver sweep; multipoint controls use
-the configured iteration budget.
+not per-pair times. The single row uses one solver sweep; multipoint controls
+use the configured iteration budget.
 
 Storage controls cover one, nine and 64 groups of four samples. Cold pair
 allocation is measured separately from retained regeneration and alternating

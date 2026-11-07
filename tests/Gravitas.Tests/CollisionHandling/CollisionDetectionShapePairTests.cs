@@ -1,13 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
-using SwiftCollections;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;

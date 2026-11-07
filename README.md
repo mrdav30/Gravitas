@@ -1,11 +1,11 @@
 # Gravitas
 
-![Gravitas icon](icon.png)
+![Gravitas icon](https://raw.githubusercontent.com/mrdav30/Gravitas/main/icon.png)
 
 **Deterministic fixed-point physics for lockstep games and simulations.**
 
-[![Build](https://github.com/mrdav30/Gravitas/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/mrdav30/Gravitas/actions/workflows/build-and-test.yml)
-[![Branch Coverage](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmrdav30.github.io%2FGravitas%2Fcoverage%2FSummary.json&query=%24.summary.branchcoverage&suffix=%25&label=branch%20coverage&color=brightgreen)](https://mrdav30.github.io/Gravitas/coverage/)
+[![Build](https://github.com/mrdav30/Gravitas/actions/workflows/build-and-test.yml/badge.svg?branch=main)](https://github.com/mrdav30/Gravitas/actions/workflows/build-and-test.yml)
+[![Coverage](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmrdav30.github.io%2FGravitas%2Fcoverage%2FSummary.json&query=%24.summary.branchcoverage&suffix=%25&label=coverage&color=brightgreen)](https://mrdav30.github.io/Gravitas/coverage/)
 [![NuGet](https://img.shields.io/nuget/v/Gravitas.svg)](https://www.nuget.org/packages/Gravitas)
 [![API](https://img.shields.io/badge/docs-API-f4511e)](https://mrdav30.github.io/Gravitas/)
 [![License](https://img.shields.io/github/license/mrdav30/Gravitas.svg)](LICENSE)
@@ -28,16 +28,18 @@ renderer-neutral diagnostics.
   ragdolls.
 - **Continuous static environments.** Declare exact continuity between bounded
   mesh or planar pieces while retaining collider identities, materials and
-  spatial partitions. See [static surfaces](docs/wiki/HOST_INTEGRATION.md#continuous-static-surfaces).
+  spatial partitions. See
+  [static surfaces](https://mrdav30.github.io/Gravitas/guides/HOST_INTEGRATION.html#continuous-static-surfaces).
 - **No engine lock-in.** Hosts provide transforms and lifecycle calls through a
   small adapter boundary; Gravitas owns no renderer, scene graph, or ECS.
 - **Tools without hidden state.** Context-local queries, replay hashes,
   diagnostic events, and debug-draw commands make simulation behavior visible
   without changing it.
 
-Runtime geometry follows an explicit [supported size contract](docs/wiki/DIMENSIONS.md#supported-geometry):
-an inclusive `4,096`-unit conservative reach per collider or context query source,
-independent of world position and travel distance.
+Runtime geometry follows an explicit
+[supported size contract](https://mrdav30.github.io/Gravitas/guides/DIMENSIONS.html#supported-geometry):
+an inclusive `4,096`-unit conservative reach per collider or context query
+source, independent of world position and travel distance.
 
 ## Install
 
@@ -83,7 +85,7 @@ context.LateVisualize();
 ```
 
 The full
-[Getting Started guide](https://github.com/mrdav30/Gravitas/wiki/GETTING_STARTED)
+[Getting Started guide](https://mrdav30.github.io/Gravitas/guides/GETTING_STARTED.html)
 creates the grid, host adapter, collider, and dynamic body behind that loop.
 
 ## What You Can Build
@@ -103,16 +105,17 @@ for the updated imports and guard names.
 
 ## Documentation
 
-- [Getting Started](https://github.com/mrdav30/Gravitas/wiki/GETTING_STARTED) —
-  build and step your first world.
-- [GitHub Wiki](https://github.com/mrdav30/Gravitas/wiki) — understand host
-  integration, dimensions, collisions, queries, replay, and diagnostics.
+- [Getting Started](https://mrdav30.github.io/Gravitas/guides/GETTING_STARTED.html)
+  — build and step your first world.
+- [Guides](https://mrdav30.github.io/Gravitas/guides/Home.html) — understand
+  host integration, dimensions, collisions, queries, replay, and diagnostics.
 - [API Reference](https://mrdav30.github.io/Gravitas/api/Gravitas.html) — browse
   public namespaces, types, and members.
 - [Coverage Report](https://mrdav30.github.io/Gravitas/coverage/) — inspect the
   current test-suite coverage.
-- [Migration Guide](https://github.com/mrdav30/Gravitas/blob/main/docs/MIGRATION.md) — update body mass access, Chronicler imports,
-  clock consumers, and persisted timing data across intentional contract changes.
+- [Migration Guide](https://github.com/mrdav30/Gravitas/blob/main/docs/MIGRATION.md)
+  — update body mass access, Chronicler imports, clock consumers, and persisted
+  timing data across intentional contract changes.
 - [Contributing](CONTRIBUTING.md) — build, test, and prepare a focused change.
 
 ## Built On The LSF Stack

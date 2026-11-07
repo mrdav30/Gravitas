@@ -5,14 +5,13 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System.Runtime.CompilerServices;
 using Gravitas.Colliders;
 using SwiftCollections;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
-internal sealed class ColliderRegistry<TCollider>
+internal sealed partial class ColliderRegistry<TCollider>
     where TCollider : class, IPhysicsColliderRegistryItem
 {
     private readonly SwiftSlotMap<TCollider> _byId;
@@ -127,10 +126,5 @@ internal sealed class ColliderRegistry<TCollider>
         _liveColliders.RemoveAt(lastIndex);
     }
 
-    internal readonly struct ReplayOrderComparer : IComparer<TCollider>
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Compare(TCollider? x, TCollider? y) =>
-            x!.ReplayOrder.CompareTo(y!.ReplayOrder);
-    }
+
 }

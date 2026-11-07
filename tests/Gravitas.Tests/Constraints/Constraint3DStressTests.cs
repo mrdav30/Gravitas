@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -6,7 +7,6 @@ using Gravitas.Constraints;
 using Gravitas.Diagnostics;
 using Gravitas.Tests.Determinism;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Constraints;

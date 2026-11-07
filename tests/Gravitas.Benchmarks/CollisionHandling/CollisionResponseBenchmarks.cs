@@ -1,14 +1,14 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
-using System;
 
 namespace Gravitas.Benchmarks;
 
 [MemoryDiagnoser]
-public class CollisionResponseBenchmarks
+public partial class CollisionResponseBenchmarks
 {
     private static readonly Fixed64 StandardSpeed = Fixed64.FromFraction(15, 8);
     private static readonly Fixed64 RestingSpeed = Fixed64.FromFraction(3, 32);
@@ -276,24 +276,9 @@ public class CollisionResponseBenchmarks
         public TCollider Collider { get; }
     }
 
-    public enum ResponseContactShape
-    {
-        SingleContact,
-        FaceManifold,
-        RestingFaceManifold,
-        CylinderContact,
-        MeshContact,
-        CompoundPartContact,
-        GroupSingle,
-        GroupRedundant,
-        GroupIndependent
-    }
 
-    public enum ResponseMaterialMode
-    {
-        Default,
-        Distinct
-    }
+
+
 
     private static readonly PhysicsMaterial RoughSurface = new(
         (Fixed64)2,

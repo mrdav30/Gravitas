@@ -215,7 +215,7 @@ public sealed class MeshCapsuleFaceRegionsTests
             new Vector3d(-2,0,-2), new Vector3d(2,0,-2), new Vector3d(2,0,2), new Vector3d(-2,0,2),
             new Vector3d(-Fixed64.Half,Fixed64.Zero,-Fixed64.Half), new Vector3d(Fixed64.Half,Fixed64.Zero,-Fixed64.Half),
             new Vector3d(Fixed64.Half,Fixed64.Zero,Fixed64.Half), new Vector3d(-Fixed64.Half,Fixed64.Zero,Fixed64.Half)
-        }, new[] { 0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6, 3,0,4, 3,4,7 },
+        }, new[] { 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7 },
             Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
         var horizontal = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized;
         var connectivity = new MeshSurfaceConnectivity();
@@ -278,7 +278,7 @@ public sealed class MeshCapsuleFaceRegionsTests
         var coarse = new PhysicsMesh(corners, new[] { 0, 1, 2, 0, 2, 3 },
             Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
         var refined = new PhysicsMesh(new[] { corners[0], corners[1], corners[2], corners[3], Vector3d.Zero },
-            new[] { 0,1,4, 1,2,4, 2,3,4, 3,0,4 }, Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
+            new[] { 0, 1, 4, 1, 2, 4, 2, 3, 4, 3, 0, 4 }, Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
         FixedQuaternion rotation = FixedQuaternion.LookRotation(new Vector3d(1, 0, 1).Normalized,
             new Vector3d(1, 1, -1).Normalized);
         var connectivity = new MeshSurfaceConnectivity();
@@ -314,7 +314,7 @@ public sealed class MeshCapsuleFaceRegionsTests
         var coarse = new PhysicsMesh(corners, new[] { 0, 1, 2, 0, 2, 3 },
             Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
         var refined = new PhysicsMesh(new[] { corners[0], corners[1], corners[2], corners[3], Vector3d.Zero },
-            new[] { 0,1,4, 1,2,4, 2,3,4, 3,0,4 }, Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
+            new[] { 0, 1, 4, 1, 2, 4, 2, 3, 4, 3, 0, 4 }, Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
         var connectivity = new MeshSurfaceConnectivity();
         var baseline = new MeshCapsuleFaceRegions();
         var subdivided = new MeshCapsuleFaceRegions();

@@ -1,8 +1,6 @@
 # Gravitas Migration Guide
 
-## Upcoming release
-
-### Shared diagnostics extraction
+## Shared diagnostics extraction
 
 Shared logging and exception guards now come from the independent
 `Chronicler.Diagnostics` package (v1.0.0), in both standard and Lean builds.
@@ -25,8 +23,8 @@ Runtime colliders, standalone meshes and context query sources share an
 inclusive `4,096`-world-unit conservative reach budget. Effective scale is
 applied before admission, so large authored geometry can still be scaled down.
 World position and swept travel are independent of this size budget. The
-[supported geometry contract](wiki/DIMENSIONS.md#supported-geometry) lists the
-shape formulas, attachment frames and mixed-thickness rule.
+[supported geometry contract](api/guides/DIMENSIONS.md#supported-geometry) lists
+the shape formulas, attachment frames and mixed-thickness rule.
 
 Split oversized terrain into admitted, recentered chunks or adopt consistent
 host length units. Do not group widely separated chunks under one body and
@@ -41,14 +39,15 @@ supported geometry is a real-time workload target.
 Numeric query sources and explicit ground-probe radii enforce the supported
 `4,096`-unit reach budget. Validate authored workloads before issuing queries;
 oversized geometry now throws instead of tracing. Long rays and travel of small
-sources retain their existing contracts. See [query geometry admission](wiki/QUERY_SERVICES.md#query-geometry-admission)
+sources retain their existing contracts. See
+[query geometry admission](api/guides/QUERY_SERVICES.md#query-geometry-admission)
 for polygon, cone and mixed-slab measurements and batch failure semantics.
 
 Use a separate mutable `PhysicsSettings` instance for each simultaneous context.
 `ApplySettings` rejects an instance already bound elsewhere; replacement or
 disposal releases it. Apply settings and change dimensional mode/mixed thickness
-between fixed steps. Invalid mixed envelopes reject before configuration changes.
-Recorded schemas and field keys are unchanged.
+between fixed steps. Invalid mixed envelopes reject before configuration
+changes. Recorded schemas and field keys are unchanged.
 
 ## Runtime mass changes
 
@@ -64,13 +63,13 @@ and CCD state, wake, and synchronize pure/mixed awake membership. No-op
 assignments preserve sleep. Changed values reject during simulation callbacks,
 an open fixed step, or after a registration reset. Non-positive mass has zero
 applicable inverse mass/inertia and retains the explicit body role. Mass set
-before initialization or after deactivation is configuration; inertia is
-derived at initialization. Saved-state loading preserves recorded sleep.
+before initialization or after deactivation is configuration; inertia is derived
+at initialization. Saved-state loading preserves recorded sleep.
 
 Existing velocities and accepted accelerations are preserved. Inputs already
 converted to acceleration are not rescaled. See
-[host integration](wiki/HOST_INTEGRATION.md#runtime-mass-changes) for the complete
-contract.
+[host integration](api/guides/HOST_INTEGRATION.md#runtime-mass-changes) for the
+complete contract.
 
 ## Partition membership ownership
 
@@ -115,9 +114,8 @@ source references use the evergreen identities centralized in
 references aligned to prevent runtime assembly-load failures. After the
 SwiftCollections and GridForge alignments are committed and pushed, refresh
 their immutable CI pins together with FixedMathSharp and Chronicler. Validate
-both configurations against released
-upstream packages before publishing; source-mode packages remain development
-artifacts.
+both configurations against released upstream packages before publishing;
+source-mode packages remain development artifacts.
 
 When building Gravitas with Chronicler v1.0.0, import `Chronicler.Hashing` for
 `ChronicleHash` returned by `GravitasWorldContext.ComputeReplayHash()` and for
@@ -177,6 +175,7 @@ Replay hashes include the widened timing fields under the new domain schema. Old
 and new hashes are not comparable; regenerate expected traces from verified
 simulation inputs, not by replacing failing hash literals blindly.
 
-See [Runtime Architecture](wiki/RUNTIME_ARCHITECTURE.md#clock-state),
-[Host Integration](wiki/HOST_INTEGRATION.md), and
-[Serialization And Replay](wiki/SERIALIZATION.md) for the current contracts.
+See [Runtime Architecture](api/guides/RUNTIME_ARCHITECTURE.md#clock-state),
+[Host Integration](api/guides/HOST_INTEGRATION.md), and
+[Serialization And Replay](api/guides/SERIALIZATION.md) for the current
+contracts.

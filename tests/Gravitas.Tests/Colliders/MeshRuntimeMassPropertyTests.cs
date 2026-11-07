@@ -44,16 +44,16 @@ public sealed class MeshRuntimeMassPropertyTests
         MeshInertiaPolicy policy = Policy(surface);
         var collider = new LSMeshCollider(vertices, triangles, MeshColliderMode.Convex, policy);
         foreach (long massRaw in new[] { 3L, 6L, 123456789012L, 4294967296000000000L })
-        foreach (Vector3d reference in new[] { Vector3d.Zero, new Vector3d(Fixed64.Half, -Fixed64.Quarter, Fixed64.One) })
-        {
-            Fixed64 mass = Fixed64.FromRaw(massRaw);
-            collider.Mesh.CalculateInertiaTensor(mass, policy, reference)
-                .Should().Be(SimplexTensor(a, b, c, massRaw, surface, reference));
-            // The collider reference is body-local; the mesh reference is in its centered geometry frame.
-            Vector3d bodyReference = collider.LocalOffset + reference;
-            collider.CalculateInertiaTensor(mass, bodyReference)
-                .Should().Be(SimplexTensor(a, b, c, massRaw, surface, reference));
-        }
+            foreach (Vector3d reference in new[] { Vector3d.Zero, new Vector3d(Fixed64.Half, -Fixed64.Quarter, Fixed64.One) })
+            {
+                Fixed64 mass = Fixed64.FromRaw(massRaw);
+                collider.Mesh.CalculateInertiaTensor(mass, policy, reference)
+                    .Should().Be(SimplexTensor(a, b, c, massRaw, surface, reference));
+                // The collider reference is body-local; the mesh reference is in its centered geometry frame.
+                Vector3d bodyReference = collider.LocalOffset + reference;
+                collider.CalculateInertiaTensor(mass, bodyReference)
+                    .Should().Be(SimplexTensor(a, b, c, massRaw, surface, reference));
+            }
     }
 
     [Theory]
@@ -168,9 +168,9 @@ public sealed class MeshRuntimeMassPropertyTests
         foreach (Vector3d reference in new[] {
             new Vector3d(Fixed64.MaxValue, Fixed64.MinValue, Fixed64.Zero),
             new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero) })
-        foreach (long massRaw in new[] { 1L, 2L, -1L, long.MinValue })
-            mesh.CalculateInertiaTensor(Fixed64.FromRaw(massRaw), Policy(surface), reference).Should()
-                .Be(BoxTensor(Vector3d.One, massRaw, surface, Vector3d.Zero, reference));
+            foreach (long massRaw in new[] { 1L, 2L, -1L, long.MinValue })
+                mesh.CalculateInertiaTensor(Fixed64.FromRaw(massRaw), Policy(surface), reference).Should()
+                    .Be(BoxTensor(Vector3d.One, massRaw, surface, Vector3d.Zero, reference));
     }
 
     [Theory]
@@ -390,20 +390,20 @@ public sealed class MeshRuntimeMassPropertyTests
         BigInteger denominator = 12 * total * (BigInteger.One << 64) * centerDenominator * centerDenominator;
         Fixed64[] entries = new Fixed64[9];
         for (int row = 0; row < 3; row++)
-        for (int col = 0; col < 3; col++)
-        {
-            BigInteger numerator = -12 * total * d[row] * d[col];
-            if (row == col)
+            for (int col = 0; col < 3; col++)
             {
-                int j = (row + 1) % 3, k = (row + 2) % 3;
-                BigInteger j2 = s[j] * s[j], k2 = s[k] * s[k];
-                numerator = surface ? area[row] * (j2 + k2) + area[j] * (3 * j2 + k2)
-                    + area[k] * (j2 + 3 * k2) : j2 + k2;
-                numerator *= centerDenominator * centerDenominator;
-                numerator += 12 * total * (d[j] * d[j] + d[k] * d[k]);
+                BigInteger numerator = -12 * total * d[row] * d[col];
+                if (row == col)
+                {
+                    int j = (row + 1) % 3, k = (row + 2) % 3;
+                    BigInteger j2 = s[j] * s[j], k2 = s[k] * s[k];
+                    numerator = surface ? area[row] * (j2 + k2) + area[j] * (3 * j2 + k2)
+                        + area[k] * (j2 + 3 * k2) : j2 + k2;
+                    numerator *= centerDenominator * centerDenominator;
+                    numerator += 12 * total * (d[j] * d[j] + d[k] * d[k]);
+                }
+                entries[row * 3 + col] = Rounded(massRaw * numerator, denominator);
             }
-            entries[row * 3 + col] = Rounded(massRaw * numerator, denominator);
-        }
         return Matrix(entries);
     }
 
@@ -419,13 +419,13 @@ public sealed class MeshRuntimeMassPropertyTests
             .Select(i => 2 * lengths[i] * lengths[i] - 2 * factor * lengths[i] * r[i] + divisor * r[i] * r[i]).ToArray();
         Fixed64[] entries = new Fixed64[9];
         for (int row = 0; row < 3; row++)
-        for (int col = 0; col < 3; col++)
-        {
-            BigInteger n = row == col ? second[(row + 1) % 3] + second[(row + 2) % 3]
-                : -lengths[row] * lengths[col] + factor * (lengths[row] * r[col] + lengths[col] * r[row])
-                    - divisor * r[row] * r[col];
-            entries[row * 3 + col] = Rounded(massRaw * n, divisor * (BigInteger.One << 64));
-        }
+            for (int col = 0; col < 3; col++)
+            {
+                BigInteger n = row == col ? second[(row + 1) % 3] + second[(row + 2) % 3]
+                    : -lengths[row] * lengths[col] + factor * (lengths[row] * r[col] + lengths[col] * r[row])
+                        - divisor * r[row] * r[col];
+                entries[row * 3 + col] = Rounded(massRaw * n, divisor * (BigInteger.One << 64));
+            }
         return Matrix(entries);
     }
 

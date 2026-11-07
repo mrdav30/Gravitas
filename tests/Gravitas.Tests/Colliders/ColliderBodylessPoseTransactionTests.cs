@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using FluentAssertions;
@@ -5,7 +6,6 @@ using Gravitas.Colliders;
 using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
 using GridForge.Spatial;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;

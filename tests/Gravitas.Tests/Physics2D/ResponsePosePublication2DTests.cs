@@ -2,9 +2,7 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Materials;
 using Gravitas.Queries;
-using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -148,7 +146,7 @@ public sealed class ResponsePosePublication2DTests
     {
         if (mixed)
             scene.InitializeStaticCollider(new LSCuboidCollider
-                { Size = new(16, 4, 2), Material = PhysicsMaterial.Frictionless }, new Vector3d(0, 0, -1));
+            { Size = new(16, 4, 2), Material = PhysicsMaterial.Frictionless }, new Vector3d(0, 0, -1));
         else
             new LSAABBoxCollider2D(new Vector2d(16, 2)) { Material = PhysicsMaterial.Frictionless }
                 .InitializeWithNoBody(new TestMatterAgent(scene.Context,

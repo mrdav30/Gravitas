@@ -20,9 +20,9 @@ public sealed class PolygonReferenceMomentTests
         Vector2d[] references = { Vector2d.Zero, new(Fixed64.Half, -Fixed64.Quarter),
             new(-Fixed64.One, Fixed64.Two), center, new(center.X, Fixed64.Zero), new(Fixed64.Zero, center.Y) };
         foreach (long mass in new[] { 1L, 3L, 9L, 19L, 4294967296000000000L })
-        foreach (Vector2d reference in references)
-            Assert.Equal(Expected(vertices, mass, reference, Vector2d.Zero, Vector2d.One),
-                polygon.CalculateMomentOfInertia(Fixed64.FromRaw(mass), reference));
+            foreach (Vector2d reference in references)
+                Assert.Equal(Expected(vertices, mass, reference, Vector2d.Zero, Vector2d.One),
+                    polygon.CalculateMomentOfInertia(Fixed64.FromRaw(mass), reference));
     }
 
     [Theory]
@@ -99,7 +99,7 @@ public sealed class PolygonReferenceMomentTests
         Vector2d ownerOffset = new(Fixed64.FromRaw(1), Fixed64.FromRaw(-3));
         Fixed64 rotation = quarterTurn ? Fixed64.HalfPi : Fixed64.PiOver4;
         var compound = new LSCompoundCollider2D(CompoundColliderPart2D.ConvexPolygon(vertices, partOffset, rotation, partScale))
-            { LocalOffset = ownerOffset };
+        { LocalOffset = ownerOffset };
         LSCollider2D part = compound.GetPartCollider(0);
         var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, new Vector3d(Fixed64.FromFraction(5, 4), Fixed64.One, Fixed64.FromFraction(3, 2)));
         foreach (bool initialized in new[] { false, true })
@@ -155,7 +155,7 @@ public sealed class PolygonReferenceMomentTests
         var polygon = new LSPolygonCollider2D(vertices);
         var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
         var body = new SolidBody2D(new TestMatterAgent(context, transform), polygon)
-            { Mass = (Fixed64)1_000_000_000, LocalCenterOfMassOffset = Vector2d.Zero };
+        { Mass = (Fixed64)1_000_000_000, LocalCenterOfMassOffset = Vector2d.Zero };
         body.Initialize(Vector2d.Zero);
         Assert.Equal(Expected(vertices, body.Mass.m_rawValue, Vector2d.Zero, Vector2d.Zero, Vector2d.One), body.MomentOfInertia);
         body.Mass = (Fixed64)100_000_000;

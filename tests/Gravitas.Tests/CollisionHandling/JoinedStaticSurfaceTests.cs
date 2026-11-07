@@ -1,11 +1,11 @@
-using FixedMathSharp;
-using Gravitas.Colliders;
-using Gravitas.Materials;
-using Gravitas.CollisionHandling;
-using Gravitas.Tests.Support;
-using GridForge.Configuration;
 using System;
 using System.Collections.Generic;
+using FixedMathSharp;
+using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
+using Gravitas.Materials;
+using Gravitas.Tests.Support;
+using GridForge.Configuration;
 using Xunit;
 
 namespace Gravitas.Tests;

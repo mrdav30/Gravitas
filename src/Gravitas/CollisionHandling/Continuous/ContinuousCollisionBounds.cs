@@ -26,18 +26,18 @@ internal static class ContinuousCollisionBounds
         var sourceCompound = source as LSCompoundCollider;
         var targetCompound = target as LSCompoundCollider;
         for (int i = 0; i < (sourceCompound?.PartCount ?? 1); i++)
-        for (int j = 0; j < (targetCompound?.PartCount ?? 1); j++)
-        {
-            LSCollider first = sourceCompound?.GetPartCollider(i) ?? source;
-            LSCollider second = targetCompound?.GetPartCollider(j) ?? target;
-            if (ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(first.Bounds, second.Bounds, motionBound))
-                continue;
-            if (second is LSMeshCollider meshTarget && IsMeshSeparated(meshTarget, first, motionBound))
-                continue;
-            if (first is LSMeshCollider meshSource && IsMeshSeparated(meshSource, second, motionBound))
-                continue;
-            return false;
-        }
+            for (int j = 0; j < (targetCompound?.PartCount ?? 1); j++)
+            {
+                LSCollider first = sourceCompound?.GetPartCollider(i) ?? source;
+                LSCollider second = targetCompound?.GetPartCollider(j) ?? target;
+                if (ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(first.Bounds, second.Bounds, motionBound))
+                    continue;
+                if (second is LSMeshCollider meshTarget && IsMeshSeparated(meshTarget, first, motionBound))
+                    continue;
+                if (first is LSMeshCollider meshSource && IsMeshSeparated(meshSource, second, motionBound))
+                    continue;
+                return false;
+            }
         return true;
     }
 
@@ -49,13 +49,13 @@ internal static class ContinuousCollisionBounds
         var sourceCompound = source as LSCompoundCollider2D;
         var targetCompound = target as LSCompoundCollider2D;
         for (int i = 0; i < (sourceCompound?.PartCount ?? 1); i++)
-        for (int j = 0; j < (targetCompound?.PartCount ?? 1); j++)
-        {
-            LSCollider2D first = sourceCompound?.GetPartCollider(i) ?? source;
-            LSCollider2D second = targetCompound?.GetPartCollider(j) ?? target;
-            if (!ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(first.Bounds, second.Bounds, motionBound))
-                return false;
-        }
+            for (int j = 0; j < (targetCompound?.PartCount ?? 1); j++)
+            {
+                LSCollider2D first = sourceCompound?.GetPartCollider(i) ?? source;
+                LSCollider2D second = targetCompound?.GetPartCollider(j) ?? target;
+                if (!ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(first.Bounds, second.Bounds, motionBound))
+                    return false;
+            }
         return true;
     }
 
@@ -67,21 +67,21 @@ internal static class ContinuousCollisionBounds
         var sourceCompound = source as LSCompoundCollider;
         var targetCompound = target as LSCompoundCollider2D;
         for (int i = 0; i < (sourceCompound?.PartCount ?? 1); i++)
-        for (int j = 0; j < (targetCompound?.PartCount ?? 1); j++)
-        {
-            LSCollider first = sourceCompound?.GetPartCollider(i) ?? source;
-            LSCollider2D second = targetCompound?.GetPartCollider(j) ?? target;
-            if (ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(first.Bounds, second.MixedBounds3D, motionBound))
-                continue;
-            if (first is LSMeshCollider mesh)
+            for (int j = 0; j < (targetCompound?.PartCount ?? 1); j++)
             {
-                ColliderCanonicalBounds2D.GetMixedRelativeBounds(second, mesh.Mesh.Origin, mesh.Mesh.Rotation,
-                    out FixedBoundBox localBounds, out FixedOrientedBox orientedBounds);
-                if (IsMeshSeparated(mesh, localBounds, motionBound, orientedBounds))
+                LSCollider first = sourceCompound?.GetPartCollider(i) ?? source;
+                LSCollider2D second = targetCompound?.GetPartCollider(j) ?? target;
+                if (ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(first.Bounds, second.MixedBounds3D, motionBound))
                     continue;
+                if (first is LSMeshCollider mesh)
+                {
+                    ColliderCanonicalBounds2D.GetMixedRelativeBounds(second, mesh.Mesh.Origin, mesh.Mesh.Rotation,
+                        out FixedBoundBox localBounds, out FixedOrientedBox orientedBounds);
+                    if (IsMeshSeparated(mesh, localBounds, motionBound, orientedBounds))
+                        continue;
+                }
+                return false;
             }
-            return false;
-        }
         return true;
     }
 

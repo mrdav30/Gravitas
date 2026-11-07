@@ -1,3 +1,4 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
@@ -5,7 +6,6 @@ using Gravitas.Diagnostics;
 using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
-using System;
 
 namespace Gravitas.Benchmarks;
 

@@ -52,7 +52,8 @@ public sealed partial class JoinedStaticSolidMixedTests
         Fixed64 h = Fixed64.Half;
         var mesh = new LSMeshCollider(new[] { new Vector3d(-h, Fixed64.Zero, -h), new(h, Fixed64.Zero, -h),
             new(-h, Fixed64.Zero, h), new(h, Fixed64.Zero, h) }, new[] { 0, 2, 1, 1, 2, 3 },
-            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
         SolidBody body = scene.CreateBody(mesh, new(-Fixed64.Two, Fixed64.Zero, h), FixedQuaternion.Identity).Body;
         body.FreezeAxes = BodyFreezeAxes3D.PositionY | BodyFreezeAxes3D.Rotation;
         body.SleepEnabled = false; body.UseManualGrounding();

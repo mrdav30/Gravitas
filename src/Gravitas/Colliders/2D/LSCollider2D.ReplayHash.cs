@@ -5,10 +5,10 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
 using Chronicler.Hashing;
 using FixedMathSharp.Chronicler;
 using Gravitas.Materials;
-using System;
 
 namespace Gravitas.Colliders;
 

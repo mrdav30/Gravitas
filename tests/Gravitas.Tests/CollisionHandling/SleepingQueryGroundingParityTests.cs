@@ -1,10 +1,10 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -17,9 +17,9 @@ public sealed class SleepingQueryGroundingParityTests
         {
             var cases = new TheoryData<PhysicsRuntimeMode, bool, int>();
             foreach (PhysicsRuntimeMode mode in new[] { PhysicsRuntimeMode.TwoD, PhysicsRuntimeMode.Mixed })
-            foreach (bool bodyless in new[] { false, true })
-            foreach (int change in new[] { 0, 1, 2, 3, 4, 5 })
-                cases.Add(mode, bodyless, change);
+                foreach (bool bodyless in new[] { false, true })
+                    foreach (int change in new[] { 0, 1, 2, 3, 4, 5 })
+                        cases.Add(mode, bodyless, change);
             return cases;
         }
     }
@@ -256,7 +256,7 @@ public sealed class SleepingQueryGroundingParityTests
             // offset leaves a half-unit gap and therefore no physical pair.
             var collider = new LSCircleCollider2D(Fixed64.Half) { LocalOffset = Vector2d.Forward };
             Body = new SolidBody2D(CreateAgent(Vector2d.Zero), collider)
-                { Mass = Fixed64.One, Gravity = -Vector2d.Forward, SleepEnabled = false };
+            { Mass = Fixed64.One, Gravity = -Vector2d.Forward, SleepEnabled = false };
             Body.Initialize(Vector2d.Zero);
             for (int frame = 0; frame < 16; frame++) Step();
             Body.SleepEnabled = true;

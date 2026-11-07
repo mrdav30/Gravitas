@@ -1,7 +1,6 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Queries;
 using Gravitas.Tests.Support;
@@ -47,12 +46,14 @@ public sealed partial class MixedQueryCcdTests
         context.Environment.Gravity = context.Environment.AirDensity = context.Environment.DampingFactor = Fixed64.Zero;
         var circle = new LSCircleCollider2D((Fixed64)radius)
         {
-            MixedHalfThicknessOverride = Fixed64.Half, Material = PhysicsMaterial.Frictionless
+            MixedHalfThicknessOverride = Fixed64.Half,
+            Material = PhysicsMaterial.Frictionless
         };
         var body = new SolidBody2D(new TestMatterAgent(context, new FixedTransform(
             new Vector3d(start.X, Fixed64.Zero, start.Y), FixedQuaternion.Identity, Vector3d.One)), circle)
         {
-            Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation,
+            Mass = Fixed64.One,
+            FreezeAxes = BodyFreezeAxes2D.Rotation,
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous
         };
         body.Initialize(start);
@@ -134,13 +135,15 @@ public sealed partial class MixedQueryCcdTests
         {
             CreateBodyless3D(context, new LSCuboidCollider
             {
-                Size = new Vector3d(100, 100, 100), Material = PhysicsMaterial.Frictionless
+                Size = new Vector3d(100, 100, 100),
+                Material = PhysicsMaterial.Frictionless
             }, new Vector3d(50, 0, 0));
             var collider = new LSSphereCollider { Radius = Fixed64.Quarter, Material = PhysicsMaterial.Frictionless };
             var body = new SolidBody(new TestMatterAgent(context,
                 new FixedTransform(start, FixedQuaternion.Identity, Vector3d.One)), collider)
             {
-                Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes3D.Rotation,
+                Mass = Fixed64.One,
+                FreezeAxes = BodyFreezeAxes3D.Rotation,
                 ContinuousCollisionMode = ContinuousCollisionMode.Continuous
             };
             body.Initialize(start, FixedQuaternion.Identity, motion);
@@ -159,7 +162,8 @@ public sealed partial class MixedQueryCcdTests
             var body = new SolidBody2D(new TestMatterAgent(context,
                 new FixedTransform(start, FixedQuaternion.Identity, Vector3d.One)), collider)
             {
-                Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation,
+                Mass = Fixed64.One,
+                FreezeAxes = BodyFreezeAxes2D.Rotation,
                 ContinuousCollisionMode = ContinuousCollisionMode.Continuous
             };
             body.Initialize(start.ToVector2d(), motionType: motion);

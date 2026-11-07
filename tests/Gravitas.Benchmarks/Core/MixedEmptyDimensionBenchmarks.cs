@@ -1,8 +1,8 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Materials;
-using System;
 
 namespace Gravitas.Benchmarks;
 
@@ -51,9 +51,9 @@ public class MixedEmptyDimensionBenchmarks
                     .Initialize(floorCenter.ToVector2d(), motionType: BodyMotionType.Static);
                 _floors2D[i] = floor;
                 var collider = new LSCircleCollider2D(Fixed64.Half)
-                    { LocalOffset = Vector2d.Forward, Material = PhysicsMaterial.Frictionless };
+                { LocalOffset = Vector2d.Forward, Material = PhysicsMaterial.Frictionless };
                 var body = new SolidBody2D(new BenchmarkMatterAgent(_context, origin), collider)
-                    { Mass = Fixed64.One, SleepEnabled = false, Gravity = -Vector2d.Forward };
+                { Mass = Fixed64.One, SleepEnabled = false, Gravity = -Vector2d.Forward };
                 body.Initialize(origin.ToVector2d());
                 _bodies2D[i] = body;
             }
@@ -65,9 +65,9 @@ public class MixedEmptyDimensionBenchmarks
                     .Initialize(floorCenter, FixedQuaternion.Identity, BodyMotionType.Static);
                 _floors3D[i] = floor;
                 var collider = new LSSphereCollider
-                    { Radius = Fixed64.Half, LocalOffset = Vector3d.Up, Material = PhysicsMaterial.Frictionless };
+                { Radius = Fixed64.Half, LocalOffset = Vector3d.Up, Material = PhysicsMaterial.Frictionless };
                 var body = new SolidBody(new BenchmarkMatterAgent(_context, origin), collider)
-                    { Mass = Fixed64.One, SleepEnabled = false, FreezeAxes = BodyFreezeAxes3D.Rotation };
+                { Mass = Fixed64.One, SleepEnabled = false, FreezeAxes = BodyFreezeAxes3D.Rotation };
                 body.Initialize(origin, FixedQuaternion.Identity);
                 _bodies3D[i] = body;
             }

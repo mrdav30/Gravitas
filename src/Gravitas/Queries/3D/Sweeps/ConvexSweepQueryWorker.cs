@@ -5,18 +5,18 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
 using SwiftCollections.Query;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
 
-internal delegate bool ContinuousSurfaceTriangleAdmission(int triangle, ref Physics3DHit hit, WideDirection3d? exactNormal);
+
 
 /// <summary>
 /// Performs deterministic translational convex-source sweeps against 3D query

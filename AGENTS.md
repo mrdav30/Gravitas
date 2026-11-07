@@ -40,17 +40,18 @@ Read these in order before making non-trivial changes:
    - [GridForge](https://github.com/mrdav30/GridForge)
    - [Chronicler](https://github.com/mrdav30/Chronicler) when serialization
      behavior is involved
-3. [`docs/wiki/GETTING_STARTED.md`](docs/wiki/GETTING_STARTED.md) for the public
-   integration path and [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md) for the
-   technical map, then the matching wiki page for the area being changed:
-   [`HOST_INTEGRATION.md`](docs/wiki/HOST_INTEGRATION.md),
-   [`RUNTIME_ARCHITECTURE.md`](docs/wiki/RUNTIME_ARCHITECTURE.md),
-   [`COLLISION_PIPELINE.md`](docs/wiki/COLLISION_PIPELINE.md),
-   [`DIMENSIONS.md`](docs/wiki/DIMENSIONS.md),
-   [`QUERY_SERVICES.md`](docs/wiki/QUERY_SERVICES.md),
-   [`SERIALIZATION.md`](docs/wiki/SERIALIZATION.md), or
-   [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md) and
-   [`DIAGNOSTIC_ADAPTERS.md`](docs/wiki/DIAGNOSTIC_ADAPTERS.md).
+3. [`docs/api/guides/GETTING_STARTED.md`](docs/api/guides/GETTING_STARTED.md)
+   for the public integration path and
+   [`docs/api/guides/OVERVIEW.md`](docs/api/guides/OVERVIEW.md) for the
+   technical map, then the matching guide for the area being changed:
+   [`HOST_INTEGRATION.md`](docs/api/guides/HOST_INTEGRATION.md),
+   [`RUNTIME_ARCHITECTURE.md`](docs/api/guides/RUNTIME_ARCHITECTURE.md),
+   [`COLLISION_PIPELINE.md`](docs/api/guides/COLLISION_PIPELINE.md),
+   [`DIMENSIONS.md`](docs/api/guides/DIMENSIONS.md),
+   [`QUERY_SERVICES.md`](docs/api/guides/QUERY_SERVICES.md),
+   [`SERIALIZATION.md`](docs/api/guides/SERIALIZATION.md), or
+   [`DIAGNOSTICS.md`](docs/api/guides/DIAGNOSTICS.md) and
+   [`DIAGNOSTIC_ADAPTERS.md`](docs/api/guides/DIAGNOSTIC_ADAPTERS.md).
 4. Feature-work coordination docs when a task belongs to an active design:
    - [`feature-work-overview.md`](docs/feature-work/feature-work-overview.md)
      for task scope, recommended ordering, and links to active plans.
@@ -83,10 +84,10 @@ workflow changes:
 - [`AGENTS.md`](AGENTS.md)
 - [`docs/api`](docs/api) for the generated API-site configuration, landing
   content, namespace overrides, logo, repository link, and custom theme
-- [`docs/wiki`](docs/wiki), the source content for the GitHub Wiki, especially
-  when runtime ownership, host integration, collision behavior, query behavior,
-  serialization/replay behavior, lifecycle order, or known runtime boundaries
-  change.
+- [`docs/api/guides`](docs/api/guides), the conceptual documentation source,
+  especially when runtime ownership, host integration, collision behavior, query
+  behavior, serialization/replay behavior, lifecycle order, or known runtime
+  boundaries change.
 - [`docs/feature-work`](docs/feature-work) when active-plan progress, deferred
   decisions, experiment results, or follow-up plans change.
 - [`tests/Gravitas.Tests`](tests/Gravitas.Tests)
@@ -94,21 +95,21 @@ workflow changes:
   claims or hot paths change.
 - Relevant workflow files under [`.github/workflows`](.github/workflows).
 
-Keep links within `docs/wiki` repository-friendly with their `.md` extensions.
-The wiki sync workflow rewrites wiki routes and repository source links for the
-published GitHub Wiki.
+Keep links within `docs/api/guides` repository-friendly with `.md` extensions.
+The guides publish alongside the API reference. Repository Markdown is the
+source of truth; there is no wiki synchronization workflow.
 
-Keep wiki pages and any complexity exception registers evergreen. Put dated
-validation summaries, capture paths and implementation history in feature-work
-records. Complexity registers must explain their rationale and invariants on
-their own, without artifact references or links to feature-work or other
-libraries' documentation.
+Keep conceptual guides and any complexity exception registers evergreen. Put
+dated validation summaries, capture paths and implementation history in
+feature-work records. Complexity registers must explain their rationale and
+invariants on their own, without artifact references or links to feature-work or
+other libraries' documentation.
 
 ## Repository Map
 
 | Path                                                               | Purpose                                                                                                            | Notes                                                                                                                                                          |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`src/Gravitas`](src/Gravitas)                                     | Main library project                                                                                               | Multi-targets `netstandard2.1` and `net10.0`.                                                                                                                   |
+| [`src/Gravitas`](src/Gravitas)                                     | Main library project                                                                                               | Multi-targets `netstandard2.1` and `net10.0`.                                                                                                                  |
 | [`src/Gravitas/Core`](src/Gravitas/Core)                           | Shared host agent interface plus dimensional runtime folders                                                       | Start here for body/registration architecture changes.                                                                                                         |
 | [`src/Gravitas/Core/3D`](src/Gravitas/Core/3D)                     | 3D body, physics, collision, grounding, and inertia ownership                                                      | Keep 3D-only behavior out of pure 2D services.                                                                                                                 |
 | [`src/Gravitas/Core/2D`](src/Gravitas/Core/2D)                     | Pure 2D body, physics, collision, and planar CCD ownership                                                         | Keep 2D semantics first-class rather than accidental 3D projection.                                                                                            |
@@ -124,7 +125,7 @@ libraries' documentation.
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests)                     | xUnit v3 test project                                                                                              | Covers runtime, settings, collision, partitions, queries, serialization, CCD, and authored shape behavior.                                                     |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks)           | BenchmarkDotNet project                                                                                            | Covers context lifecycle, registration/partitioning, simulation, queries, diagnostics, mixed broad phase, 2D, meshes, and CCD scaling.                         |
 | [`docs/api`](docs/api)                                             | DocFX configuration, branded landing content, namespace overrides, and theme                                       | Generated output under `docs/api/obj` is ignored. Build with warnings as errors and preserve the logo, repository action, and local-link checks.               |
-| [`docs/wiki`](docs/wiki)                                           | User guides plus developer-facing architecture and usage notes                                                     | Keep `GETTING_STARTED.md` approachable and align deeper pages with runtime, host integration, collision, query, serialization/replay, and diagnostics changes. |
+| [`docs/api/guides`](docs/api/guides)                               | User guides plus developer-facing architecture and usage notes                                                     | Keep `GETTING_STARTED.md` approachable and align deeper pages with runtime, host integration, collision, query, serialization/replay, and diagnostics changes. |
 
 Ignore generated output when reviewing structure:
 
@@ -201,12 +202,14 @@ The runtime uses explicit world-context ownership:
   and context structs form the narrow-phase and response layer.
 
 `StaticSurface` and `StaticSurface2D` are context-owned continuity declarations,
-created by their dimensional physics services. Keep member identity, eligibility,
-supplier materials and finite boundaries distinct from response ownership.
-Membership is authoritative and recorded through typed links; joins and caches
-are derived. Preserve atomic replacement and neighbor/supplier invalidation.
-See the [host contract](docs/wiki/HOST_INTEGRATION.md#continuous-static-surfaces)
-and [exact geometry contract](docs/wiki/COLLISION_PIPELINE.md#continuous-static-surfaces).
+created by their dimensional physics services. Keep member identity,
+eligibility, supplier materials and finite boundaries distinct from response
+ownership. Membership is authoritative and recorded through typed links; joins
+and caches are derived. Preserve atomic replacement and neighbor/supplier
+invalidation. See the
+[host contract](docs/api/guides/HOST_INTEGRATION.md#continuous-static-surfaces)
+and
+[exact geometry contract](docs/api/guides/COLLISION_PIPELINE.md#continuous-static-surfaces).
 
 Treat this architecture as intentionally evolvable. Context ownership, collider
 IDs, partition reuse, collision-pair ownership, and simulation phase ordering
@@ -225,22 +228,23 @@ publishing changed mass, invalidate contact/joint/CCD caches, and synchronize
 pure and mixed awake membership without changing role or registration. Equal
 mass is a no-op. Populate-existing loads bypass the waking setter and refresh
 derived state and caches while retaining saved sleep. See the
-[mass mutation contract](docs/wiki/HOST_INTEGRATION.md#runtime-mass-changes).
+[mass mutation contract](docs/api/guides/HOST_INTEGRATION.md#runtime-mass-changes).
 
 Keep mutable `PhysicsSettings` bound to one context, releasing ownership on
 replacement/disposal. Preflight mode and mixed-thickness changes between fixed
 steps before assigning configuration. Public query size admission must not cap
-trusted internal CCD search padding. Explicit mixed queries in pure modes validate
-active target slabs from committed admission geometry before mixed indexing;
-preparation scratch is not a committed metric after a failed transaction.
+trusted internal CCD search padding. Explicit mixed queries in pure modes
+validate active target slabs from committed admission geometry before mixed
+indexing; preparation scratch is not a committed metric after a failed
+transaction.
 
 Mesh consumers must use `PhysicsMesh.GeometryFrame` and its matching
 `GeometryVertices`/BVH chart. Public `Center` and rounded centered inspection
-vertices do not define collision geometry. Preserve exact authored placement
-and scale through admission and selection; round only final physical witnesses.
+vertices do not define collision geometry. Preserve exact authored placement and
+scale through admission and selection; round only final physical witnesses.
 Positive diagonal scale preserves source topology. Pose changes must not rebuild
 the BVH; switching between equivalent compact and source charts must rebuild it.
-See the [mesh coordinate contract](docs/wiki/COLLIDER_SHAPE_REFERENCE.md).
+See the [mesh coordinate contract](docs/api/guides/COLLIDER_SHAPE_REFERENCE.md).
 
 ## Lockstep Host Lifecycle
 
@@ -342,8 +346,8 @@ partition/query approaches are acceptable if they:
 - are measured against a baseline with benchmarks when they touch hot paths.
 - improve or preserve time complexity, allocation behavior, and physical
   coherence.
-- are documented in `docs/wiki` or a feature-work plan when the design changes
-  how the system should be understood.
+- are documented in `docs/api/guides` or a feature-work plan when the design
+  changes how the system should be understood.
 
 Do not reject a better design just because it is unusual. Do reject clever
 changes that cannot be explained, tested, benchmarked, or made deterministic.
@@ -458,11 +462,11 @@ relative locations declared in `src/Gravitas/Gravitas.csproj`. Core, tests, and
 benchmarks explicitly select source Chronicler and its Lean shim.
 `Directory.Build.props` centralizes evergreen per-library identities; Gravitas
 uses `0.0.0-grv-local-lsf`, and all local assembly/file versions are `0.0.0.0`.
-These coordinate source builds and do not change for releases.
-Tests also select the source `FixedMathSharp.FluentAssertions` helper in this
-mode. Set `$env:UseLocalLsfStack = 'true'` to carry local selection into child
-builds, including benchmark-generated projects. Package-based restore remains
-the release-validation path.
+These coordinate source builds and do not change for releases. Tests also select
+the source `FixedMathSharp.FluentAssertions` helper in this mode. Set
+`$env:UseLocalLsfStack = 'true'` to carry local selection into child builds,
+including benchmark-generated projects. Package-based restore remains the
+release-validation path.
 
 ## Determinism Rules
 
@@ -472,7 +476,7 @@ remain `Fixed64`. Subtract timestamps before explicitly narrowing a bounded
 duration. Do not reintroduce a narrow absolute clock or reciprocal-based
 duration counting. Preserve preflight exhaustion checks and reset-lifetime
 invalidation for retained waits. See the clock contract in
-`docs/wiki/RUNTIME_ARCHITECTURE.md`.
+`docs/api/guides/RUNTIME_ARCHITECTURE.md`.
 
 Any change that affects simulation order, iteration order, rounding, collision
 pair identity, partition traversal, contact generation, integration, or update
@@ -542,8 +546,8 @@ Optimization rules:
 ## Serialization
 
 Serialization is explicit deterministic state-transfer infrastructure. Read
-[`docs/wiki/SERIALIZATION.md`](docs/wiki/SERIALIZATION.md) before changing
-`RecordData`, settings snapshots, load defaults, or replay tests.
+[`docs/api/guides/SERIALIZATION.md`](docs/api/guides/SERIALIZATION.md) before
+changing `RecordData`, settings snapshots, load defaults, or replay tests.
 
 Behavior defined by source:
 
@@ -580,7 +584,8 @@ Important rules:
 
 Observed project conventions:
 
-- `LangVersion` defaults to `14.0` and is overridden to `11.0` for `netstandard2.1`.
+- `LangVersion` defaults to `14.0` and is overridden to `11.0` for
+  `netstandard2.1`.
 - `ImplicitUsings` are disabled.
 - Library nullable context is enabled.
 - Tests enable nullable context; benchmarks disable nullable context.
@@ -611,6 +616,14 @@ Contributor expectations:
   not in the core library.
 
 ### File Organization And Navigation
+
+Give each namespace-level type/delegate its own file. Public/internal nested
+types use companion files while retaining containing types, constraints,
+attributes and CLR identities; private nested helpers may stay with their owner.
+Authored C# files under `src` have the MIT header with the current filename.
+Test and benchmark files under `tests` have no license header. Use the explicit
+cleanup/check commands in [CONTRIBUTING.md](CONTRIBUTING.md); exclude generated
+output and leave cleanup changes unstaged for review.
 
 Large source files are a maintainability and reviewability risk in this
 codebase. Treat `1000` lines as a hard warning threshold, not a normal target.
@@ -697,19 +710,17 @@ Important notes:
   native validation did not succeed. Executed lanes retain shared replay
   observations plus actual process, SDK/runtime, source, dependency and fixture
   provenance. After successful native validation, comparison requires all eight
-  lanes, checks shared expectations and directly compares
-  raw frames and ordered observations. Missing, emulated or mixed source/package
-  lanes fail the gate. Source captures require sibling commit IDs; package
-  captures use an empty source map and compare loaded release identities. An
-  explicit local comparator submatrix reports omitted lanes; do not describe it
-  as completion of the full native matrix.
+  lanes, checks shared expectations and directly compares raw frames and ordered
+  observations. Missing, emulated or mixed source/package lanes fail the gate.
+  Source captures require sibling commit IDs; package captures use an empty
+  source map and compare loaded release identities. An explicit local comparator
+  submatrix reports omitted lanes; do not describe it as completion of the full
+  native matrix.
 - After a successful `main` push, the
   [coverage workflow](.github/workflows/coverage.yml) enforces 100% reachable
   line, branch, and method coverage, builds DocFX with warnings as errors,
   verifies the branded resources and local links, then publishes the DocFX site
   and the coverage report beneath `/coverage` as one GitHub Pages artifact.
-- [Wiki sync](.github/workflows/sync-wiki.yml) publishes `docs/wiki` after the
-  same build gate and rewrites repository links for GitHub Wiki navigation.
 
 ### Replay Conformance Captures
 
@@ -864,9 +875,10 @@ For both humans and AI agents, use this order:
 11. Run the full `Release` suite before closing behavior work.
 12. Run `ReleaseLean` validation when package shape, serialization, or
     MemoryPack-related code changed.
-13. Update `docs/wiki`, `docs/feature-work`, `README.md`, benchmark docs, or
-    workflow docs if public behavior, developer workflow, system architecture,
-    collision behavior, query behavior, progress, or follow-up context changed.
+13. Update `docs/api/guides`, `docs/feature-work`, `README.md`, benchmark docs,
+    or workflow docs if public behavior, developer workflow, system
+    architecture, collision behavior, query behavior, progress, or follow-up
+    context changed.
 
 ## Guidance For AI Agents
 
@@ -913,10 +925,10 @@ If you are an automated coding agent working in this repository:
   pass.
 - Keep the root README concise and product-focused. Put installation, benefits,
   a small accurate example, and documentation routes there; move architecture,
-  lifecycle, and subsystem detail into `docs/wiki` or the API reference.
+  lifecycle, and subsystem detail into `docs/api/guides` or the API reference.
 - If you change runtime architecture, host integration, collision flow, query
   behavior, lifecycle order, or known runtime boundaries, update the matching
-  page under `docs/wiki`.
+  page under `docs/api/guides`.
 - If you add comments, comment the invariant or reason, not the syntax.
 - Do not leave generic helpers buried inside unrelated classes when they can
   stand alone as reusable support types.
@@ -954,6 +966,6 @@ Be especially careful when changing:
 
 Use the independent `Chronicler.Diagnostics` package for diagnostic channels,
 lazy logging handlers, and `ChronicleGuard` guards. It does not depend on
-`Chronicler.Core`. Keep library-specific channels, formatters, and logger facades
-in their owning library. `UseLocalLsfStack=true` selects the sibling diagnostics
-project; standard and Lean builds use the same diagnostics package.
+`Chronicler.Core`. Keep library-specific channels, formatters, and logger
+facades in their owning library. `UseLocalLsfStack=true` selects the sibling
+diagnostics project; standard and Lean builds use the same diagnostics package.

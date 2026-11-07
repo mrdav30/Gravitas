@@ -1,7 +1,6 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
-using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Queries;
 using Gravitas.Support;
@@ -21,12 +20,12 @@ public sealed partial class ContinuousCollisionDetectionTests
         {
             var cases = new TheoryData<MeshColliderMode, bool, bool, bool>();
             foreach (bool reverseWinding in new[] { false, true })
-            foreach (bool kinematic in new[] { false, true })
-            {
-                cases.Add(MeshColliderMode.Convex, reverseWinding, false, kinematic);
-                cases.Add(MeshColliderMode.Concave, reverseWinding, false, kinematic);
-                cases.Add(MeshColliderMode.Convex, reverseWinding, true, kinematic);
-            }
+                foreach (bool kinematic in new[] { false, true })
+                {
+                    cases.Add(MeshColliderMode.Convex, reverseWinding, false, kinematic);
+                    cases.Add(MeshColliderMode.Concave, reverseWinding, false, kinematic);
+                    cases.Add(MeshColliderMode.Convex, reverseWinding, true, kinematic);
+                }
             return cases;
         }
     }
@@ -37,51 +36,51 @@ public sealed partial class ContinuousCollisionDetectionTests
         MeshColliderMode mode, bool reverseWinding, bool compoundTarget, bool kinematic)
     {
         foreach (int side in new[] { -1, 1 })
-        foreach (Fixed64 gap in new[] { Fixed64.Half, Fixed64.Quarter })
-        foreach (int motion in new[] { 1, 0, -1 })
-        {
-            using PhysicsScenarioBuilder scenario = CreateCcdScenario();
-            AddInitialConvexMeshTarget(scenario, mode, reverseWinding, compoundTarget);
-            Vector3d normal = Vector3d.Up * (Fixed64)side;
-            Vector3d start = normal * gap;
-            SolidBody source = scenario.CreateBody(new LSCuboidCollider(), start, FixedQuaternion.Identity,
-                preventAngularForces: true, isKinematic: kinematic).Body;
-            source.Collider.Material = PhysicsMaterial.Frictionless;
-            source.UseManualGrounding();
-            source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-            Vector3d displacement = motion == 0 ? Vector3d.Right : normal * (Fixed64)motion;
-            if (kinematic)
-                source.Agent.Transform.LocalPosition = start + displacement;
-            else
-                source.AddLinearImpulse(displacement * source.Mass);
-
-            scenario.Context.Simulate();
-            scenario.Context.LateSimulate();
-
-            if (motion < 0)
-            {
-                (source.Position3d.Y * (Fixed64)side).Should().BeGreaterThanOrEqualTo(gap - Fixed64.Epsilon);
-                source.LastContinuousCollisionToiIterationCount.Should().BeGreaterThan(0);
-                if (!kinematic)
-                    source.LinearVelocity.Y.Should().Be(Fixed64.Zero);
-            }
-            else
-            {
-                if (motion == 0 && gap < Fixed64.Half && !kinematic)
+            foreach (Fixed64 gap in new[] { Fixed64.Half, Fixed64.Quarter })
+                foreach (int motion in new[] { 1, 0, -1 })
                 {
-                    // Discrete penetration correction may change only the
-                    // normal coordinate after CCD admits this tangential travel.
-                    source.Position3d.X.Should().Be(displacement.X);
-                    source.Position3d.Z.Should().Be(Fixed64.Zero);
-                    (source.Position3d.Y * (Fixed64)side).Should().BeGreaterThanOrEqualTo(gap - Fixed64.Epsilon);
+                    using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+                    AddInitialConvexMeshTarget(scenario, mode, reverseWinding, compoundTarget);
+                    Vector3d normal = Vector3d.Up * (Fixed64)side;
+                    Vector3d start = normal * gap;
+                    SolidBody source = scenario.CreateBody(new LSCuboidCollider(), start, FixedQuaternion.Identity,
+                        preventAngularForces: true, isKinematic: kinematic).Body;
+                    source.Collider.Material = PhysicsMaterial.Frictionless;
+                    source.UseManualGrounding();
+                    source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+                    Vector3d displacement = motion == 0 ? Vector3d.Right : normal * (Fixed64)motion;
+                    if (kinematic)
+                        source.Agent.Transform.LocalPosition = start + displacement;
+                    else
+                        source.AddLinearImpulse(displacement * source.Mass);
+
+                    scenario.Context.Simulate();
+                    scenario.Context.LateSimulate();
+
+                    if (motion < 0)
+                    {
+                        (source.Position3d.Y * (Fixed64)side).Should().BeGreaterThanOrEqualTo(gap - Fixed64.Epsilon);
+                        source.LastContinuousCollisionToiIterationCount.Should().BeGreaterThan(0);
+                        if (!kinematic)
+                            source.LinearVelocity.Y.Should().Be(Fixed64.Zero);
+                    }
+                    else
+                    {
+                        if (motion == 0 && gap < Fixed64.Half && !kinematic)
+                        {
+                            // Discrete penetration correction may change only the
+                            // normal coordinate after CCD admits this tangential travel.
+                            source.Position3d.X.Should().Be(displacement.X);
+                            source.Position3d.Z.Should().Be(Fixed64.Zero);
+                            (source.Position3d.Y * (Fixed64)side).Should().BeGreaterThanOrEqualTo(gap - Fixed64.Epsilon);
+                        }
+                        else
+                            source.Position3d.Should().Be(start + displacement);
+                        source.LastContinuousCollisionToiIterationCount.Should().Be(0);
+                        if (!kinematic)
+                            source.LinearVelocity.Should().Be(displacement);
+                    }
                 }
-                else
-                    source.Position3d.Should().Be(start + displacement);
-                source.LastContinuousCollisionToiIterationCount.Should().Be(0);
-                if (!kinematic)
-                    source.LinearVelocity.Should().Be(displacement);
-            }
-        }
     }
 
     [Theory]
@@ -464,7 +463,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         scenario.InitializeStaticCollider(target,
             new Vector3d(Fixed64.MaxValue - Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         SolidBody blade = scenario.CreateBody(new LSCuboidCollider
-            { Size = new Vector3d((Fixed64)8, Fixed64.Quarter, Fixed64.Quarter) },
+        { Size = new Vector3d((Fixed64)8, Fixed64.Quarter, Fixed64.Quarter) },
             new Vector3d(Fixed64.MaxValue - Fixed64.FromFraction(9, 2), (Fixed64)4, Fixed64.Zero),
             FixedQuaternion.Identity, isKinematic: true).Body;
         blade.UseManualGrounding();

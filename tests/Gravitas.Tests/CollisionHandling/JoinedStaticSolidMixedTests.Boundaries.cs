@@ -1,9 +1,9 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -18,9 +18,9 @@ public sealed partial class JoinedStaticSolidMixedTests
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         var left = new LSPolygonCollider2D(new(-2, 0), new(-4, -2), new(-2, -2))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         var right = new LSPolygonCollider2D(new(2, 0), new(2, -2), new(4, -2))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         left.InitializeWithNoBody(new TestMatterAgent(scene.Context)); right.InitializeWithNoBody(new TestMatterAgent(scene.Context));
         LSCollider2D rear = Rectangle(scene, -4, 4, -3, -2, Fixed64.Two);
         using var surface = scene.Context.Physics2D.CreateStaticSurface(new[] { left, right, rear });
@@ -49,11 +49,15 @@ public sealed partial class JoinedStaticSolidMixedTests
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         var first = new LSPolygonCollider2D(new(-2, -2), new(0, -2), new(0, 0))
-            { MixedHalfThicknessOverride = unequalOriginalHeights ? Fixed64.One : Fixed64.Two,
-                Material = PhysicsMaterial.Frictionless };
+        {
+            MixedHalfThicknessOverride = unequalOriginalHeights ? Fixed64.One : Fixed64.Two,
+            Material = PhysicsMaterial.Frictionless
+        };
         var second = new LSPolygonCollider2D(new(-2, -2), new(0, 0), new(-2, 0))
-            { MixedHalfThicknessOverride = unequalOriginalHeights ? 3 * Fixed64.Half : Fixed64.Two,
-                Material = PhysicsMaterial.Frictionless };
+        {
+            MixedHalfThicknessOverride = unequalOriginalHeights ? 3 * Fixed64.Half : Fixed64.Two,
+            Material = PhysicsMaterial.Frictionless
+        };
         first.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(
             unequalOriginalHeights ? Vector3d.Down : Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         second.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(
@@ -133,9 +137,9 @@ public sealed partial class JoinedStaticSolidMixedTests
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         var lower = new LSPolygonCollider2D(new(0, 0), new(-2, -2), new(0, -2))
-            { MixedHalfThicknessOverride = Fixed64.Half, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Half, Material = PhysicsMaterial.Frictionless };
         var upper = new LSPolygonCollider2D(new(0, 0), new(-2, -2), new(0, -2))
-            { MixedHalfThicknessOverride = Fixed64.Half, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Half, Material = PhysicsMaterial.Frictionless };
         lower.InitializeWithNoBody(new TestMatterAgent(scene.Context,
             new FixedTransform(Vector3d.Down * (3 * Fixed64.Half), FixedQuaternion.Identity, Vector3d.One)));
         upper.InitializeWithNoBody(new TestMatterAgent(scene.Context,
@@ -245,9 +249,9 @@ public sealed partial class JoinedStaticSolidMixedTests
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         var first = new LSPolygonCollider2D(new(-2, -2), new(0, -2), new(0, 0))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         var second = new LSPolygonCollider2D(new(-2, -2), new(0, 0), new(-2, 0))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         first.InitializeWithNoBody(new TestMatterAgent(scene.Context)); second.InitializeWithNoBody(new TestMatterAgent(scene.Context));
         var lower = Rectangle(scene, 0, 2, -2, 0, 3 * Fixed64.Quarter, -5 * Fixed64.Quarter);
         var upper = Rectangle(scene, 0, 2, -2, 0, 3 * Fixed64.Quarter, 5 * Fixed64.Quarter);
@@ -353,7 +357,7 @@ public sealed partial class JoinedStaticSolidMixedTests
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         LSCollider2D face = Rectangle(scene, -2, 0, -2, 0, Fixed64.One, -Fixed64.One);
         var tip = new LSPolygonCollider2D(new(0, 0), new(0, -2), new(2, -2))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         tip.InitializeWithNoBody(new TestMatterAgent(scene.Context));
         using var surface = scene.Context.Physics2D.CreateStaticSurface(new[] { face, tip });
         LSCollider mover = Mover(scene, hull, Vector3d.Forward * Fixed64.Quarter, FixedQuaternion.Identity, new(3, 3, 1));
@@ -388,7 +392,7 @@ public sealed partial class JoinedStaticSolidMixedTests
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         LSCollider2D face = Rectangle(scene, -2, 0, -2, 0, Fixed64.One);
         var tip = new LSPolygonCollider2D(new(0, 0), new(0, -2), new(2, -2))
-            { MixedHalfThicknessOverride = Fixed64.One, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.One, Material = PhysicsMaterial.Frictionless };
         tip.InitializeWithNoBody(new TestMatterAgent(scene.Context,
             new FixedTransform(new(0, 4, 0), FixedQuaternion.Identity, Vector3d.One)));
         LSCollider2D bridge = Rectangle(scene, -2, 2, -4, -2, (Fixed64)3, Fixed64.Two);
@@ -428,7 +432,7 @@ public sealed partial class JoinedStaticSolidMixedTests
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         var left = new LSPolygonCollider2D(new(-4, -1), new(-3, -2), new(0, -2), new(0, 2), new(-3, 2), new(-4, 1))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         left.InitializeWithNoBody(new TestMatterAgent(scene.Context));
         LSCollider2D right = Rectangle(scene, 0, 4, -2, 2, Fixed64.Two);
         using var surface = scene.Context.Physics2D.CreateStaticSurface(new[] { left, right });

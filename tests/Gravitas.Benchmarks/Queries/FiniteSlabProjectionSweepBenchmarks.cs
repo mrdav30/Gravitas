@@ -1,9 +1,9 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.Queries;
-using System;
 
 namespace Gravitas.Benchmarks;
 

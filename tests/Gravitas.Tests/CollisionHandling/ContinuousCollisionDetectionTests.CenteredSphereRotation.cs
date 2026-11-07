@@ -102,11 +102,13 @@ public sealed partial class ContinuousCollisionDetectionTests
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
         scenario.InitializeStaticCollider(new LSCuboidCollider
         {
-            Size = new Vector3d(4, 2, 4), Material = PhysicsMaterial.Frictionless
+            Size = new Vector3d(4, 2, 4),
+            Material = PhysicsMaterial.Frictionless
         }, Vector3d.Down);
         ScenarioBody<LSSphereCollider> source = scenario.CreateBody(new LSSphereCollider
         {
-            Radius = Fixed64.FromFraction(1, 8), Material = PhysicsMaterial.Frictionless
+            Radius = Fixed64.FromFraction(1, 8),
+            Material = PhysicsMaterial.Frictionless
         }, Vector3d.Up * Fixed64.FromFraction(1, 8), FixedQuaternion.Identity);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         // Initialization already probed the floor; clear that cached support so
@@ -276,7 +278,8 @@ public sealed partial class ContinuousCollisionDetectionTests
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
         ScenarioBody<LSSphereCollider> source = scenario.CreateBody(new LSSphereCollider
         {
-            Radius = Fixed64.FromFraction(1, 8), Material = PhysicsMaterial.Frictionless
+            Radius = Fixed64.FromFraction(1, 8),
+            Material = PhysicsMaterial.Frictionless
         }, Vector3d.Zero, FixedQuaternion.Identity, isKinematic: true);
         source.Body.UseManualGrounding();
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;

@@ -1,9 +1,9 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -11,49 +11,58 @@ namespace Gravitas.Tests;
 public sealed class MeshConeContinuousAdmissionTests
 {
     [Theory]
-    [InlineData(0, false)] [InlineData(0, true)]
-    [InlineData(1, false)] [InlineData(1, true)]
-    [InlineData(2, false)] [InlineData(2, true)]
-    [InlineData(3, false)] [InlineData(3, true)]
-    [InlineData(4, false)] [InlineData(4, true)]
-    [InlineData(5, false)] [InlineData(5, true)]
-    [InlineData(6, false)] [InlineData(6, true)]
-    [InlineData(7, false)] [InlineData(7, true)]
-    [InlineData(8, false)] [InlineData(8, true)]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
+    [InlineData(4, false)]
+    [InlineData(4, true)]
+    [InlineData(5, false)]
+    [InlineData(5, true)]
+    [InlineData(6, false)]
+    [InlineData(6, true)]
+    [InlineData(7, false)]
+    [InlineData(7, true)]
+    [InlineData(8, false)]
+    [InlineData(8, true)]
     public void FiniteAdmission_ShouldMatchCompleteManifoldAtRealBoundaries(int geometry, bool affine)
     {
         foreach (Fixed64 x in new[] { Fixed64.Zero, Fixed64.MaxValue - (Fixed64)32,
             Fixed64.MinValue + (Fixed64)32 })
-        foreach (FixedQuaternion rotation in new[] { FixedQuaternion.Identity, PhysicsScenarioBuilder.Yaw(31) })
-        {
-            using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
-            var vertices = new List<Vector3d>();
-            var triangles = new List<int>();
-            CreateGeometry(geometry, vertices, triangles);
-            if (affine)
-                for (int i = 0; i < vertices.Count; i++)
-                    // Half-raw physical Z placement requires the exact source chart.
-                    vertices[i] = new(vertices[i].X, vertices[i].Y,
-                        vertices[i].Z * Fixed64.Two + Fixed64.MinIncrement);
-            var mesh = new LSMeshCollider(vertices.ToArray(), triangles.ToArray(),
-                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
-            Vector3d origin = Vector3d.Right * x;
-            mesh.InitializeWithNoBody(new TestMatterAgent(scene.Context,
-                new FixedTransform(origin, rotation,
-                    new Vector3d(Fixed64.One, Fixed64.One, affine ? Fixed64.Half : Fixed64.One))));
-            var cone = new LSConeCollider
+            foreach (FixedQuaternion rotation in new[] { FixedQuaternion.Identity, PhysicsScenarioBuilder.Yaw(31) })
             {
-                Radius = geometry == 8 ? Fixed64.MinIncrement : Fixed64.Half,
-                Size = new Vector3d(Fixed64.One, geometry == 8 ? Fixed64.MinIncrement : Fixed64.One, Fixed64.One)
-            };
-            cone.InitializeWithNoBody(new TestMatterAgent(scene.Context,
-                new FixedTransform(origin, rotation, Vector3d.One)));
+                using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
+                var vertices = new List<Vector3d>();
+                var triangles = new List<int>();
+                CreateGeometry(geometry, vertices, triangles);
+                if (affine)
+                    for (int i = 0; i < vertices.Count; i++)
+                        // Half-raw physical Z placement requires the exact source chart.
+                        vertices[i] = new(vertices[i].X, vertices[i].Y,
+                            vertices[i].Z * Fixed64.Two + Fixed64.MinIncrement);
+                var mesh = new LSMeshCollider(vertices.ToArray(), triangles.ToArray(),
+                    MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+                Vector3d origin = Vector3d.Right * x;
+                mesh.InitializeWithNoBody(new TestMatterAgent(scene.Context,
+                    new FixedTransform(origin, rotation,
+                        new Vector3d(Fixed64.One, Fixed64.One, affine ? Fixed64.Half : Fixed64.One))));
+                var cone = new LSConeCollider
+                {
+                    Radius = geometry == 8 ? Fixed64.MinIncrement : Fixed64.Half,
+                    Size = new Vector3d(Fixed64.One, geometry == 8 ? Fixed64.MinIncrement : Fixed64.One, Fixed64.One)
+                };
+                cone.InitializeWithNoBody(new TestMatterAgent(scene.Context,
+                    new FixedTransform(origin, rotation, Vector3d.One)));
 
-            bool expected = geometry != 4 && geometry != 6 && geometry != 7;
-            CollisionDetection.IntersectsMeshConeSurface(mesh, cone, scene.Context.CollisionScratch)
-                .Should().Be(expected);
-            CollisionDetection.DoCollisionCheck(scene.CreatePair(mesh, cone)).Should().Be(expected);
-        }
+                bool expected = geometry != 4 && geometry != 6 && geometry != 7;
+                CollisionDetection.IntersectsMeshConeSurface(mesh, cone, scene.Context.CollisionScratch)
+                    .Should().Be(expected);
+                CollisionDetection.DoCollisionCheck(scene.CreatePair(mesh, cone)).Should().Be(expected);
+            }
     }
 
     private static void CreateGeometry(int kind, List<Vector3d> vertices, List<int> triangles)

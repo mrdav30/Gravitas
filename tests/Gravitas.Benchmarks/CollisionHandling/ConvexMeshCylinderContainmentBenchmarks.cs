@@ -27,7 +27,7 @@ public class ConvexMeshCylinderContainmentBenchmarks
         {
             new Vector3d(-1,-1,-1), new Vector3d(1,-1,-1), new Vector3d(-1,1,-1), new Vector3d(1,1,-1),
             new Vector3d(-1,-1,1), new Vector3d(1,-1,1), new Vector3d(-1,1,1), new Vector3d(1,1,1)
-        }, new[] { 0,2,3, 0,3,1, 4,5,7, 4,7,6, 0,1,5, 0,5,4, 2,6,7, 2,7,3, 0,4,6, 0,6,2, 1,3,7, 1,7,5 }, MeshColliderMode.Convex)
+        }, new[] { 0, 2, 3, 0, 3, 1, 4, 5, 7, 4, 7, 6, 0, 1, 5, 0, 5, 4, 2, 6, 7, 2, 7, 3, 0, 4, 6, 0, 6, 2, 1, 3, 7, 1, 7, 5 }, MeshColliderMode.Convex)
         { Material = PhysicsMaterial.Frictionless };
         mesh.InitializeWithNoBody(new BenchmarkMatterAgent(_context, Vector3d.Zero));
         _start = Geometry == "CylinderExterior" ? Vector3d.Right * (Fixed64)1.125m
@@ -36,7 +36,7 @@ public class ConvexMeshCylinderContainmentBenchmarks
             : new LSCylinderCollider { Radius = Fixed64.Quarter, Size = Vector3d.One * Fixed64.Half };
         collider.Material = PhysicsMaterial.Frictionless;
         _body = new SolidBody(new BenchmarkMatterAgent(_context, _start), collider)
-            { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes3D.Rotation, SleepEnabled = false };
+        { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes3D.Rotation, SleepEnabled = false };
         _body.Initialize(_start, FixedQuaternion.Identity);
         _body.UseManualGrounding();
         for (int i = 0; i < 16; i++) FullStep();

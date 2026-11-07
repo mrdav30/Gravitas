@@ -1,9 +1,3 @@
-using Chronicler.Hashing;
-using FixedMathSharp;
-using FixedMathSharp.Chronicler;
-using GridForge.Grids;
-using SwiftCollections;
-using SwiftCollections.Query;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,6 +6,12 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Chronicler.Hashing;
+using FixedMathSharp;
+using FixedMathSharp.Chronicler;
+using GridForge.Grids;
+using SwiftCollections;
+using SwiftCollections.Query;
 
 namespace Gravitas.Tests.Determinism;
 

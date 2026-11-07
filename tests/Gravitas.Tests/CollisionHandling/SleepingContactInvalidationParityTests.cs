@@ -1,10 +1,10 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -200,7 +200,7 @@ public sealed class SleepingContactInvalidationParityTests
         var agent = new TestMatterAgent(context,
             new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
-            { Mass = Fixed64.One, SleepEnabled = false };
+        { Mass = Fixed64.One, SleepEnabled = false };
         body.Initialize(position);
         body.UseManualGrounding();
         return body;
@@ -411,7 +411,7 @@ public sealed class SleepingContactInvalidationParityTests
             else
             {
                 _floor2D = new LSAABBoxCollider2D(new Vector2d((Fixed64)8, kind == 0 ? Fixed64.One : (Fixed64)8))
-                    { Material = PhysicsMaterial.Frictionless };
+                { Material = PhysicsMaterial.Frictionless };
                 Vector2d center = kind == 0 ? -Vector2d.Forward * Fixed64.Half : Vector2d.Zero;
                 var agent = CreateAgent(new Vector3d(center.X, Fixed64.Zero, center.Y));
                 if (bodyless) _floor2D.InitializeWithNoBody(agent);
@@ -431,7 +431,7 @@ public sealed class SleepingContactInvalidationParityTests
             {
                 var collider = new LSCircleCollider2D(Fixed64.Half) { Material = PhysicsMaterial.Frictionless };
                 Mover2D = new SolidBody2D(CreateAgent(Vector3d.Zero), collider)
-                    { Mass = Fixed64.One, Gravity = -Vector2d.Forward };
+                { Mass = Fixed64.One, Gravity = -Vector2d.Forward };
                 Mover2D.Initialize(Vector2d.Forward * Fixed64.Half);
                 Mover2D.SleepEnabled = false;
                 if (!automaticGrounding) Mover2D.UseManualGrounding();

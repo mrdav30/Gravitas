@@ -1,11 +1,11 @@
+using System.Numerics;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using Gravitas.Tests.Support;
 using Gravitas.Queries;
 using Gravitas.Support;
-using System.Numerics;
+using Gravitas.Tests.Support;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -34,7 +34,9 @@ public sealed class StaticSurfaceNormalAdmissionTests
     }
 
     [Theory]
-    [InlineData(-1)] [InlineData(0)] [InlineData(1)]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
     public void SweptSphereAdmission_ShouldOrientItsGeometricPlaneNormalAgainstApproach(int side)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -67,7 +69,8 @@ public sealed class StaticSurfaceNormalAdmissionTests
     }
 
     [Theory]
-    [InlineData(-1)] [InlineData(1)]
+    [InlineData(-1)]
+    [InlineData(1)]
     public void CircleSlabWitnessOutsideItsCap_ShouldRemainConservative(int side)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -97,7 +100,9 @@ public sealed class StaticSurfaceNormalAdmissionTests
     }
 
     [Theory]
-    [InlineData(0)] [InlineData(1)] [InlineData(2)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
     public void PlanarBoundaryAdmission_ShouldKeepExposedAndUnresolvedWitnesses(int shape)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -129,7 +134,10 @@ public sealed class StaticSurfaceNormalAdmissionTests
     }
 
     [Theory]
-    [InlineData(false, 0)] [InlineData(true, 0)] [InlineData(false, -1)] [InlineData(false, 1)]
+    [InlineData(false, 0)]
+    [InlineData(true, 0)]
+    [InlineData(false, -1)]
+    [InlineData(false, 1)]
     public void MixedBoundaryAdmission_ShouldKeepTheExposedFaceAcrossAnIncidentJoin(bool elevatedNeighbor, int heightBand)
     {
         using var scene = PhysicsScenarioBuilder.Create();

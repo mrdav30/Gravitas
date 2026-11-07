@@ -9,7 +9,6 @@ using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System;
 
 namespace Gravitas;
 

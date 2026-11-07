@@ -1,10 +1,10 @@
-using Chronicler.Timing;
-using FixedMathSharp;
-using Gravitas.Support;
-using Gravitas.Diagnostics;
-using Gravitas.Tests.Support;
 using System;
 using System.Collections.Generic;
+using Chronicler.Timing;
+using FixedMathSharp;
+using Gravitas.Diagnostics;
+using Gravitas.Support;
+using Gravitas.Tests.Support;
 using Xunit;
 
 namespace Gravitas.Tests.Runtime;

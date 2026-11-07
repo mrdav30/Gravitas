@@ -1,5 +1,5 @@
-using Chronicler.Timing;
 using System.Reflection;
+using Chronicler.Timing;
 
 namespace Gravitas.Tests.Support;
 

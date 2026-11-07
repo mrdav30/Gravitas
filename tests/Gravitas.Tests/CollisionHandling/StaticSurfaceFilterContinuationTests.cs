@@ -1,3 +1,4 @@
+using System.Reflection;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -5,7 +6,6 @@ using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -26,7 +26,8 @@ public sealed class StaticSurfaceFilterContinuationTests
         scene.Context.ApplySettings(new PhysicsSettings(16, new[,]
         {
             { true, true, true }, { true, true, false }, { true, false, true }
-        }) { RuntimeMode = PhysicsRuntimeMode.Mixed });
+        })
+        { RuntimeMode = PhysicsRuntimeMode.Mixed });
         scene.Context.Environment.Gravity = Fixed64.Zero;
         scene.Context.Environment.AirDensity = Fixed64.Zero;
         scene.Context.Environment.DampingFactor = Fixed64.Zero;

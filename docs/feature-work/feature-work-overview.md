@@ -4,9 +4,9 @@
 
 This document is an evergreen overview of Gravitas feature work. It tracks the
 active scope, recently completed work, and deferred or evidence-gated plans. It
-is a curated view rather than a backlog of every possible feature.
-Update it for significant feature-work milestones; keep individual issue and
-benchmark status in their coordination trackers.
+is a curated view rather than a backlog of every possible feature. Update it for
+significant feature-work milestones; keep individual issue and benchmark status
+in their coordination trackers.
 
 Keep active and deferred plans alongside the coordination trackers in this
 directory. Archive completed plans and finished investigation reports under
@@ -31,10 +31,10 @@ instead of burying it in notes.
 - **Lockstep Conformance And Workload Guidance**
   - Approved follow-up sequence after the confirmed benchmark signals close:
     strengthen complete-loop replay evidence, characterize an evolving strategy
-    scene, then publish long-duration physical quality versus configuration cost.
-    Full-lifecycle replay conformance is complete across the eight native
-    platform/profile lanes, and upstream develop CI alignment is complete.
-    The workload and quality plans follow.
+    scene, then publish long-duration physical quality versus configuration
+    cost. Full-lifecycle replay conformance is complete across the eight native
+    platform/profile lanes, and upstream develop CI alignment is complete. The
+    workload and quality plans follow.
   - [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
     follows complete stepping and a shared trace format. One strategy scene
     supplies activity stages, a comparable 3D case, per-frame tails and churn
@@ -63,17 +63,18 @@ instead of burying it in notes.
     motion; preserve the measured warm baseline.
 
 - **Terrain Representation And Optional Member Indexes**
-  - Reuse the completed continuity contract. Specialized heightfields, navigation
-    adapter policy and alternate indexes require a concrete workload and measured
-    benefit; retain the [representation gates](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#later-terrain-and-heightfield-gates).
+  - Reuse the completed continuity contract. Specialized heightfields,
+    navigation adapter policy and alternate indexes require a concrete workload
+    and measured benefit; retain the
+    [representation gates](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#later-terrain-and-heightfield-gates).
 
 ## Recently Completed
 
 - [`Static Surface Continuity`](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md)
-  - Context-owned mesh and filled-planar declarations preserve exact finite joins,
-    member identity/materials, dimensional response and CCD, transactional
-    membership and replay/restore ordering. Heightfields and alternative indexes
-    remain separate, evidence-gated decisions.
+  - Context-owned mesh and filled-planar declarations preserve exact finite
+    joins, member identity/materials, dimensional response and CCD,
+    transactional membership and replay/restore ordering. Heightfields and
+    alternative indexes remain separate, evidence-gated decisions.
 
 - [`Supported Geometry Range`](done/2026-10-12-supported-geometry-range-plan.md)
   - Effective scaled geometry, attachments, queries, settings and restored state
@@ -101,15 +102,17 @@ instead of burying it in notes.
     and separate dependency-mode caches preserve the selected graph. Hosted
     [FixedMathSharp run 37644534163](https://github.com/mrdav30/FixedMathSharp/actions/runs/37644534163),
     [SwiftCollections run 37654294859](https://github.com/mrdav30/SwiftCollections/actions/runs/37654294859)
-    and [GridForge run 37655373739](https://github.com/mrdav30/GridForge/actions/runs/37655373739)
-    pass. Chronicler already passed and needed no workflow change. The collection
-    RCA and finalizer coverage follow-up are owned by the
+    and
+    [GridForge run 37655373739](https://github.com/mrdav30/GridForge/actions/runs/37655373739)
+    pass. Chronicler already passed and needed no workflow change. The
+    collection RCA and finalizer coverage follow-up are owned by the
     [SwiftCollections tracker](https://github.com/mrdav30/SwiftCollections/blob/develop/docs/feature-work/issue-tracker.md).
 
 - [`Full-Lifecycle Replay Conformance`](done/2026-10-06-full-lifecycle-replay-conformance-plan.md)
   - Completed 2026-10-07. Full host-loop stepping, reviewed command/result
     fixtures and native Windows/Linux x64/ARM64 Release/Lean CI now agree across
-    five fixtures and 36 frames. [Run 37640701967](https://github.com/mrdav30/Gravitas/actions/runs/37640701967)
+    five fixtures and 36 frames.
+    [Run 37640701967](https://github.com/mrdav30/Gravitas/actions/runs/37640701967)
     passed every lane and direct comparison; downloaded artifacts independently
     reproduce the result. Exact production coverage remains 100%. Develop
     validates the source stack; main promotion still requires released packages.
@@ -121,16 +124,18 @@ instead of burying it in notes.
   - Same-value assignments preserve sleep; changed runtime assignments are
     allowed between complete steps. Recorded-state loads retain saved sleep.
     Release/Lean coverage, replay, and warmed allocation gates pass; the 3D
-    field-to-property migration is documented. Gravitas phase committed in `942d80f`.
+    field-to-property migration is documented. Gravitas phase committed in
+    `942d80f`.
 
 - [`Circle Workload Partition And Grounding Scaling`](benchmark-signal-hardening-backlog.md#grv-benchmark-023--circle-workload-partition-and-grounding-scaling)
   - GRV-Benchmark-023 closed 2026-10-04 under the predictable-scaling and
     published-cost criterion. Gravitas changes are committed through `1c2ce4a`,
     with coordinated FixedMathSharp `5447b34` and GridForge `3f34f8b` phases.
-  - Closure verification passed 4473/4414 Release/Lean tests with 100% line/branch/method coverage;
-    both target frameworks build without warnings/errors. Final scaling,
-    contract/allocation smoke and all three DocFX gates pass. Repeated controls
-    do not establish a stable full-step gain from the latest bounds rejection.
+  - Closure verification passed 4473/4414 Release/Lean tests with 100%
+    line/branch/method coverage; both target frameworks build without
+    warnings/errors. Final scaling, contract/allocation smoke and all three
+    DocFX gates pass. Repeated controls do not establish a stable full-step gain
+    from the latest bounds rejection.
   - At 1024 diagonal pairs, 16-unit cells cost 30.0562 +/- 0.5735 ms and unit
     cells 201.9929 +/- 4.3606 ms, both 0 B/op. Costs are not uniformly linear;
     closure does not certify a fixed-Hz host budget. Detailed counts, rejected
@@ -147,13 +152,13 @@ instead of burying it in notes.
     improve. Both repositories retain 100% reachable line/branch/method coverage
     in Release and Lean in that capture.
   - The 2026-10-02 GRV-Benchmark-022 follow-up removes redundant shared vector
-    rescaling, preserves raw results and improves diagonal/rotated direct queries
-    by 7.2%/3.7%. A sustained 64/1024-pair workload keeps the remaining exact
-    premium visible without claiming a full-step speedup or accepting a frame
-    budget. Its larger partition/grounding costs are documented in closed
-    GRV-Benchmark-023.
-    Fresh Release/ReleaseLean builds and suites pass in both repositories with
-    exact 100% reachable line/branch/method coverage and no review findings.
+    rescaling, preserves raw results and improves diagonal/rotated direct
+    queries by 7.2%/3.7%. A sustained 64/1024-pair workload keeps the remaining
+    exact premium visible without claiming a full-step speedup or accepting a
+    frame budget. Its larger partition/grounding costs are documented in closed
+    GRV-Benchmark-023. Fresh Release/ReleaseLean builds and suites pass in both
+    repositories with exact 100% reachable line/branch/method coverage and no
+    review findings.
 
 - [`Complete Capsule/Slab Contact`](done/2026-09-29-complete-capsule-slab-contact-plan.md)
   - Completed 2026-09-30; GRV-Issue-088 is resolved. Both repositories retain
@@ -162,47 +167,48 @@ instead of burying it in notes.
     37-41%. The user accepted the remaining complete-query cost for now.
   - GRV-Benchmark-021 closed 2026-10-05; Gravitas `989c7f9` and coordinated
     FixedMathSharp `bd8f6a2` are committed. GRV-Benchmark-020 also closes on
-    2026-10-05 after its separate investigation. Their shared
-    analytic materializer and distinct oblique root paths have coordinated
-    profiles. [Retained-root refinement](done/2026-10-04-capsule-slab-cost-refinement.md)
+    2026-10-05 after its separate investigation. Their shared analytic
+    materializer and distinct oblique root paths have coordinated profiles.
+    [Retained-root refinement](done/2026-10-04-capsule-slab-cost-refinement.md)
     improves four oblique stadium fixtures by 7.1-24.2% with 0 B/op. The
     [certified-sign refinement](done/2026-10-05-capsule-slab-sign-refinement.md)
-    subsequently brings the analytic-winner fixture to about 1.39 ms with
-    0 B/op (49.9-51.3% mean reduction across repeated committed baselines),
-    reusing retained-cell and endpoint certificates with a measured
-    point-evaluation budget. The subsequent
+    subsequently brings the analytic-winner fixture to about 1.39 ms with 0 B/op
+    (49.9-51.3% mean reduction across repeated committed baselines), reusing
+    retained-cell and endpoint certificates with a measured point-evaluation
+    budget. The subsequent
     [root-isolation refinement](done/2026-10-05-capsule-slab-root-isolation-refinement.md)
     shares subdivision counts and reciprocal-chart chains and certifies negative
     global minima. Its four fixtures improve another 11.5-26.4% against fresh
     committed captures, to 0.53-1.05 ms/query, all 0 B/op. Closure uses verified
-    gains and published remaining cost, not a fixed-rate workload budget.
-    No single common CPU hotspot is proved for #020 and #021. Exact classification, rounding, chart
-    coverage and bounded scratch remain unchanged. Fresh 2026-10-05
-    standard/Lean coverage remains exactly 100% line/branch/method in both
-    repositories; focused Debug/resource checks and both DocFX gates pass.
+    gains and published remaining cost, not a fixed-rate workload budget. No
+    single common CPU hotspot is proved for #020 and #021. Exact classification,
+    rounding, chart coverage and bounded scratch remain unchanged. Fresh
+    2026-10-05 standard/Lean coverage remains exactly 100% line/branch/method in
+    both repositories; focused Debug/resource checks and both DocFX gates pass.
 
 - [`Complete Capsule/Circle-Slab Contacts`](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query)
   - Completed 2026-09-29. Mixed capsule contacts reuse FixedMathSharp's complete
     cylinder/capsule geometry, including zero-core planar capsule slabs. The
     incomplete direction helpers are removed, full slab thickness is retained,
-    and exact rim classification, minimum depth and canonical anchors agree
-    with the shared 3D contract. Nonzero-core capsule slabs were subsequently
+    and exact rim classification, minimum depth and canonical anchors agree with
+    the shared 3D contract. Nonzero-core capsule slabs were subsequently
     repaired as GRV-Issue-088. The measured complete-query cost, including
     equivalent 3D controls, is retained as GRV-Benchmark-020. Its first
     [exact output refinement](done/2026-10-05-capsule-circle-cost-refinement.md)
-    improves the representative oblique query by 37.2% mixed / 35.6% 3D,
-    to 0.72-0.75 ms at 0 B/op with exact 100% standard/Lean coverage across
-    both repositories. Subsequent certified point signs, invariant normal products
+    improves the representative oblique query by 37.2% mixed / 35.6% 3D, to
+    0.72-0.75 ms at 0 B/op with exact 100% standard/Lean coverage across both
+    repositories. Subsequent certified point signs, invariant normal products
     and factored radical bounds bring endpoint rim output to 37–39 µs, ordinary
     output to roughly 10–11.5 µs and the oblique query to about 0.70 ms. Shared
     stadium ordinary contacts improve another 36–54% and straight-rim output
-    improves 23%; oblique and triangle controls have small shifts with overlapping
-    intervals. GRV-Benchmark-020 closes 2026-10-05 with 0 B/op throughout and
-    fresh exact 100% reachable line/branch/method coverage in both configurations,
-    Debug resource/allocation checks, both target frameworks and DocFX/local-link
-    gates. The rejected cell-certificate experiment is removed. Remaining exact
-    oblique root cost is published under the same judgment-based closure bar as
-    #021; these query costs promise no host rate or universal multiplayer scale.
+    improves 23%; oblique and triangle controls have small shifts with
+    overlapping intervals. GRV-Benchmark-020 closes 2026-10-05 with 0 B/op
+    throughout and fresh exact 100% reachable line/branch/method coverage in
+    both configurations, Debug resource/allocation checks, both target
+    frameworks and DocFX/local-link gates. The rejected cell-certificate
+    experiment is removed. Remaining exact oblique root cost is published under
+    the same judgment-based closure bar as #021; these query costs promise no
+    host rate or universal multiplayer scale.
 
 - [`Canonical-Frame Cone-Volume Queries`](issue-tracker.md#grv-issue-087---cone-volume-queries-reject-an-intersecting-mesh-when-the-apex-cannot-enter-its-scalar-frame)
   - Completed 2026-09-29. Closest/all-hit and batch cone queries preserve the
@@ -212,11 +218,11 @@ instead of burying it in notes.
 
 - [`Complete Triangle/Cylinder Cost Refinement`](done/2026-10-06-triangle-cylinder-cost-refinement.md)
   - GRV-Benchmark-018 closes 2026-10-06 after exact reciprocal-chart and
-    opposite-direction support reuse. Complete feature admission, canonical ties,
-    correctly rounded depth and paired witnesses remain shared by 3D cylinder
-    and mixed circle-slab contacts.
-  - Rim-heavy fixtures improve 9-20%; 64-pair mesh batches improve 6.5-8.1%,
-    all at 0 B/op. Positive-core triangle/slab controls preserve results and
+    opposite-direction support reuse. Complete feature admission, canonical
+    ties, correctly rounded depth and paired witnesses remain shared by 3D
+    cylinder and mixed circle-slab contacts.
+  - Rim-heavy fixtures improve 9-20%; 64-pair mesh batches improve 6.5-8.1%, all
+    at 0 B/op. Positive-core triangle/slab controls preserve results and
     allocations. Winning-root retention is reverted after its preliminary gain
     fails the fresh controlled comparison.
   - Fresh Release/Lean coverage, Debug/resource tests, both target frameworks
@@ -231,15 +237,16 @@ instead of burying it in notes.
   - Both repositories retain 100% reachable line, branch and method coverage in
     Release and ReleaseLean. Exact face certificates and shared depth reduction
     cut ordinary face costs by 67–89% from the first complete solver; measured
-    remaining costs are published in closed GRV-Benchmark-019. Fresh shared-owner
-    controls detected no material regression; frequency and complete-step capacity
-    remain GRV-Benchmark-024. The separate cone-volume query bug was resolved as
-    GRV-Issue-087.
+    remaining costs are published in closed GRV-Benchmark-019. Fresh
+    shared-owner controls detected no material regression; frequency and
+    complete-step capacity remain GRV-Benchmark-024. The separate cone-volume
+    query bug was resolved as GRV-Issue-087.
   - [Final benchmark refinement](done/2026-10-06-triangle-cone-final-refinement.md)
     closes GRV-Benchmark-019 after four measured passes through existing exact
     owners. The last retained root-sign change lowers interior-rim cost by 4.1%
-    against its fresh baseline, with zero allocations and 100% coverage. Ordinary
-    faces cost about 23-29 us; remaining exact rim and gap costs are published.
+    against its fresh baseline, with zero allocations and 100% coverage.
+    Ordinary faces cost about 23-29 us; remaining exact rim and gap costs are
+    published.
 
 - [`Mixed Discrete Broad-Phase Signal Closure`](benchmark-signal-hardening-backlog.md#grv-benchmark-012--mixed-discrete-broad-phase-allocation-at-32-pairs)
   - Completed 2026-08-04. The original run-dependent 32-pair allocation no

@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/TestResults/
+**/__pycache__/
+artifacts/
+BenchmarkDotNet.Artifacts/
+.vs/
+.codex/
+node_modules/
+# Reviewed replay inputs are identified by their exact file hashes.
+tests/Gravitas.Tests/Determinism/Fixtures/

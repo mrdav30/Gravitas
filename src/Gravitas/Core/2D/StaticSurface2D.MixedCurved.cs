@@ -1,5 +1,10 @@
+//=======================================================================
+// StaticSurface2D.MixedCurved.cs
+//=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
+//=======================================================================
+
 using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
@@ -237,7 +242,9 @@ public sealed partial class StaticSurface2D
         internal readonly RationalPoint3d Reference;
         internal CurvedGroup(int member, int face, RationalSegmentInterval clip, Fixed64 lower, Fixed64 upper,
             int boundaryEdge, bool farBoundary, WideDirection3d axis, RationalPoint3d reference)
-        { Member = member; Face = face; Clip = clip; Lower = lower; Upper = upper;
-            BoundaryEdge = boundaryEdge; FarBoundary = farBoundary; Axis = axis; Reference = reference; }
+        {
+            Member = member; Face = face; Clip = clip; Lower = lower; Upper = upper;
+            BoundaryEdge = boundaryEdge; FarBoundary = farBoundary; Axis = axis; Reference = reference;
+        }
     }
 }

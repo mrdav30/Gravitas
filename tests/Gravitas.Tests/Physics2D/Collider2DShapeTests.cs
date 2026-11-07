@@ -1,10 +1,10 @@
+using System;
+using System.Collections.Generic;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;

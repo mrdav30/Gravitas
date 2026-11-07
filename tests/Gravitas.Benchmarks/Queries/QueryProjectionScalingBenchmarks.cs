@@ -1,10 +1,4 @@
-//=======================================================================
-// QueryProjectionScalingBenchmarks.cs
-//=======================================================================
-// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
-// See LICENSE file in the project root for full license information.
-//=======================================================================
-
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Queries;
@@ -13,7 +7,6 @@ using GridForge.Configuration;
 using GridForge.Grids.Storage;
 using GridForge.Spatial;
 using SwiftCollections;
-using System;
 
 namespace Gravitas.Benchmarks;
 

@@ -1,25 +1,21 @@
 //=======================================================================
 // CollisionPair.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Grids;
 using GridForge.Grids.Topology;
 using SwiftCollections;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
-internal enum CollisionResponseDispatchMode
-{
-    Immediate,
-    Deferred
-}
+
 
 /// <summary>
 /// Owns deterministic 3D pair lifecycle, culling, contact, and notification state.

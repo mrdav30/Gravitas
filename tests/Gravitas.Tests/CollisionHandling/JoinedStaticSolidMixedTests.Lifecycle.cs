@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -5,10 +9,6 @@ using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -50,7 +50,7 @@ public sealed partial class JoinedStaticSolidMixedTests
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         LSCollider2D left = Rectangle(scene, -2, 0, -2, 2, Fixed64.Two);
         var right = new LSPolygonCollider2D(new(0, -2), new(2, 2), new(0, -1))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         right.InitializeWithNoBody(new TestMatterAgent(scene.Context));
         using var surface = scene.Context.Physics2D.CreateStaticSurface(new[] { left, right });
         LSCollider mover = Mover(scene, false, new(Fixed64.Zero, 7 * Fixed64.Quarter, Fixed64.Zero),
@@ -79,7 +79,7 @@ public sealed partial class JoinedStaticSolidMixedTests
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         int x = connected ? 0 : 2;
         var tip = new LSPolygonCollider2D(new(x, 0), new(x, -2), new(x + 2, -2))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         // Exercise both supplier orders, including an edge node preceding its face.
         if (hull) tip.InitializeWithNoBody(new TestMatterAgent(scene.Context));
         LSCollider2D face = Rectangle(scene, connected ? -2 : -4, connected ? 0 : -2, -2, 0, Fixed64.Two);
@@ -352,4 +352,3 @@ public sealed partial class JoinedStaticSolidMixedTests
         return pair!;
     }
 }
-

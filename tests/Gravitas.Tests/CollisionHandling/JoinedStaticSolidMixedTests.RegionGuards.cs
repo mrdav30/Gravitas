@@ -1,9 +1,9 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -55,8 +55,10 @@ public sealed partial class JoinedStaticSolidMixedTests
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         LSCollider2D face = Rectangle(scene, -2, 0, -2, 0, Fixed64.Two);
         var tip = new LSPolygonCollider2D(new(0, 0), new(1, -2), new(2, -2))
-            { MixedHalfThicknessOverride = clippedTip ? Fixed64.Two : Fixed64.One,
-                Material = PhysicsMaterial.Frictionless };
+        {
+            MixedHalfThicknessOverride = clippedTip ? Fixed64.Two : Fixed64.One,
+            Material = PhysicsMaterial.Frictionless
+        };
         tip.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(
             new Vector3d(Fixed64.Zero, clippedTip ? Fixed64.Zero : -Fixed64.One, Fixed64.Zero),
             FixedQuaternion.Identity, Vector3d.One)));
@@ -66,7 +68,7 @@ public sealed partial class JoinedStaticSolidMixedTests
         if (clippedTip)
         {
             var cover = new LSPolygonCollider2D(new(0, 0), new(-1, 1), new(1, -2))
-                { MixedHalfThicknessOverride = 3 * Fixed64.Half, Material = PhysicsMaterial.Frictionless };
+            { MixedHalfThicknessOverride = 3 * Fixed64.Half, Material = PhysicsMaterial.Frictionless };
             cover.InitializeWithNoBody(new TestMatterAgent(scene.Context,
                 new FixedTransform(Vector3d.Up * Fixed64.Half, FixedQuaternion.Identity, Vector3d.One)));
             members.Add(cover);
@@ -172,9 +174,9 @@ public sealed partial class JoinedStaticSolidMixedTests
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         var left = new LSPolygonCollider2D(new(-4, -2), new(0, -2), new(0, 2), new(-4, 2))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         var right = new LSPolygonCollider2D(new(0, -2), new(4, -2), new(4, 2), new(0, 2))
-            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+        { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
         FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)31, Fixed64.Zero);
         foreach (LSCollider2D member in new[] { left, right })
             member.InitializeWithNoBody(new TestMatterAgent(scene.Context,

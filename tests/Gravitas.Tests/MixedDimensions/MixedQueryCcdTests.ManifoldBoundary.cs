@@ -58,7 +58,8 @@ public sealed partial class MixedQueryCcdTests
         {
             new Vector3d(x, (Fixed64)(-2), (Fixed64)(-2)), new Vector3d(x, (Fixed64)2, (Fixed64)(-2)),
             new Vector3d(x, (Fixed64)(-2), (Fixed64)2), new Vector3d(x, (Fixed64)2, (Fixed64)2)
-        }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = material };
+        }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = material };
         mesh.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         SolidBody2D source = CreateCircle2D(context, Vector2d.Zero);
@@ -101,7 +102,8 @@ public sealed partial class MixedQueryCcdTests
             var compound = new LSCompoundCollider2D(CompoundColliderPart2D.Circle(Fixed64.Half,
                 Vector2d.Zero, PhysicsMaterial.Frictionless));
             body2D = new SolidBody2D(new TestMatterAgent(context,
-                new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), compound) { Mass = Fixed64.One };
+                new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), compound)
+            { Mass = Fixed64.One };
             body2D.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
             body2D.Agent.Transform.LocalPosition = Vector3d.Right;
         }

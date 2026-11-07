@@ -657,8 +657,10 @@ public sealed partial class ContinuousCollision2DTests
     {
         var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One * (pending ? (Fixed64)4096 : Fixed64.One));
         var collider = new LSCircleCollider2D(pending ? Fixed64.Half : Fixed64.Quarter)
-        { LocalOffset = pending ? Vector2d.Zero : Vector2d.Right * Fixed64.Half,
-            MixedHalfThicknessOverride = Fixed64.One };
+        {
+            LocalOffset = pending ? Vector2d.Zero : Vector2d.Right * Fixed64.Half,
+            MixedHalfThicknessOverride = Fixed64.One
+        };
         var source = new SolidBody2D(new TestMatterAgent(context, transform), collider);
         source.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;

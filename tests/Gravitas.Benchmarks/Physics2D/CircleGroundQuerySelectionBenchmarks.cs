@@ -1,8 +1,8 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Queries;
 using SwiftCollections;
-using System;
 
 namespace Gravitas.Benchmarks;
 

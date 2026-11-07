@@ -94,8 +94,11 @@ public sealed class OrdinaryConvexPatchSweepTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         LSMeshCollider target = Quad(0);
         scenario.InitializeStaticCollider(target, Vector3d.Zero);
-        var source = new LSCapsuleCollider { Radius = Fixed64.Quarter,
-            Size = new Vector3d(Fixed64.Half, (Fixed64)4, Fixed64.Half) };
+        var source = new LSCapsuleCollider
+        {
+            Radius = Fixed64.Quarter,
+            Size = new Vector3d(Fixed64.Half, (Fixed64)4, Fixed64.Half)
+        };
         Vector3d center = coplanar ? new Vector3d(0, 3, 0) : new Vector3d(-3, -2, 0);
         Vector3d travel = coplanar ? Vector3d.Down * (Fixed64)4 : new Vector3d(6, 4, 0);
         scenario.CreateBody(source, center,

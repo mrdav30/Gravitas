@@ -68,8 +68,11 @@ public sealed class PreparedConvexMeshInitialContactTests
                 new Vector3d(Fixed64.FromFraction(1, 5), Fixed64.Zero, Fixed64.FromFraction(1, 5)) },
             new[] { 0, 2, 1 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         scenario.InitializeStaticCollider(target, Vector3d.Zero);
-        var source = new LSCapsuleCollider { Radius = Fixed64.FromFraction(1, 10),
-            Size = new Vector3d(Fixed64.FromFraction(1, 5), Fixed64.FromFraction(11, 5), Fixed64.FromFraction(1, 5)) };
+        var source = new LSCapsuleCollider
+        {
+            Radius = Fixed64.FromFraction(1, 10),
+            Size = new Vector3d(Fixed64.FromFraction(1, 5), Fixed64.FromFraction(11, 5), Fixed64.FromFraction(1, 5))
+        };
         source.InitializeWithNoBody(new TestMatterAgent(scenario.Context, new FixedTransform(Vector3d.Right + Vector3d.Up * Fixed64.FromFraction(1, 10),
             FixedQuaternion.FromAxisAngle(Vector3d.Forward, -Fixed64.PiOver4), Vector3d.One)));
         target.Mesh.GetGeometryTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
@@ -319,8 +322,11 @@ public sealed class PreparedConvexMeshInitialContactTests
             nearest * Fixed64.Two - perpendicular },
             new[] { 0, 1, 2 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         scenario.InitializeStaticCollider(target, Vector3d.Zero);
-        var source = new LSCylinderCollider { Radius = radius,
-            Size = new Vector3d(Fixed64.One, Fixed64.MinIncrement, Fixed64.One) };
+        var source = new LSCylinderCollider
+        {
+            Radius = radius,
+            Size = new Vector3d(Fixed64.One, Fixed64.MinIncrement, Fixed64.One)
+        };
         scenario.InitializeStaticCollider(source, Vector3d.Zero);
 
         // Radius is about 0.625 units. Both triangle edges leave the nearest

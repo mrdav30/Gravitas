@@ -1,12 +1,11 @@
+using System;
+using System.Numerics;
 using FixedMathSharp;
-using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
-using System;
-using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -863,23 +862,23 @@ public sealed class LSCompoundColliderMassPropertyTests
         center = new Vector3d(coordinates[0], coordinates[1], coordinates[2]);
         Fixed64[] entries = new Fixed64[9];
         for (int row = 0; row < 3; row++)
-        for (int column = 0; column < 3; column++)
-        {
-            BigInteger integral = BigInteger.Zero;
-            for (int part = 0; part < 2; part++)
+            for (int column = 0; column < 3; column++)
             {
-                BigInteger[] shift = new BigInteger[3];
-                for (int axis = 0; axis < 3; axis++)
-                    shift[axis] = (part == 0 ? BigInteger.Zero : offset[axis]) - coordinates[axis].m_rawValue;
-                BigInteger geometry = row == column ? 1717986918 * radii[part] * radii[part]
-                    : -q * shift[row] * shift[column];
-                if (row == column)
+                BigInteger integral = BigInteger.Zero;
+                for (int part = 0; part < 2; part++)
+                {
+                    BigInteger[] shift = new BigInteger[3];
                     for (int axis = 0; axis < 3; axis++)
-                        if (axis != row) geometry += q * shift[axis] * shift[axis];
-                integral += weights[part] * geometry;
+                        shift[axis] = (part == 0 ? BigInteger.Zero : offset[axis]) - coordinates[axis].m_rawValue;
+                    BigInteger geometry = row == column ? 1717986918 * radii[part] * radii[part]
+                        : -q * shift[row] * shift[column];
+                    if (row == column)
+                        for (int axis = 0; axis < 3; axis++)
+                            if (axis != row) geometry += q * shift[axis] * shift[axis];
+                    integral += weights[part] * geometry;
+                }
+                entries[row * 3 + column] = RoundRational(massRaw * integral, totalWeight * q * q * q);
             }
-            entries[row * 3 + column] = RoundRational(massRaw * integral, totalWeight * q * q * q);
-        }
         return new Fixed3x3(entries[0], entries[1], entries[2], entries[3], entries[4], entries[5], entries[6], entries[7], entries[8]);
     }
 

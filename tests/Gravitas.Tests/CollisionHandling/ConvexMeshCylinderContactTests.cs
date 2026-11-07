@@ -163,6 +163,7 @@ public sealed class ConvexMeshCylinderContactTests
         Vector3d[] vertices = fixture.Mesh.LocalVertices.ToArray();
         for (int i = 0; i < vertices.Length; i++) vertices[i] *= Fixed64.Two;
         return new LSMeshCollider(vertices, fixture.Mesh.Triangles.ToArray(), mode,
-            MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+            MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
     }
 }

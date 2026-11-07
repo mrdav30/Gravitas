@@ -149,7 +149,8 @@ public sealed partial class MixedNarrowPhaseTests
         var compound3D = new LSCompoundCollider(CompoundColliderPart.Capsule(
             Fixed64.One, (Fixed64)4, Vector3d.Zero, PhysicsMaterial.Frictionless));
         var compound2D = new LSCompoundCollider2D(CompoundColliderPart2D.Capsule(
-            Fixed64.One, (Fixed64)4, Vector2d.Zero, PhysicsMaterial.Bouncy)) { MixedHalfThicknessOverride = Fixed64.One };
+            Fixed64.One, (Fixed64)4, Vector2d.Zero, PhysicsMaterial.Bouncy))
+        { MixedHalfThicknessOverride = Fixed64.One };
         ScenarioBody<LSCompoundCollider> capsule = CreateBody3D(context, compound3D,
             new Vector3d(Fixed64.FromFraction(7, 4), Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
         CreateBody2D(context, compound2D, Vector2d.Zero);

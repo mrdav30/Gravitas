@@ -1,14 +1,14 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
-using System;
 
 namespace Gravitas.Benchmarks;
 
 [MemoryDiagnoser]
-public class MixedCollisionResponseBenchmarks
+public partial class MixedCollisionResponseBenchmarks
 {
     private GravitasWorldContext _context;
     private CollisionPairMixed[] _pairs;
@@ -145,11 +145,7 @@ public class MixedCollisionResponseBenchmarks
         public TCollider Collider { get; }
     }
 
-    public enum ResponseMaterialMode
-    {
-        Default,
-        Distinct
-    }
+
 
     private static readonly PhysicsMaterial RoughSurface = new(
         (Fixed64)2,

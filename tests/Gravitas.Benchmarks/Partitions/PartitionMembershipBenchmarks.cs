@@ -1,6 +1,6 @@
+using System;
 using BenchmarkDotNet.Attributes;
 using SwiftCollections;
-using System;
 
 namespace Gravitas.Benchmarks;
 

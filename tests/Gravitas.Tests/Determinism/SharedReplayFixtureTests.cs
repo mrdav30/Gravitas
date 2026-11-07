@@ -1,8 +1,8 @@
-using FixedMathSharp;
-using Gravitas.Support;
 using System;
 using System.IO;
 using System.Linq;
+using FixedMathSharp;
+using Gravitas.Support;
 using Xunit;
 
 namespace Gravitas.Tests.Determinism;

@@ -8,50 +8,51 @@ their recorded investigations; they are not claims of fresh validation or a
 current package release. Signals without an expanded section retain their
 original table evidence. Relative links resolve to the same records as before.
 
-Use the [backlog](../benchmark-signal-hardening-backlog.md) for the current queue,
-experimental signals and compact [closed index](../benchmark-signal-hardening-backlog.md#closed-signals).
+Use the [backlog](../benchmark-signal-hardening-backlog.md) for the current
+queue, experimental signals and compact
+[closed index](../benchmark-signal-hardening-backlog.md#closed-signals).
 
 ## Closed Signals
 
-| Signal                                                                                                                                               | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost](#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost) | Closed | 2026-11-01 | Ordinary whole-mesh convex patch/prism contacts reuse native SAT/witness/reduction owners; full-step, physical and compatibility evidence follows. |
-| [GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost](#grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost) | Closed | 2026-11-01 | Exact unit-basis planar sampling removes redundant decomposition while preserving transform freshness and fixed-point rounding; matched host/refresh controls and limits follow. |
-| [GRV-Benchmark-029 — Dense mesh sweeps](#grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening) | Closed | 2026-10-31 | Certified patch/carrier sweeps and query-local duplicate reuse reduce query costs by 96.6–99.9% at 2,048 triangles and zero warm allocation; finite geometry and small-control limits are explicit. |
-| [GRV-Benchmark-028 — Mixed broad phase with an empty opposite dimension](#grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension) | Closed | 2026-10-31 | Skipped impossible mixed distribution; 30–42% lower measured empty-population step time, zero warm allocation and preserved query/lifetime behavior. |
-| [GRV-Benchmark-027 — Nonconvex rotational CCD step cost](#grv-benchmark-027--nonconvex-rotational-ccd-step-cost) | Closed | 2026-10-31 | Deferred exact contact materialization reduces measured cone steps by 59–64% and the pressed-capsule episode by 65%, at zero warm allocation; residual conservative progress limits and reopening criteria are explicit. |
-| [GRV-Benchmark-032 — First isolated 2D pair-owner deactivation allocation](#grv-benchmark-032--first-isolated-2d-pair-owner-deactivation-allocation) | Closed | 2026-10-30 | Removed default-value boxing from SwiftCollections dictionary/set nullability initializers; cold collection regressions and unchanged 2D teardown now allocate 0 B, with full standard/Lean consumer passes and 100% reachable coverage.                                                        |
-| [GRV-Benchmark-026 — Initial generic convex mesh contact cost](#grv-benchmark-026--initial-generic-convex-mesh-contact-resolution-cost)              | Closed | 2026-10-30 | Deferred witnesses improve initial sweeps; a certified whole-patch follow-up lowers the ordinary concave capsule row by about 80%, at 0 B/op. Output tolerances and control variation are published; the pre-existing #032 validation exception was subsequently resolved upstream.             |
-| [GRV-Benchmark-025 — Debug ragdoll steady-state allocations](#grv-benchmark-025--debug-ragdoll-steady-state-allocations)                             | Closed | 2026-10-30 | Current Debug/Release allocation stacks agree; restore the strict warmed humanoid guard without a runtime change. Historical 4.3 MB remains unattributed.                                                                                                                                       |
-| [GRV-Benchmark-018 — Complete triangle/cylinder contact cost](#grv-benchmark-018--complete-trianglecylinder-contact-cost)                            | Closed | 2026-10-06 | Exact reciprocal-chart and opposite-direction reuse cut rim-heavy queries by 9-20% and 64-pair batches by 6.5-8.1%, at 0 B/op and 100% coverage. Root retention is reverted; scene capacity remains GRV-Benchmark-024.                                                                          |
-| [GRV-Benchmark-019 — Complete triangle/cone contact cost](#grv-benchmark-019--complete-trianglecone-contact-cost)                                    | Closed | 2026-10-06 | Four measured passes retain exact complete contact geometry at 0 B/op and 100% coverage. Final root-sign refinement lowers interior rim by 4.1%; remaining costs and workload-frequency gate are published in GRV-Benchmark-024.                                                                |
-| [GRV-Benchmark-020 — Complete capsule/circle-slab contact cost](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost)                        | Closed | 2026-10-05 | Exact output bounds, invariant normal products and certified Sturm signs reduce endpoint output to 37–39 µs and representative oblique contacts to 0.70 ms, with shared-consumer gains, 0 B/op and 100% coverage. Remaining exact root cost is published without a host-rate guarantee.         |
-| [GRV-Benchmark-021 — Complete capsule/stadium-slab curved contact cost](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost)        | Closed | 2026-10-05 | Shared exact root isolation and negative global-minimum certificates improve four fixtures by 11.5-26.4%, at 0 B/op and 100% coverage. Committed in Gravitas `989c7f9` / FixedMathSharp `bd8f6a2`; remaining costs are published without a host-rate guarantee.                                 |
-| [GRV-Benchmark-023 — Circle workload partition and grounding scaling](#grv-benchmark-023--circle-workload-partition-and-grounding-scaling)           | Closed | 2026-10-04 | Ownership/storage/math repairs and lean 2D gathering retained; repeated controls, 100% coverage and published configuration costs support the no-further-change decision. Latest refinement remains unstaged for review; no fixed-Hz guarantee.                                                 |
-| GRV-Benchmark-022 — Exact pure-2D circle contact cost                                                                                                | Closed | 2026-10-02 | Shared normalization optimization committed; retain exact contact owner under documented no-further-change decision. Scene partition/grounding costs are documented separately in closed GRV-Benchmark-023.                                                                                     |
-| GRV-Benchmark-012 — Mixed discrete broad-phase allocation at 32 pairs                                                                                | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation                                       |
-| <a id="grv-benchmark-017--mixed-public-sweep-traversal-on-extreme-sparse-grid-spans"></a>GRV-Benchmark-017 — Mixed public sweep traversal on extreme sparse-grid spans                                                                        | Closed | 2026-08-04 | GridForge's two-tier hash/BVH index replaces 64-billion-cell registration with active-grid scaling; Gravitas completes the exact public sweep in 14.8-16.0 us at 0 B with deterministic candidate and hit order; full evidence is retained in GridForge's completed two-tier spatial-index plan |
-| GRV-Benchmark-013 — Mesh scale rebuild allocation                                                                                                    | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                                                                          |
-| <a id="grv-benchmark-015--exact-3d-contact-response-ordinary-throughput"></a>GRV-Benchmark-015 — Exact 3D contact-response ordinary throughput                                                                                    | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                                                                        |
-| <a id="grv-benchmark-016--exact-canonical-obb-ordinary-throughput"></a>GRV-Benchmark-016 — Exact canonical OBB ordinary throughput                                                                                          | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                                                                                |
-| GRV-Benchmark-011 — Physics-material combine numeric hardening                                                                                       | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                                                                               |
-| GRV-Benchmark-010 — Checked mesh scale and thin-shell cache cost                                                                                     | Closed | 2026-07-12 | Scale changes retain deterministic O(triangle-count) checked rebuilding, while successfully validated shell and volume properties are cached and repeated cached reads remain allocation-free                                                                                                   |
-| GRV-Benchmark-009 — Replay hash collider-ID churn scaling                                                                                            | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity                                                           |
-| GRV-Benchmark-008 — Pure 2D response position-correction repartition allocation                                                                      | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                                                                                  |
-| GRV-Benchmark-005 — SwiftCollections sort hot-path allocation                                                                                        | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                                                                         |
-| GRV-Benchmark-006 — Mixed mesh finite-slab triangle scaling signal                                                                                   | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates                                                     |
-| GRV-Benchmark-001 — Pure 2D dynamic CCD candidate asymmetry                                                                                          | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity                                                                                                                                                                         |
-| GRV-Benchmark-002 — 3D shape-exact false-positive cost                                                                                               | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement                                                                                                                                                                                 |
-| GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                                                                                     | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
-| GRV-Benchmark-003 — 3D full-runtime CCD allocation                                                                                                   | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
-| GRV-Benchmark-004 — Grounding raycast probe allocation                                                                                               | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+| Signal                                                                                                                                                                 | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost](#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost)                                             | Closed | 2026-11-01 | Ordinary whole-mesh convex patch/prism contacts reuse native SAT/witness/reduction owners; full-step, physical and compatibility evidence follows.                                                                                                                                              |
+| [GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost](#grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost)                             | Closed | 2026-11-01 | Exact unit-basis planar sampling removes redundant decomposition while preserving transform freshness and fixed-point rounding; matched host/refresh controls and limits follow.                                                                                                                |
+| [GRV-Benchmark-029 — Dense mesh sweeps](#grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening)                                                       | Closed | 2026-10-31 | Certified patch/carrier sweeps and query-local duplicate reuse reduce query costs by 96.6–99.9% at 2,048 triangles and zero warm allocation; finite geometry and small-control limits are explicit.                                                                                             |
+| [GRV-Benchmark-028 — Mixed broad phase with an empty opposite dimension](#grv-benchmark-028--mixed-broad-phase-work-with-an-empty-opposite-dimension)                  | Closed | 2026-10-31 | Skipped impossible mixed distribution; 30–42% lower measured empty-population step time, zero warm allocation and preserved query/lifetime behavior.                                                                                                                                            |
+| [GRV-Benchmark-027 — Nonconvex rotational CCD step cost](#grv-benchmark-027--nonconvex-rotational-ccd-step-cost)                                                       | Closed | 2026-10-31 | Deferred exact contact materialization reduces measured cone steps by 59–64% and the pressed-capsule episode by 65%, at zero warm allocation; residual conservative progress limits and reopening criteria are explicit.                                                                        |
+| [GRV-Benchmark-032 — First isolated 2D pair-owner deactivation allocation](#grv-benchmark-032--first-isolated-2d-pair-owner-deactivation-allocation)                   | Closed | 2026-10-30 | Removed default-value boxing from SwiftCollections dictionary/set nullability initializers; cold collection regressions and unchanged 2D teardown now allocate 0 B, with full standard/Lean consumer passes and 100% reachable coverage.                                                        |
+| [GRV-Benchmark-026 — Initial generic convex mesh contact cost](#grv-benchmark-026--initial-generic-convex-mesh-contact-resolution-cost)                                | Closed | 2026-10-30 | Deferred witnesses improve initial sweeps; a certified whole-patch follow-up lowers the ordinary concave capsule row by about 80%, at 0 B/op. Output tolerances and control variation are published; the pre-existing #032 validation exception was subsequently resolved upstream.             |
+| [GRV-Benchmark-025 — Debug ragdoll steady-state allocations](#grv-benchmark-025--debug-ragdoll-steady-state-allocations)                                               | Closed | 2026-10-30 | Current Debug/Release allocation stacks agree; restore the strict warmed humanoid guard without a runtime change. Historical 4.3 MB remains unattributed.                                                                                                                                       |
+| [GRV-Benchmark-018 — Complete triangle/cylinder contact cost](#grv-benchmark-018--complete-trianglecylinder-contact-cost)                                              | Closed | 2026-10-06 | Exact reciprocal-chart and opposite-direction reuse cut rim-heavy queries by 9-20% and 64-pair batches by 6.5-8.1%, at 0 B/op and 100% coverage. Root retention is reverted; scene capacity remains GRV-Benchmark-024.                                                                          |
+| [GRV-Benchmark-019 — Complete triangle/cone contact cost](#grv-benchmark-019--complete-trianglecone-contact-cost)                                                      | Closed | 2026-10-06 | Four measured passes retain exact complete contact geometry at 0 B/op and 100% coverage. Final root-sign refinement lowers interior rim by 4.1%; remaining costs and workload-frequency gate are published in GRV-Benchmark-024.                                                                |
+| [GRV-Benchmark-020 — Complete capsule/circle-slab contact cost](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost)                                          | Closed | 2026-10-05 | Exact output bounds, invariant normal products and certified Sturm signs reduce endpoint output to 37–39 µs and representative oblique contacts to 0.70 ms, with shared-consumer gains, 0 B/op and 100% coverage. Remaining exact root cost is published without a host-rate guarantee.         |
+| [GRV-Benchmark-021 — Complete capsule/stadium-slab curved contact cost](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost)                          | Closed | 2026-10-05 | Shared exact root isolation and negative global-minimum certificates improve four fixtures by 11.5-26.4%, at 0 B/op and 100% coverage. Committed in Gravitas `989c7f9` / FixedMathSharp `bd8f6a2`; remaining costs are published without a host-rate guarantee.                                 |
+| [GRV-Benchmark-023 — Circle workload partition and grounding scaling](#grv-benchmark-023--circle-workload-partition-and-grounding-scaling)                             | Closed | 2026-10-04 | Ownership/storage/math repairs and lean 2D gathering retained; repeated controls, 100% coverage and published configuration costs support the no-further-change decision. Latest refinement remains unstaged for review; no fixed-Hz guarantee.                                                 |
+| GRV-Benchmark-022 — Exact pure-2D circle contact cost                                                                                                                  | Closed | 2026-10-02 | Shared normalization optimization committed; retain exact contact owner under documented no-further-change decision. Scene partition/grounding costs are documented separately in closed GRV-Benchmark-023.                                                                                     |
+| GRV-Benchmark-012 — Mixed discrete broad-phase allocation at 32 pairs                                                                                                  | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation                                       |
+| <a id="grv-benchmark-017--mixed-public-sweep-traversal-on-extreme-sparse-grid-spans"></a>GRV-Benchmark-017 — Mixed public sweep traversal on extreme sparse-grid spans | Closed | 2026-08-04 | GridForge's two-tier hash/BVH index replaces 64-billion-cell registration with active-grid scaling; Gravitas completes the exact public sweep in 14.8-16.0 us at 0 B with deterministic candidate and hit order; full evidence is retained in GridForge's completed two-tier spatial-index plan |
+| GRV-Benchmark-013 — Mesh scale rebuild allocation                                                                                                                      | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                                                                          |
+| <a id="grv-benchmark-015--exact-3d-contact-response-ordinary-throughput"></a>GRV-Benchmark-015 — Exact 3D contact-response ordinary throughput                         | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                                                                        |
+| <a id="grv-benchmark-016--exact-canonical-obb-ordinary-throughput"></a>GRV-Benchmark-016 — Exact canonical OBB ordinary throughput                                     | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                                                                                |
+| GRV-Benchmark-011 — Physics-material combine numeric hardening                                                                                                         | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                                                                               |
+| GRV-Benchmark-010 — Checked mesh scale and thin-shell cache cost                                                                                                       | Closed | 2026-07-12 | Scale changes retain deterministic O(triangle-count) checked rebuilding, while successfully validated shell and volume properties are cached and repeated cached reads remain allocation-free                                                                                                   |
+| GRV-Benchmark-009 — Replay hash collider-ID churn scaling                                                                                                              | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity                                                           |
+| GRV-Benchmark-008 — Pure 2D response position-correction repartition allocation                                                                                        | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                                                                                  |
+| GRV-Benchmark-005 — SwiftCollections sort hot-path allocation                                                                                                          | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                                                                         |
+| GRV-Benchmark-006 — Mixed mesh finite-slab triangle scaling signal                                                                                                     | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates                                                     |
+| GRV-Benchmark-001 — Pure 2D dynamic CCD candidate asymmetry                                                                                                            | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity                                                                                                                                                                         |
+| GRV-Benchmark-002 — 3D shape-exact false-positive cost                                                                                                                 | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement                                                                                                                                                                                 |
+| GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                                                                                                       | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
+| GRV-Benchmark-003 — 3D full-runtime CCD allocation                                                                                                                     | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
+| GRV-Benchmark-004 — Grounding raycast probe allocation                                                                                                                 | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
 
 ### GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost
 
 **Status:** Closed 2026-11-01. Certified whole-mesh convex patches reuse the
-existing convex-pair SAT/contact owner against finite AABB/polygon prisms.
-This closes the ordinary open-quad signal, not arbitrary nonconvex mesh capacity
-or curved-contact workload frequency. Experimental #014/#024 remain separate.
+existing convex-pair SAT/contact owner against finite AABB/polygon prisms. This
+closes the ordinary open-quad signal, not arbitrary nonconvex mesh capacity or
+curved-contact workload frequency. Experimental #014/#024 remain separate.
 
 #### Attribution and implementation
 
@@ -61,10 +62,10 @@ A sampled full-step profile attributes **96.59%** to ordinary mesh/slab contact,
 including **84.52%** in `MeshSlabSurfaceBoundary.BuildSurfaceContacts` and
 **83.59%** in `SegmentSlabSurfaceContact`. Its prism edge/corner enumeration is
 the cost, not missing corner-fan recognition: `MeshSlabFaceRegions.Build`
-already consumes certified corners. Percentages are overlapping inclusive
-sample weights, not additive CPU fractions or acceptance timings. The capture
-uses `dotnet-trace` 10.0.750501 `dotnet-sampled-thread-time`, a one-second warmup
-and 12-second loop filtered to `RunProfile`, excluding fixture setup.
+already consumes certified corners. Percentages are overlapping inclusive sample
+weights, not additive CPU fractions or acceptance timings. The capture uses
+`dotnet-trace` 10.0.750501 `dotnet-sampled-thread-time`, a one-second warmup and
+12-second loop filtered to `RunProfile`, excluding fixture setup.
 
 The runtime diff is **22 net lines across three existing files**. The mixed
 owner widens its existing closed-convex/prism route to meshes whose entire
@@ -81,8 +82,8 @@ passes exactly its original geometry and is separately measured below.
 The whole-mesh certificate is intentionally conservative. It excludes holes,
 nonconvex fill, bent or disconnected surfaces and additional owners. Curved
 slabs keep their current owners. A positive-thickness convex prism supplies
-full-dimensional SAT axes, so the extra axes required when *both* operands
-are planar are unnecessary. A certified open sheet gains no filled interior.
+full-dimensional SAT axes, so the extra axes required when _both_ operands are
+planar are unnecessary. A certified open sheet gains no filled interior.
 Geometry uses `GeometryVertices`/`GeometryFrame` and the established bounded
 `mesh.Origin` witness chart. Empty witness visitation still declines to the
 original finite-surface path. Separation is a handled convex-pair result.
@@ -98,11 +99,11 @@ deliberate, not a claim of byte-identical manifolds or replay caches.
 The ten new maintained source-behavior cases exercise 16 axis-aligned setups
 (both windings, one/four subdivisions, rigid/affine placement, zero/extreme X),
 oblique finite rims and overlapping-bounds empty-corner misses, real compound
-leaves with independent materials/namespaces, and two repeated 128-frame
-freely rotating runs. They check finite matched witnesses, exact selected
-depth/normal, deterministic contact identity, whole-shape clearance through the
-independent authored-triangle continuous-admission path, drive preservation
-and same-version replay including solver caches.
+leaves with independent materials/namespaces, and two repeated 128-frame freely
+rotating runs. They check finite matched witnesses, exact selected depth/normal,
+deterministic contact identity, whole-shape clearance through the independent
+authored-triangle continuous-admission path, drive preservation and same-version
+replay including solver caches.
 
 On the confirmed baseline DLL, eight of these new expectations fail: multiple
 groups replace the new single family, and the freely moving grazing panel
@@ -113,14 +114,14 @@ stability or scene-capacity claim.
 
 Two existing finite tall-slab cases deliberately update their exact tie winner.
 For plane `X+Y=0`, source X/Z extents `[-2,2]`, target X/Z `[-1/2,1/2]` and
-half-height 100, either X or Z clears the whole sheet at exactly **2.5**;
-the oblique plane exit is `100.5/sqrt(2)`. SAT encounters the prism's Z face
-first and retains it on the exact tie. The tests now pin that exact Z axis for
+half-height 100, either X or Z clears the whole sheet at exactly **2.5**; the
+oblique plane exit is `100.5/sqrt(2)`. SAT encounters the prism's Z face first
+and retains it on the exact tie. The tests now pin that exact Z axis for
 AABB/polygon prisms and retain X for unchanged circle/capsule owners. They do
-not accept either axis loosely: depth/four-raw tolerance, sample counts,
-contact IDs/anchors across subdivisions and near/far whole-owner clearance
-assertions remain intact. Independent review verified this geometric tie and
-the revised selection contract before the expectation changed.
+not accept either axis loosely: depth/four-raw tolerance, sample counts, contact
+IDs/anchors across subdivisions and near/far whole-owner clearance assertions
+remain intact. Independent review verified this geometric tie and the revised
+selection contract before the expectation changed.
 
 #### Matched full-step results
 
@@ -128,84 +129,84 @@ Values are **microseconds per complete host frame**, including drive,
 `Simulate`, `LateSimulate` and existing physical assertions. They are steady
 local measurements, not game capacity or gameplay-frame tail latency.
 
-| Shape / layout | Before us/frame | After us/frame | Change |
-| --- | ---: | ---: | ---: |
-| OpenMesh/Continuous | 4523.49 | 114.65 | -97.47% |
-| OpenMesh/Joined2 | 269.15 | 265.99 | -1.17% |
-| OpenMesh/Joined16 | 516.39 | 507.12 | -1.80% |
-| ConcaveMesh/Continuous | 5055.65 | 4931.09 | -2.46% |
-| Box/Continuous | 112.22 | 113.77 | +1.39% |
-| Sphere/Continuous | 159.25 | 161.69 | +1.53% |
-| 3DConvexMesh/Continuous | 126.64 | 126.25 | -0.31% |
+| Shape / layout          | Before us/frame | After us/frame |  Change |
+| ----------------------- | --------------: | -------------: | ------: |
+| OpenMesh/Continuous     |         4523.49 |         114.65 | -97.47% |
+| OpenMesh/Joined2        |          269.15 |         265.99 |  -1.17% |
+| OpenMesh/Joined16       |          516.39 |         507.12 |  -1.80% |
+| ConcaveMesh/Continuous  |         5055.65 |        4931.09 |  -2.46% |
+| Box/Continuous          |          112.22 |         113.77 |  +1.39% |
+| Sphere/Continuous       |          159.25 |         161.69 |  +1.53% |
+| 3DConvexMesh/Continuous |          126.64 |         126.25 |  -0.31% |
 
 All 448 measured windows allocate **zero current-thread bytes**. The frozen
-payloads preserve position, linear/angular velocity and rotation for fixed
-setup and four 64-frame continuation snapshots in all seven cases. Authority
-and solver-cache hashes also match for every control; only ordinary
-OpenMesh/Continuous intentionally changes its contact selection/hashes.
-Repeated same-version setup hashes match across independent timing launches.
+payloads preserve position, linear/angular velocity and rotation for fixed setup
+and four 64-frame continuation snapshots in all seven cases. Authority and
+solver-cache hashes also match for every control; only ordinary
+OpenMesh/Continuous intentionally changes its contact selection/hashes. Repeated
+same-version setup hashes match across independent timing launches.
 
 Per-process means retain dispersion and adverse estimates. Each cell contains
 the two independent process means; small control differences are inconclusive,
 not equivalence, zero overhead or a universal speedup claim:
 
-| Case | Baseline processes (us/frame) | Final processes (us/frame) | Mean delta us/frame |
-| --- | ---: | ---: | ---: |
-| OpenMesh/Continuous | 4613.691 / 4433.290 | 117.232 / 112.075 | -4408.837 |
-| OpenMesh/Joined2 | 273.548 / 264.759 | 268.452 / 263.534 | -3.161 |
-| OpenMesh/Joined16 | 526.703 / 506.079 | 504.578 / 509.654 | -9.275 |
-| ConcaveMesh/Continuous | 5159.552 / 4951.757 | 4911.568 / 4950.622 | -124.560 |
-| Box/Continuous | 114.143 / 110.288 | 111.699 / 115.849 | +1.558 |
-| Sphere/Continuous | 163.479 / 155.013 | 157.537 / 165.835 | +2.440 |
-| 3DConvexMesh/Continuous | 129.084 / 124.199 | 125.772 / 126.735 | -0.388 |
+| Case                    | Baseline processes (us/frame) | Final processes (us/frame) | Mean delta us/frame |
+| ----------------------- | ----------------------------: | -------------------------: | ------------------: |
+| OpenMesh/Continuous     |           4613.691 / 4433.290 |          117.232 / 112.075 |           -4408.837 |
+| OpenMesh/Joined2        |             273.548 / 264.759 |          268.452 / 263.534 |              -3.161 |
+| OpenMesh/Joined16       |             526.703 / 506.079 |          504.578 / 509.654 |              -9.275 |
+| ConcaveMesh/Continuous  |           5159.552 / 4951.757 |        4911.568 / 4950.622 |            -124.560 |
+| Box/Continuous          |             114.143 / 110.288 |          111.699 / 115.849 |              +1.558 |
+| Sphere/Continuous       |             163.479 / 155.013 |          157.537 / 165.835 |              +2.440 |
+| 3DConvexMesh/Continuous |             129.084 / 124.199 |          125.772 / 126.735 |              -0.388 |
 
-The positive Box/Sphere estimates are **+1.56/+2.44 us/frame**
-(+1.39/+1.53%), with overlapping process ranges. They are retained as
-inconclusive; no regression absence or zero-overhead claim is made.
+The positive Box/Sphere estimates are **+1.56/+2.44 us/frame** (+1.39/+1.53%),
+with overlapping process ranges. They are retained as inconclusive; no
+regression absence or zero-overhead claim is made.
 
-A separate A/A check runs the identical baseline and its byte-identical clone
-in fresh processes for both method groups. All 35 payload DLLs match, loaded
+A separate A/A check runs the identical baseline and its byte-identical clone in
+fresh processes for both method groups. All 35 payload DLLs match, loaded
 bindings and complete fixed states/hashes agree, and 224 windows allocate zero
 bytes. Its contrasts expose process/environment sensitivity, not an isolated
 cause, statistical equivalence bound or proof that an A/B estimate is noise.
 
 | Identical-binary control | Original us/frame | Clone us/frame | Sham change |
-| --- | ---: | ---: | ---: |
-| OpenMesh/Continuous | 4480.955 | 4535.058 | +1.21% |
-| OpenMesh/Joined2 | 271.049 | 261.972 | -3.35% |
-| OpenMesh/Joined16 | 514.637 | 502.294 | -2.40% |
-| ConcaveMesh/Continuous | 4950.148 | 4953.648 | +0.07% |
-| Box/Continuous | 109.558 | 110.770 | +1.11% |
-| Sphere/Continuous | 158.426 | 157.522 | -0.57% |
-| 3DConvexMesh/Continuous | 125.063 | 124.989 | -0.06% |
+| ------------------------ | ----------------: | -------------: | ----------: |
+| OpenMesh/Continuous      |          4480.955 |       4535.058 |      +1.21% |
+| OpenMesh/Joined2         |           271.049 |        261.972 |      -3.35% |
+| OpenMesh/Joined16        |           514.637 |        502.294 |      -2.40% |
+| ConcaveMesh/Continuous   |          4950.148 |       4953.648 |      +0.07% |
+| Box/Continuous           |           109.558 |        110.770 |      +1.11% |
+| Sphere/Continuous        |           158.426 |        157.522 |      -0.57% |
+| 3DConvexMesh/Continuous  |           125.063 |        124.989 |      -0.06% |
 
 Reopen a small control on a longer reproducible host-relevant regression; the
 large ordinary-row improvement does not license an accepted control tradeoff.
 
 #### Reproducer, environment and bindings
 
-The primary maintained scene is one mass-one frictionless open two-triangle
-X/Z quad with coordinates +/-1/2, Concave mode and SurfaceApproximation inertia.
-It starts at `(-2,0,1/2)` against one bodyless rectangle X`[-8,8]`, Z`[-2,0]`,
+The primary maintained scene is one mass-one frictionless open two-triangle X/Z
+quad with coordinates +/-1/2, Concave mode and SurfaceApproximation inertia. It
+starts at `(-2,0,1/2)` against one bodyless rectangle X`[-8,8]`, Z`[-2,0]`,
 mixed half-thickness 2, with no continuity membership. The mixed world has one
-grid from `(-8,-4,-8)` to `(16,4,8)` (the maintained mixed-context helper),
-16 Hz, zero gravity/air/damping/minimum speed, frozen Y/rotation, manual
-grounding and disabled sleep. After 32 settling frames and four 64-frame setup
-batches, every invocation drives X velocity +/-1 (reversing at X=+/-2), applies
-Z impulse -1/16 and advances 64 complete frames. Setup/settling are outside
-timing. Contact preserves tangential speed and positive source Z every frame.
+grid from `(-8,-4,-8)` to `(16,4,8)` (the maintained mixed-context helper), 16
+Hz, zero gravity/air/damping/minimum speed, frozen Y/rotation, manual grounding
+and disabled sleep. After 32 settling frames and four 64-frame setup batches,
+every invocation drives X velocity +/-1 (reversing at X=+/-2), applies Z impulse
+-1/16 and advances 64 complete frames. Setup/settling are outside timing.
+Contact preserves tangential speed and positive source Z every frame.
 
 Controls use the same maintained fixtures: OpenMesh joined2/16 wall pieces;
-ordinary six-vertex four-triangle nonconvex L mesh; ordinary Box and Sphere;
-and `JoinedStaticSurfaceSimulationBenchmarks` with `Shape=ConvexMesh`,
+ordinary six-vertex four-triangle nonconvex L mesh; ordinary Box and Sphere; and
+`JoinedStaticSurfaceSimulationBenchmarks` with `Shape=ConvexMesh`,
 `Joined=false`, `Workload=Small` for the affected 3D closed-hull/patch owner.
 All use their committed fixture inputs and assertions. Joined work is not an
 equivalent-work speedup comparison, and the nonconvex row retains its general
 finite-surface owner. The baseline revision below preserves these fixture
 definitions independently of disposable drivers.
 
-Windows x64 10.0.26300, Intel i7-9700K, SDK 10.0.302, runtime 10.0.10,
-Release net10.0, workstation blocking GC, high priority, affinity 192 (CPUs 6/7),
+Windows x64 10.0.26300, Intel i7-9700K, SDK 10.0.302, runtime 10.0.10, Release
+net10.0, workstation blocking GC, high priority, affinity 192 (CPUs 6/7),
 `DOTNET_PROCESSOR_COUNT=2`. Coordinator builds/tests/profiles/timings were
 serialized. Four fresh-process rounds use baseline/final/final/baseline order,
 with separate mixed and 3D launches each round (eight launches). Each row warms
@@ -216,8 +217,8 @@ timings/prototypes are excluded from acceptance means.
 
 Validation uses an isolated committed source graph because concurrent
 SwiftCollections work temporarily made the shared checkout fail to compile
-(`IStateBacked<>`, `StateJsonConverterFactory`, `DiagnosticChannel` missing).
-No concurrent source was reverted, included, staged or repaired here. Frozen
+(`IStateBacked<>`, `StateJsonConverterFactory`, `DiagnosticChannel` missing). No
+concurrent source was reverted, included, staged or repaired here. Frozen
 revisions, plus this Gravitas runtime/test diff:
 
 - Gravitas: `a7d5931c60b4ca7b5eba44ac117a9c9216c2e1b6`.
@@ -228,36 +229,36 @@ revisions, plus this Gravitas runtime/test diff:
 
 The isolated copy initially retained its older baseline DLL because copied
 source timestamps preceded its output. DLL checks exposed that stale build;
-forcing copied inputs newer and rebuilding produced the tested candidate.
-The failing baseline expectations above were confirmed against the baseline
-hash. Final acceptance uses the final freshly rebuilt/tested DLL, not that
-stale copy. FMS's preceding c3fcd6b->4a2d433 change is documentation only;
-no numerical source or dependency worktree changes are part of this fix.
+forcing copied inputs newer and rebuilding produced the tested candidate. The
+failing baseline expectations above were confirmed against the baseline hash.
+Final acceptance uses the final freshly rebuilt/tested DLL, not that stale copy.
+FMS's preceding c3fcd6b->4a2d433 change is documentation only; no numerical
+source or dependency worktree changes are part of this fix.
 
 Actual loaded LSF modules and CoreLib hashes/paths are recorded on every
 acceptance launch. All payload DLLs are byte-identical except `Gravitas.dll`,
 and the final timed DLL matches the ordinary restored Release test DLL.
 
-| Payload DLL | SHA256 (baseline / final if changed) |
-| --- | --- |
-| Gravitas.dll | `2c1b2a632b2680a537324202e32f5bbb2994451a541d77e733838b9305b913e4` / `008b0817a6f37f5ddefa2f5650ecc3ce35778416b9ea9a13dd2bec1953133cf0` |
-| Gravitas.Benchmarks.dll | `06419d729bf05bb00ee496582cebf4190fc5d04fd47a9b1c8b4e9d620844da13` |
-| Driver.dll | `d68212566ece243798531093a6a57f242479db3389d10965fc37f155e21ffb93` |
-| FixedMathSharp.dll | `af64e83ffa0058d494f85178859a9da58b89fa6847ec65a7373a6631510c9eab` |
-| FixedMathSharp.Chronicler.dll | `019c5e17a624bf966805fb95c9a2616a6ba38ed2508f28ad0011d5d1986aef74` |
-| SwiftCollections.dll | `91bb0536bb0bfd16e5decb4835e5de06ee2e1d0ef00bc1e617c454af575f6bbd` |
-| SwiftCollections.FixedMathSharp.dll | `da3a5e159c48ad09fd9343069c3b5a4b6a2459396dd4aa18d2b3645c0bf81a65` |
-| GridForge.dll | `d5e513272676c6e0629c9812cf73a00bed857960c4323bc3f199244c4ed379cc` |
-| Chronicler.dll | `e3ae01662a1dcf4e9a1a64c26ddb53b8a12ead981ccecc52adeab8df76d106c8` |
-| Chronicler.Diagnostics.dll | `448097e72f51dca32bc779e17783f71d7dab9e2d043f80a95cc34e12a7e26c67` |
+| Payload DLL                         | SHA256 (baseline / final if changed)                                                                                                    |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Gravitas.dll                        | `2c1b2a632b2680a537324202e32f5bbb2994451a541d77e733838b9305b913e4` / `008b0817a6f37f5ddefa2f5650ecc3ce35778416b9ea9a13dd2bec1953133cf0` |
+| Gravitas.Benchmarks.dll             | `06419d729bf05bb00ee496582cebf4190fc5d04fd47a9b1c8b4e9d620844da13`                                                                      |
+| Driver.dll                          | `d68212566ece243798531093a6a57f242479db3389d10965fc37f155e21ffb93`                                                                      |
+| FixedMathSharp.dll                  | `af64e83ffa0058d494f85178859a9da58b89fa6847ec65a7373a6631510c9eab`                                                                      |
+| FixedMathSharp.Chronicler.dll       | `019c5e17a624bf966805fb95c9a2616a6ba38ed2508f28ad0011d5d1986aef74`                                                                      |
+| SwiftCollections.dll                | `91bb0536bb0bfd16e5decb4835e5de06ee2e1d0ef00bc1e617c454af575f6bbd`                                                                      |
+| SwiftCollections.FixedMathSharp.dll | `da3a5e159c48ad09fd9343069c3b5a4b6a2459396dd4aa18d2b3645c0bf81a65`                                                                      |
+| GridForge.dll                       | `d5e513272676c6e0629c9812cf73a00bed857960c4323bc3f199244c4ed379cc`                                                                      |
+| Chronicler.dll                      | `e3ae01662a1dcf4e9a1a64c26ddb53b8a12ead981ccecc52adeab8df76d106c8`                                                                      |
+| Chronicler.Diagnostics.dll          | `448097e72f51dca32bc779e17783f71d7dab9e2d043f80a95cc34e12a7e26c67`                                                                      |
 
-Release passes **8,348 tests** and Lean **8,277**, with zero failures/skips.
-One fresh, unmerged final capture per configuration retains 100% raw reachable
+Release passes **8,348 tests** and Lean **8,277**, with zero failures/skips. One
+fresh, unmerged final capture per configuration retains 100% raw reachable
 coverage: Release **53,559/53,559 sequence points, 21,772/21,772 branches,
-5,602/5,602 methods**; Lean **53,557/53,557 sequence points,
-21,772/21,772 branches, 5,601/5,601 methods**. No exclusions were added.
-Both netstandard2.1/net10.0 library targets build in Release/Lean with zero
-errors. Nested analyzer-config conflicts and existing generated MemoryPack XML
+5,602/5,602 methods**; Lean **53,557/53,557 sequence points, 21,772/21,772
+branches, 5,601/5,601 methods**. No exclusions were added. Both
+netstandard2.1/net10.0 library targets build in Release/Lean with zero errors.
+Nested analyzer-config conflicts and existing generated MemoryPack XML
 documentation warnings occur in the isolated graph; they are not clean-warning
 claims or changes to suppression policy. The final raw captures are under
 `coverage-release-final/` and `coverage-lean-final/`; earlier two-failure
@@ -275,7 +276,6 @@ attributes 47.67% to mesh/slab contact and 31.38% to collider partition updating
 call-site-sensitive weights are not additional acceptance timings; the former
 perimeter enumeration is no longer the ordinary-row bottleneck.
 
-
 Reproduce maintained source-stack rows without editing project references:
 
 ```powershell
@@ -290,12 +290,12 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release -p:UseLocalLsf
 Ignored `artifacts/grv-benchmark-031/` retains archived source HEADs/status,
 `graph/`, `control-baseline/` and `final/` payloads, driver source, full raw
 coverage, profile traces, fixed continuation smoke, per-launch timings/bindings
-A/A clone/captures/summary and `verified.log`/`validated-summary.json`. Earlier root prototypes and failed
-test expectations are retained separately; failed/partial runs are not timing
-or final coverage evidence. Maintained source/tests/fixtures, inputs, revisions,
-protocol, results and limitations here preserve the conclusion without relying
-on those disposable artifacts. No tests of benchmark/test projects or launchers
-were added.
+A/A clone/captures/summary and `verified.log`/`validated-summary.json`. Earlier
+root prototypes and failed test expectations are retained separately;
+failed/partial runs are not timing or final coverage evidence. Maintained
+source/tests/fixtures, inputs, revisions, protocol, results and limitations here
+preserve the conclusion without relying on those disposable artifacts. No tests
+of benchmark/test projects or launchers were added.
 
 #### Remaining scope and reopening
 
@@ -303,8 +303,8 @@ Nonconvex/holed/disconnected/multiple-owner surfaces, curved contacts, joined
 supplier domains and general mesh capacity keep their existing contracts and
 costs. Reopen with a finite witness/clearance defect, unstable same-version
 identity or replay, warm allocation, reproducible control regression, or a
-host-relevant remaining ordinary-patch budget bottleneck. Do not generalize
-this scene to a game capacity claim. Revalidate integration with the separate
+host-relevant remaining ordinary-patch budget bottleneck. Do not generalize this
+scene to a game capacity claim. Revalidate integration with the separate
 SwiftCollections changes when they land; they were intentionally excluded.
 Native cross-platform and released-package validation were not rerun.
 
@@ -361,136 +361,139 @@ maintained fixture are sufficient to reproduce the workload.
 
 ### GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost
 
-**Status:** Closed 2026-11-01. The executed transform-sampling cost is attributed
-and reduced for an exact unit X/Z basis. Static populations still require a
-linear freshness pass; this is not a constant-time refresh or capacity claim.
+**Status:** Closed 2026-11-01. The executed transform-sampling cost is
+attributed and reduced for an exact unit X/Z basis. Static populations still
+require a linear freshness pass; this is not a constant-time refresh or capacity
+claim.
 
 The 64-bodyless pure 2D baseline profile attributes **47.27%** of sampled
 full-step thread time to `PrepareCollisionPartitions`, including **22.13%** in
-`ColliderScalePolicy.TryExtractPlanarTransform`. These inclusive weights overlap;
-they are not additive CPU percentages. A 12-second `dotnet-trace` 10.0.750501
-`dotnet-sampled-thread-time` capture, filtered to the maintained fixture's
-`FullStep`, includes its setup calls to that same method. No profile timings
-are used in the acceptance table.
+`ColliderScalePolicy.TryExtractPlanarTransform`. These inclusive weights
+overlap; they are not additive CPU percentages. A 12-second `dotnet-trace`
+10.0.750501 `dotnet-sampled-thread-time` capture, filtered to the maintained
+fixture's `FullStep`, includes its setup calls to that same method. No profile
+timings are used in the acceptance table.
 
 Nine added runtime lines in the existing `ColliderScalePolicy` return unit scale
 and zero yaw only for the **exact** X/Z identity basis, after rejecting Y/XZ
 coupling. Every call still checks positive authored X/Z ancestry and strictly
 composes the current world matrix. Other bases retain the same decomposition,
-rounding and admission checks. Direct arbitrary diagonal extraction was rejected:
-`One + MinIncrement` can decompose to exactly `One`, so returning the raw matrix
-coefficient would change physical scale. No cache, index, lifecycle change,
-public API, new runtime file or persistent state is introduced. 3D extraction is
-untouched; mixed consumers of the existing planar owner receive the same benefit.
+rounding and admission checks. Direct arbitrary diagonal extraction was
+rejected: `One + MinIncrement` can decompose to exactly `One`, so returning the
+raw matrix coefficient would change physical scale. No cache, index, lifecycle
+change, public API, new runtime file or persistent state is introduced. 3D
+extraction is untouched; mixed consumers of the existing planar owner receive
+the same benefit.
 
 #### Workload and matched results
 
 `StaticPopulationRefreshBenchmarks` maintains the bounded population control.
-All rows use the same loaded grid bounds `(-16,-4,-16)` to `(288,4,16)`, a
-16 Hz host, no continuity declaration, no damping/air drag/minimum speed, a
-frictionless floor, radius-1/2 mover, disabled sleep and frozen rotation.
-The local floor is 16 units wide; each extra remote piece is two units wide at
+All rows use the same loaded grid bounds `(-16,-4,-16)` to `(288,4,16)`, a 16 Hz
+host, no continuity declaration, no damping/air drag/minimum speed, a
+frictionless floor, radius-1/2 mover, disabled sleep and frozen rotation. The
+local floor is 16 units wide; each extra remote piece is two units wide at
 `X = 32 + 4*(i-1)`, for `i=1..63`. Pure 2D uses a two-unit-deep planar box at
 Z=-1 and a circle starting at `(-2,1/2)`. Pure 3D uses a box of size
 `(width,2,4)` at Y=-1 and a sphere at `(-2,1/2,0)`, with Z frozen. Mixed uses
-the planar boxes with half-thickness two and a sphere at `(-2,0,1/2)`, with
-Y frozen, zero gravity and a 1/16 inward Z impulse each frame. Pure modes use
-unit gravity. Owners are either bodyless or explicitly static bodies.
+the planar boxes with half-thickness two and a sphere at `(-2,0,1/2)`, with Y
+frozen, zero gravity and a 1/16 inward Z impulse each frame. Pure modes use unit
+gravity. Owners are either bodyless or explicitly static bodies.
 
 Setup settles 32 frames and runs four 64-frame batches. Each measured full-step
 invocation drives X velocity to +/-1, reverses at X=+/-2, and runs 64 complete
 `Simulate` / `LateSimulate` frames, asserting preserved tangential speed and
 positive support height every frame. Values below are **microseconds per full
-frame**. The 1/64-static rows isolate remote population, not local contact density.
+frame**. The 1/64-static rows isolate remote population, not local contact
+density.
 
-| Mode | Static owner | 1 before | 1 after | 64 before | 64 after | 64 change |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| TwoD | Bodyless | 20.66 | 18.59 | 71.25 | 34.00 | -52.28% |
-| TwoD | Explicit static | 21.09 | 19.31 | 60.35 | 32.34 | -46.41% |
-| ThreeD | Bodyless | 33.02 | 33.35 | 75.28 | 75.87 | +0.78% |
-| ThreeD | Explicit static | 33.53 | 33.27 | 102.60 | 103.51 | +0.89% |
-| Mixed | Bodyless | 165.78 | 167.72 | 224.57 | 185.68 | -17.32% |
-| Mixed | Explicit static | 165.65 | 167.45 | 209.03 | 182.48 | -12.70% |
+| Mode   | Static owner    | 1 before | 1 after | 64 before | 64 after | 64 change |
+| ------ | --------------- | -------: | ------: | --------: | -------: | --------: |
+| TwoD   | Bodyless        |    20.66 |   18.59 |     71.25 |    34.00 |   -52.28% |
+| TwoD   | Explicit static |    21.09 |   19.31 |     60.35 |    32.34 |   -46.41% |
+| ThreeD | Bodyless        |    33.02 |   33.35 |     75.28 |    75.87 |    +0.78% |
+| ThreeD | Explicit static |    33.53 |   33.27 |    102.60 |   103.51 |    +0.89% |
+| Mixed  | Bodyless        |   165.78 |  167.72 |    224.57 |   185.68 |   -17.32% |
+| Mixed  | Explicit static |   165.65 |  167.45 |    209.03 |   182.48 |   -12.70% |
 
 The matching refresh-only pass calls each static collider's existing `Simulate`
 without advancing the moving body. Values are **microseconds per 64-collider
 pass**, not per collider or per frame:
 
-| Mode | Static owner | Before | After | Change |
-| --- | --- | ---: | ---: | ---: |
-| TwoD | Bodyless | 50.20 | 14.16 | -71.79% |
-| TwoD | Explicit static | 38.44 | 11.51 | -70.06% |
-| ThreeD | Bodyless | 42.58 | 42.09 | -1.15% |
-| ThreeD | Explicit static | 66.44 | 66.13 | -0.46% |
-| Mixed | Bodyless | 51.03 | 14.21 | -72.16% |
-| Mixed | Explicit static | 38.88 | 11.46 | -70.54% |
+| Mode   | Static owner    | Before | After |  Change |
+| ------ | --------------- | -----: | ----: | ------: |
+| TwoD   | Bodyless        |  50.20 | 14.16 | -71.79% |
+| TwoD   | Explicit static |  38.44 | 11.51 | -70.06% |
+| ThreeD | Bodyless        |  42.58 | 42.09 |  -1.15% |
+| ThreeD | Explicit static |  66.44 | 66.13 |  -0.46% |
+| Mixed  | Bodyless        |  51.03 | 14.21 | -72.16% |
+| Mixed  | Explicit static |  38.88 | 11.46 | -70.54% |
 
 Nonidentity/mutation controls run one pass over 64 bodyless radius-1/2 circles
-at X=4*i in a grid bounded by `(-16,0,-16)` to `(288,0,16)`:
-yaw Pi/4, scale `(2,1,3)`, identity children of
-parents scaled `(2,1,2)`, and moving hosts alternating Z=0/1 each pass. These
-exercise retained fallback, hierarchy composition and changed-shape publication.
-They are disposable RCA controls, not tests of benchmark machinery.
+at X=4*i in a grid bounded by `(-16,0,-16)` to `(288,0,16)`: yaw Pi/4, scale
+`(2,1,3)`, identity children of parents scaled `(2,1,2)`, and moving hosts
+alternating Z=0/1 each pass. These exercise retained fallback, hierarchy
+composition and changed-shape publication. They are disposable RCA controls, not
+tests of benchmark machinery.
 
-| Refresh control | Before us | After us | Change |
-| --- | ---: | ---: | ---: |
-| Yaw | 59.69 | 60.26 | +0.96% |
-| Scale | 54.27 | 54.96 | +1.27% |
-| Hierarchy | 85.56 | 85.77 | +0.26% |
-| Moving | 167.40 | 128.39 | -23.30% |
+| Refresh control | Before us | After us |  Change |
+| --------------- | --------: | -------: | ------: |
+| Yaw             |     59.69 |    60.26 |  +0.96% |
+| Scale           |     54.27 |    54.96 |  +1.27% |
+| Hierarchy       |     85.56 |    85.77 |  +0.26% |
+| Moving          |    167.40 |   128.39 | -23.30% |
 
 All 1,792 measured windows allocate **zero current-thread bytes**. Fixed setup
 observations and eight 64-frame continuation snapshots per case match exactly
 between payloads, including position, linear/angular velocity, rotation and
-authoritative replay hash. Fixture assertions remain active during timing.
-These are local steady-state observations, not cross-platform proof or frame
-tail latency. Small control differences must not be read as equivalence or
-universal speedups; process-level estimates and limits follow below.
+authoritative replay hash. Fixture assertions remain active during timing. These
+are local steady-state observations, not cross-platform proof or frame tail
+latency. Small control differences must not be read as equivalence or universal
+speedups; process-level estimates and limits follow below.
 
-The 63 additional bodyless pieces add **50.59 us/frame before and
-15.41 us/frame after** in pure 2D, derived from the matched 64-minus-one-static
-full steps. The remaining population cost is retained freshness work.
+The 63 additional bodyless pieces add **50.59 us/frame before and 15.41 us/frame
+after** in pure 2D, derived from the matched 64-minus-one-static full steps. The
+remaining population cost is retained freshness work.
 
 Small-control process means follow (each entry is an independent process mean;
-units follow the named method). Positive estimates remain **inconclusive**,
-not proven noise or established zero overhead. In particular, one-static mixed
-steps estimate +1.94/+1.80 us/frame despite cheaper planar sampling; no
-universal full-step speedup is claimed.
+units follow the named method). Positive estimates remain **inconclusive**, not
+proven noise or established zero overhead. In particular, one-static mixed steps
+estimate +1.94/+1.80 us/frame despite cheaper planar sampling; no universal
+full-step speedup is claimed.
 
-| Control | Baseline process A / B (us) | Final process A / B (us) | Mean difference (us) |
-| --- | ---: | ---: | ---: |
-| ('ThreeD', False, 1) step | 32.521 / 33.511 | 33.331 / 33.361 | +0.330 |
-| ('ThreeD', False, 64) step | 74.859 / 75.701 | 76.009 / 75.722 | +0.585 |
-| ('ThreeD', True, 1) step | 33.210 / 33.852 | 32.998 / 33.544 | -0.260 |
-| ('ThreeD', True, 64) step | 101.373 / 103.828 | 104.224 / 102.800 | +0.911 |
-| ('Mixed', False, 1) step | 164.971 / 166.583 | 166.955 / 168.486 | +1.943 |
-| ('Mixed', True, 1) step | 165.674 / 165.621 | 167.242 / 167.649 | +1.798 |
-| Yaw timing | 59.704 / 59.666 | 59.872 / 60.641 | +0.571 |
-| Scale timing | 54.814 / 53.720 | 54.577 / 55.337 | +0.690 |
-| Hierarchy timing | 86.329 / 84.784 | 86.163 / 85.386 | +0.219 |
+| Control                    | Baseline process A / B (us) | Final process A / B (us) | Mean difference (us) |
+| -------------------------- | --------------------------: | -----------------------: | -------------------: |
+| ('ThreeD', False, 1) step  |             32.521 / 33.511 |          33.331 / 33.361 |               +0.330 |
+| ('ThreeD', False, 64) step |             74.859 / 75.701 |          76.009 / 75.722 |               +0.585 |
+| ('ThreeD', True, 1) step   |             33.210 / 33.852 |          32.998 / 33.544 |               -0.260 |
+| ('ThreeD', True, 64) step  |           101.373 / 103.828 |        104.224 / 102.800 |               +0.911 |
+| ('Mixed', False, 1) step   |           164.971 / 166.583 |        166.955 / 168.486 |               +1.943 |
+| ('Mixed', True, 1) step    |           165.674 / 165.621 |        167.242 / 167.649 |               +1.798 |
+| Yaw timing                 |             59.704 / 59.666 |          59.872 / 60.641 |               +0.571 |
+| Scale timing               |             54.814 / 53.720 |          54.577 / 55.337 |               +0.690 |
+| Hierarchy timing           |             86.329 / 84.784 |          86.163 / 85.386 |               +0.219 |
 
 An additional A/A control runs the identical baseline payload and its byte-for-
 byte clone in two fresh processes per method group, with the same protocol and
 bindings/state checks. Its 896 windows also allocate zero bytes. This exposes
-process/environment sensitivity; it does not isolate its cause or establish
-that the positive A/B estimates are regression-free. A/A process contrasts:
+process/environment sensitivity; it does not isolate its cause or establish that
+the positive A/B estimates are regression-free. A/A process contrasts:
 
-| Control | Original process (us) | Identical clone process (us) | Sham change |
-| --- | ---: | ---: | ---: |
-| ('ThreeD', False, 1) step | 32.621 | 35.898 | +10.05% |
-| ('ThreeD', False, 64) step | 74.937 | 77.511 | +3.44% |
-| ('ThreeD', True, 1) step | 32.634 | 35.458 | +8.65% |
-| ('ThreeD', True, 64) step | 101.358 | 105.868 | +4.45% |
-| ('Mixed', False, 1) step | 166.315 | 167.397 | +0.65% |
-| ('Mixed', True, 1) step | 166.475 | 166.903 | +0.26% |
-| Yaw timing | 60.258 | 59.908 | -0.58% |
-| Scale timing | 54.163 | 54.188 | +0.05% |
-| Hierarchy timing | 85.324 | 85.844 | +0.61% |
+| Control                    | Original process (us) | Identical clone process (us) | Sham change |
+| -------------------------- | --------------------: | ---------------------------: | ----------: |
+| ('ThreeD', False, 1) step  |                32.621 |                       35.898 |     +10.05% |
+| ('ThreeD', False, 64) step |                74.937 |                       77.511 |      +3.44% |
+| ('ThreeD', True, 1) step   |                32.634 |                       35.458 |      +8.65% |
+| ('ThreeD', True, 64) step  |               101.358 |                      105.868 |      +4.45% |
+| ('Mixed', False, 1) step   |               166.315 |                      167.397 |      +0.65% |
+| ('Mixed', True, 1) step    |               166.475 |                      166.903 |      +0.26% |
+| Yaw timing                 |                60.258 |                       59.908 |      -0.58% |
+| Scale timing               |                54.163 |                       54.188 |      +0.05% |
+| Hierarchy timing           |                85.324 |                       85.844 |      +0.61% |
 
-Across all 28 A/A row metrics, sham changes range from -0.58% to +13.33%.
-The largest is the unchanged 64-explicit-static 3D refresh pass,
-64.624 to 73.238 us. That adverse control is retained; the single A/A pair
-cannot identify its cause or provide an equivalence bound for another row.
+Across all 28 A/A row metrics, sham changes range from -0.58% to +13.33%. The
+largest is the unchanged 64-explicit-static 3D refresh pass, 64.624 to 73.238
+us. That adverse control is retained; the single A/A pair cannot identify its
+cause or provide an equivalence bound for another row.
 
 These small estimates are unresolved/inconclusive, not an accepted measured
 regression or a guarantee of no overhead. Reopen on a longer, reproducible
@@ -500,16 +503,16 @@ speculative tuning of unrelated code.
 
 #### Protocol, bindings and validation
 
-Windows x64 10.0.26300, Intel i7-9700K, SDK 10.0.302, runtime 10.0.10,
-Release net10.0, workstation blocking GC, high process priority, affinity mask
-192 (CPUs 6/7), `DOTNET_PROCESSOR_COUNT=2`. Builds/tests/profiles and acceptance
-timings were serialized. Four fresh-process rounds use baseline, final, final,
-baseline order. Each round runs separate population and fallback-control
-processes (eight launches total). Each row warms for two seconds, calibrates for
-at least 200 ms, then records sixteen windows targeting 50 ms, with 1..65,536
-invocations per window. Full-step values divide each 64-frame invocation by 64.
-Means weight the two process means equally. A preliminary baseline-only run and
-the sampling profile are excluded from matched acceptance means.
+Windows x64 10.0.26300, Intel i7-9700K, SDK 10.0.302, runtime 10.0.10, Release
+net10.0, workstation blocking GC, high process priority, affinity mask 192 (CPUs
+6/7), `DOTNET_PROCESSOR_COUNT=2`. Builds/tests/profiles and acceptance timings
+were serialized. Four fresh-process rounds use baseline, final, final, baseline
+order. Each round runs separate population and fallback-control processes (eight
+launches total). Each row warms for two seconds, calibrates for at least 200 ms,
+then records sixteen windows targeting 50 ms, with 1..65,536 invocations per
+window. Full-step values divide each 64-frame invocation by 64. Means weight the
+two process means equally. A preliminary baseline-only run and the sampling
+profile are excluded from matched acceptance means.
 
 Gravitas baseline is `d6b9c0d53c89a9856afd1f8eb89c0124cddbf8bd` plus the new
 unchanged benchmark fixture; final adds only the nine-line runtime change for
@@ -523,43 +526,43 @@ timing. Committed sibling sources:
 Actual loaded LSF/host payloads are SHA256-checked on every launch. All payload
 DLLs are byte-identical except `Gravitas.dll`; loaded CoreLib is from 10.0.10.
 
-| Loaded assembly | SHA256 (baseline / final if changed) |
-| --- | --- |
-| Gravitas.dll | `b62f6337255764576e0d7af6ef15f066c2a411fae7fceb90abf58a951ae44a0c` / `9510dd92ee654e12837f0b83708ec886a416da86f374445a60f6d4c0b0c830a2` |
-| Gravitas.Benchmarks.dll | `41148a48bfdb3703dfec4ece97e3024c0a06b894f1a3db5252b15ba98bc33779` |
-| Driver.dll | `1c5ec54065929278112e243998f12e413df2a7f17c4eb0f46f3343518b966aa3` |
-| FixedMathSharp.dll | `d82ad7953feb4d01d4da2dc9c8f7fdfaba4226fc33ef88cd4d2382ed5db34743` |
-| FixedMathSharp.Chronicler.dll | `a39af9f53e4249b280abac2bda2e923a4e3874f6fe067ac9755e7f55e7e2793a` |
-| SwiftCollections.dll | `b87da81aaf0d551f347249c0a73bd7e67ead993f9c47636b6c4cb92703d0a8f2` |
-| SwiftCollections.FixedMathSharp.dll | `9ca70b0f4ebad43b1f61bbbfe29d49c0ea69c6341a79838f29f29e3ed95f3d85` |
-| GridForge.dll | `5aa8934a285545a0bcce6af8a6b2ddf7eee45a9ec91a81d6bef7388565fd0a39` |
-| Chronicler.dll | `4de2015a0e6a977db42506e01737c1151a70398cbd395451ff563eb267a78d92` |
-| Chronicler.Diagnostics.dll | `bbe0d019808bdfaa3c122fab97235b3f18d1da3b66277e48f6d8dd21e4e97432` |
+| Loaded assembly                     | SHA256 (baseline / final if changed)                                                                                                    |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Gravitas.dll                        | `b62f6337255764576e0d7af6ef15f066c2a411fae7fceb90abf58a951ae44a0c` / `9510dd92ee654e12837f0b83708ec886a416da86f374445a60f6d4c0b0c830a2` |
+| Gravitas.Benchmarks.dll             | `41148a48bfdb3703dfec4ece97e3024c0a06b894f1a3db5252b15ba98bc33779`                                                                      |
+| Driver.dll                          | `1c5ec54065929278112e243998f12e413df2a7f17c4eb0f46f3343518b966aa3`                                                                      |
+| FixedMathSharp.dll                  | `d82ad7953feb4d01d4da2dc9c8f7fdfaba4226fc33ef88cd4d2382ed5db34743`                                                                      |
+| FixedMathSharp.Chronicler.dll       | `a39af9f53e4249b280abac2bda2e923a4e3874f6fe067ac9755e7f55e7e2793a`                                                                      |
+| SwiftCollections.dll                | `b87da81aaf0d551f347249c0a73bd7e67ead993f9c47636b6c4cb92703d0a8f2`                                                                      |
+| SwiftCollections.FixedMathSharp.dll | `9ca70b0f4ebad43b1f61bbbfe29d49c0ea69c6341a79838f29f29e3ed95f3d85`                                                                      |
+| GridForge.dll                       | `5aa8934a285545a0bcce6af8a6b2ddf7eee45a9ec91a81d6bef7388565fd0a39`                                                                      |
+| Chronicler.dll                      | `4de2015a0e6a977db42506e01737c1151a70398cbd395451ff563eb267a78d92`                                                                      |
+| Chronicler.Diagnostics.dll          | `bbe0d019808bdfaa3c122fab97235b3f18d1da3b66277e48f6d8dd21e4e97432`                                                                      |
 
 The eleven new source-behavior cases cover exact unit bases, hierarchical
-cancellation, retained Y-scale policy, both yaw-capture modes, near-unit rounding,
-nonunit/yawed fallbacks, canceled negative ancestry, tiny nonplanar coupling,
-unchanged runtime versions and live scale/pose/offset/query freshness for
-bodyless/explicit-static owners in pure 2D/mixed. Existing full-suite replay,
-serialization, shape admission, contact, query and allocation regressions remain
-active. This is an optimization with a passing compatibility baseline, not a
-newly reproduced correctness defect.
+cancellation, retained Y-scale policy, both yaw-capture modes, near-unit
+rounding, nonunit/yawed fallbacks, canceled negative ancestry, tiny nonplanar
+coupling, unchanged runtime versions and live scale/pose/offset/query freshness
+for bodyless/explicit-static owners in pure 2D/mixed. Existing full-suite
+replay, serialization, shape admission, contact, query and allocation
+regressions remain active. This is an optimization with a passing compatibility
+baseline, not a newly reproduced correctness defect.
 
 Release passes **8,338 tests** and ReleaseLean **8,267**, with zero failures or
 skips. One fresh unmerged OpenCover capture per configuration retains raw
-reachable coverage: Release **53,545/53,545 sequence points,
-21,768/21,768 branches, 5,602/5,602 methods**; Lean **53,543/53,543 sequence
-points, 21,768/21,768 branches, 5,601/5,601 methods**. No coverage exclusions
-were added. Both `netstandard2.1` and `net10.0` library targets build in both
+reachable coverage: Release **53,545/53,545 sequence points, 21,768/21,768
+branches, 5,602/5,602 methods**; Lean **53,543/53,543 sequence points,
+21,768/21,768 branches, 5,601/5,601 methods**. No coverage exclusions were
+added. Both `netstandard2.1` and `net10.0` library targets build in both
 configurations with zero errors/warnings. Independent read-only source, caller,
 fixture and test review found no actionable findings; the coordinator ran the
 reported checks. The ordinary Release test DLL matches the final timed runtime
 SHA256. New tests exercise library source; no tests of benchmark/test projects
 or launchers were added.
 
-All 24 maintained BenchmarkDotNet rows also complete in-process `Dry` mode
-with a successful launcher exit. Those cold smoke measurements validate the
-fixture, not the warmed acceptance timings or allocations above.
+All 24 maintained BenchmarkDotNet rows also complete in-process `Dry` mode with
+a successful launcher exit. Those cold smoke measurements validate the fixture,
+not the warmed acceptance timings or allocations above.
 
 Reproduce maintained rows using the source graph with `UseLocalLsfStack=true`
 propagated into child builds, without editing project references:
@@ -574,25 +577,26 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release -p:UseLocalLsf
 ```
 
 Ignored `artifacts/grv-benchmark-030/` retains `heads.json`, frozen
-`baseline/`/`final/` payloads, loaded bindings, driver source, A/A clone/captures/summary, profile, full raw
-coverage and the eight `N-variant-{measure,controls}.json` launch captures.
-`validated-summary.json` and `verified.log` check DLL parity, fixed trajectories,
-bindings, launch/row/window completeness and allocation. The maintained fixture,
-inputs, source revisions, protocol, results and limitations above retain the
-conclusion independently of those disposable artifacts.
+`baseline/`/`final/` payloads, loaded bindings, driver source, A/A
+clone/captures/summary, profile, full raw coverage and the eight
+`N-variant-{measure,controls}.json` launch captures. `validated-summary.json`
+and `verified.log` check DLL parity, fixed trajectories, bindings,
+launch/row/window completeness and allocation. The maintained fixture, inputs,
+source revisions, protocol, results and limitations above retain the conclusion
+independently of those disposable artifacts.
 
 #### Remaining scope and reopening
 
 The retained O(population * hierarchy-depth) sampling pass is intentional:
 `FixedTransform` has mutable local components and ancestry with no revision or
-dirty-propagation contract. A static label cannot prove a bodyless host transform
-unchanged. The existing snapshot still avoids republishing identical geometry;
-introducing a transform cache or another collider index is not justified by this
-bounded signal. General-scale/rotated transforms retain their existing costs.
-A matching final 12-second sampled full-step profile attributes 13.43% to
-partition preparation and 62.29% to discrete response solving. These overlapping,
-call-site-sensitive sample weights confirm the remaining dominant work is
-ordinary contact response; they are not additional acceptance timings.
+dirty-propagation contract. A static label cannot prove a bodyless host
+transform unchanged. The existing snapshot still avoids republishing identical
+geometry; introducing a transform cache or another collider index is not
+justified by this bounded signal. General-scale/rotated transforms retain their
+existing costs. A matching final 12-second sampled full-step profile attributes
+13.43% to partition preparation and 62.29% to discrete response solving. These
+overlapping, call-site-sensitive sample weights confirm the remaining dominant
+work is ordinary contact response; they are not additional acceptance timings.
 Reopen with a reproducible host budget exceeded by the retained sampling work,
 an actionable fallback regression, changed admission/witnesses/replay, or warm
 allocation. #031 remains separate ordinary open-mesh mixed full-step work.
@@ -664,55 +668,55 @@ loop to GJK distance; and 99.3%/98.7% of the mixed dense/false-positive loops to
 finite triangle/circle-slab sweeps. These inclusive weights overlap; they are
 not additive CPU shares or acceptance timings.
 
-- The existing certified-patch GJK attempt now admits convex mesh sources.
-  Their reference-center chord only selects an attempt; GJK still tests the
-  actual hull. `ConvexShape.ContainsCenter` remains false for mesh sources.
+- The existing certified-patch GJK attempt now admits convex mesh sources. Their
+  reference-center chord only selects an attempt; GJK still tests the actual
+  hull. `ConvexShape.ContainsCenter` remains false for mesh sources.
 - Ordinary sphere sweeps use the certified patch's corner fan with the existing
   analytic kernels when all triangles are candidates and initial source bounds
-  are disjoint. Initial contacts,
-  identity-sensitive CCD/supplier admission, partial candidate sets and
-  uncertified/nonconvex domains retain authored processing.
+  are disjoint. Initial contacts, identity-sensitive CCD/supplier admission,
+  partial candidate sets and uncertified/nonconvex domains retain authored
+  processing.
 - Replacement sphere fan faces use cached/robust mesh normals and the existing
-  exact-zero-degenerate wide projection predicate. This preserves admitted
-  micro faces when internal diagonals disappear. Authored fallback retains its
+  exact-zero-degenerate wide projection predicate. This preserves admitted micro
+  faces when internal diagonals disappear. Authored fallback retains its
   existing projection predicate, avoiding unrelated nonfan overhead.
 - Mixed circle-slab sweeps use **one analytic carrier triangle** only when exact
   world-plane arithmetic certifies an aligned face hit. X/Z motion must be
   parallel to the nonzero projected plane normal, with nonzero approach. The
   exact approach/vertical signs choose the supporting cap, or axial midpoint
   when the vertical coefficient is zero. Its center chord must cross the finite
-  fan, and the published normal must retain a nonzero radial component.
-  Before whole-plane entry the complete cylinder is separated. Its entering
-  radial extreme follows that cap-center line, so the finite crossing proves
-  the plane-entry lower bound is attained by the containing triangle. That
+  fan, and the published normal must retain a nonzero radial component. Before
+  whole-plane entry the complete cylinder is separated. Its entering radial
+  extreme follows that cap-center line, so the finite crossing proves the
+  plane-entry lower bound is attained by the containing triangle. That
   triangle's existing kernel supplies distance; the crossing supplies paired
   final rounded physical witnesses and the geometric plane normal. TOI and
   witness rounding can leave a small separation at the retained time. This
   removes contact reconstruction entirely. Oblique/rim-only/tangent casts and
-  failed certificates stay authored; a declined carrier kernel falls through
-  to every original candidate without publishing its synthetic index.
+  failed certificates stay authored; a declined carrier kernel falls through to
+  every original candidate without publishing its synthetic index.
 - Consecutive identical ordered triangles reuse only the analytic kernel result
   inside one ordinary mixed query. The frame, chord and slab inputs are fixed
   within that attempt, every authored index still participates in the authored
   reduction, and new queries start with no memo. There is no persistent cache or
   invalidation protocol.
 
-Runtime growth is **105 net lines across three existing query files**, with no new
-runtime files, public API, dependency or upstream math change. Counter semantics
-remain unchanged: triangle counters report BVH-admitted authored triangles,
-not the reduced number of narrow-phase kernel calls.
+Runtime growth is **105 net lines across three existing query files**, with no
+new runtime files, public API, dependency or upstream math change. Counter
+semantics remain unchanged: triangle counters report BVH-admitted authored
+triangles, not the reduced number of narrow-phase kernel calls.
 
 #### Frozen source and process provenance
 
 Baseline Gravitas is `4e674b08eb7f2de4b036e5f717647fdbc4997251`. Both variants
 use committed source archives of these exact dependencies:
 
-| Repository | Revision |
-| --- | --- |
-| FixedMathSharp | `c3fcd6bd035afdb4aeea776d2a6a6ca35723585f` |
+| Repository       | Revision                                   |
+| ---------------- | ------------------------------------------ |
+| FixedMathSharp   | `c3fcd6bd035afdb4aeea776d2a6a6ca35723585f` |
 | SwiftCollections | `0418123fa52f78cbff551e6ca291ef816493069b` |
-| GridForge | `76e2bd46380664cfa5403d3b57eca6a82cb6b88a` |
-| Chronicler | `c45f9ab53913e5b1692f0717733425e0f4defeb2` |
+| GridForge        | `76e2bd46380664cfa5403d3b57eca6a82cb6b88a` |
+| Chronicler       | `c45f9ab53913e5b1692f0717733425e0f4defeb2` |
 
 Concurrent Chronicler dependency/migration edits in Gravitas, SwiftCollections
 and GridForge, including the separately recorded package blocker #149, are
@@ -724,32 +728,32 @@ or a released package combination.
 Windows x64, OS build `10.0.26300`, i7-9700K, SDK `10.0.302`, .NET `10.0.10`,
 Release, `UseLocalLsfStack=true`, `DisableTransitiveProjectReferences=true`,
 `DOTNET_PROCESSOR_COUNT=2`. The disposable direct driver uses blocking
-workstation GC, high priority and affinity mask 192 (logical CPUs 6/7).
-Builds, tests, profiles and timings run serially.
+workstation GC, high priority and affinity mask 192 (logical CPUs 6/7). Builds,
+tests, profiles and timings run serially.
 
 All payload DLLs match except `Gravitas.dll`; actual loaded assembly names,
-paths and SHA-256 hashes are checked in every measured process. Loaded identities
-include Gravitas `0.0.0.0`, FixedMathSharp `7.1.0.0`, SwiftCollections `7.0.0.0`,
-SwiftCollections.FixedMathSharp `7.1.0.0`, GridForge `9.1.0.0`, and Chronicler /
-Chronicler.Diagnostics `1.0.0.0`. Package-looking versions alone do not identify
-these source-built assemblies.
+paths and SHA-256 hashes are checked in every measured process. Loaded
+identities include Gravitas `0.0.0.0`, FixedMathSharp `7.1.0.0`,
+SwiftCollections `7.0.0.0`, SwiftCollections.FixedMathSharp `7.1.0.0`, GridForge
+`9.1.0.0`, and Chronicler / Chronicler.Diagnostics `1.0.0.0`. Package-looking
+versions alone do not identify these source-built assemblies.
 
-| Measured module | SHA-256 |
-| --- | --- |
-| Gravitas baseline | `C5C9E8F27C3E0DF38324EE58975A6335FD5B880F8645AABCD83C806CE0A2A5A9` |
-| System.Private.CoreLib | `76A49F17E83F613BC8A5B55FC98830B764E7838265AACBDBCC8F46707F80A3C9` |
-| FixedMathSharp | `E8002520AC021DA7AEBCFE5B790AA739E916A5AA761D0350136DEBA94CCE28E6` |
-| Gravitas final | `03A321425050490058A53DE31A852F6A26687689AEAED67F06ED91C915B8EB2D` |
-| Chronicler | `F2D894CB20F5C734510DE9E0B08CAB04A45D05BAAEF20F04D2B1CEFEB1CB9A88` |
-| SwiftCollections | `3BE058EDBDDFBE5E0A26A55DA4295741A4AF1FE357D34E75AD5A9D32F30EE610` |
-| GridForge | `743CC1BCDF4FE7E2E5E6248ED1B487053B74EE9E1F689C2EB2AACB2327264324` |
-| Gravitas.Benchmarks | `8B6C2EF6371DB43D70BA38BF4DCBEA2DFE57B4733674E279D26AAA94501DE2F5` |
-| Chronicler.Diagnostics | `B401C40A2E669F7F214DB60AF7C09A0AACB006C83E6C313BF6462DC65727E020` |
+| Measured module                 | SHA-256                                                            |
+| ------------------------------- | ------------------------------------------------------------------ |
+| Gravitas baseline               | `C5C9E8F27C3E0DF38324EE58975A6335FD5B880F8645AABCD83C806CE0A2A5A9` |
+| System.Private.CoreLib          | `76A49F17E83F613BC8A5B55FC98830B764E7838265AACBDBCC8F46707F80A3C9` |
+| FixedMathSharp                  | `E8002520AC021DA7AEBCFE5B790AA739E916A5AA761D0350136DEBA94CCE28E6` |
+| Gravitas final                  | `03A321425050490058A53DE31A852F6A26687689AEAED67F06ED91C915B8EB2D` |
+| Chronicler                      | `F2D894CB20F5C734510DE9E0B08CAB04A45D05BAAEF20F04D2B1CEFEB1CB9A88` |
+| SwiftCollections                | `3BE058EDBDDFBE5E0A26A55DA4295741A4AF1FE357D34E75AD5A9D32F30EE610` |
+| GridForge                       | `743CC1BCDF4FE7E2E5E6248ED1B487053B74EE9E1F689C2EB2AACB2327264324` |
+| Gravitas.Benchmarks             | `8B6C2EF6371DB43D70BA38BF4DCBEA2DFE57B4733674E279D26AAA94501DE2F5` |
+| Chronicler.Diagnostics          | `B401C40A2E669F7F214DB60AF7C09A0AACB006C83E6C313BF6462DC65727E020` |
 | SwiftCollections.FixedMathSharp | `6D2CBD38F41874322530011C8117273BC72233B8FDA85DC151E1EE7C2FE844B2` |
-| FixedMathSharp.Chronicler | `61D49349E5D1D7A7C0A05CB140F53E3EA9D7A1C3500953745383F5DEA2755ED7` |
+| FixedMathSharp.Chronicler       | `61D49349E5D1D7A7C0A05CB140F53E3EA9D7A1C3500953745383F5DEA2755ED7` |
 
-The Release coverage/test DLL and final measured DLL have the same SHA-256.
-No instrumented assembly is used for timing.
+The Release coverage/test DLL and final measured DLL have the same SHA-256. No
+instrumented assembly is used for timing.
 
 #### Matched public-query measurements
 
@@ -758,85 +762,87 @@ normal `Setup`, and runs `Cleanup` outside measurement. Each row warms for four
 seconds, calibrates for at least 200 ms, and records 16 windows targeting 50 ms
 each (one to 4,096 invocations/window). The independent process order is
 **baseline, final, final, baseline**, with both dense rows and nonfan controls
-in each round. Tables give equally weighted means of the two process means;
-the ranges retain both process means. Allocation is the current-thread byte
-delta around every window. These are synthetic warm operation means, not
-gameplay frame-tail latency, cold-start cost or scene-capacity evidence.
+in each round. Tables give equally weighted means of the two process means; the
+ranges retain both process means. Allocation is the current-thread byte delta
+around every window. These are synthetic warm operation means, not gameplay
+frame-tail latency, cold-start cost or scene-capacity evidence.
 
 The maintained dense geometry is the vertical quad `X=0, Y/Z=+-0.5`, subdivided
 8/32 times into 128/2,048 triangles. Probes travel `(-3,0,0)` to `(3,0,0)`;
 sphere/circle radius and mixed half-thickness are 0.5. The convex source is the
-unit closed cube with half-extents 0.5; its target is concave. The false-positive
-fixture repeats the ordered triangle `(0,-1,0.49),(0,1,0.71),(0,-1,1)` 128/2,048
-times with separate vertex slots, without changing physical geometry.
+unit closed cube with half-extents 0.5; its target is concave. The
+false-positive fixture repeats the ordered triangle
+`(0,-1,0.49),(0,1,0.71),(0,-1,1)` 128/2,048 times with separate vertex slots,
+without changing physical geometry.
 
-| Public all-hit query / triangles | Baseline mean ms [launch range] | Final mean ms [launch range] | Change |
-| --- | ---: | ---: | ---: |
-| Sphere / 128 | 1.945 [1.923–1.967] | 0.0940 [0.0937–0.0943] | -95.17% |
-| Convex mesh / 128 | 4.911 [4.882–4.940] | 0.0353 [0.0351–0.0354] | -99.28% |
-| Mixed circle / 128 | 2.582 [2.563–2.601] | 0.0526 [0.0522–0.0531] | -97.96% |
-| Mixed false-positive / 128 | 3.338 [3.319–3.356] | 0.0457 [0.0451–0.0464] | -98.63% |
-| Sphere / 2,048 | 26.174 [25.941–26.406] | 0.8897 [0.8890–0.8904] | -96.60% |
-| Convex mesh / 2,048 | 79.237 [78.215–80.260] | 0.0700 [0.0698–0.0702] | -99.91% |
-| Mixed circle / 2,048 | 38.389 [38.044–38.734] | 0.0897 [0.0894–0.0900] | -99.77% |
-| Mixed false-positive / 2,048 | 53.523 [53.516–53.529] | 0.1572 [0.1545–0.1600] | -99.71% |
+| Public all-hit query / triangles | Baseline mean ms [launch range] | Final mean ms [launch range] |  Change |
+| -------------------------------- | ------------------------------: | ---------------------------: | ------: |
+| Sphere / 128                     |             1.945 [1.923–1.967] |       0.0940 [0.0937–0.0943] | -95.17% |
+| Convex mesh / 128                |             4.911 [4.882–4.940] |       0.0353 [0.0351–0.0354] | -99.28% |
+| Mixed circle / 128               |             2.582 [2.563–2.601] |       0.0526 [0.0522–0.0531] | -97.96% |
+| Mixed false-positive / 128       |             3.338 [3.319–3.356] |       0.0457 [0.0451–0.0464] | -98.63% |
+| Sphere / 2,048                   |          26.174 [25.941–26.406] |       0.8897 [0.8890–0.8904] | -96.60% |
+| Convex mesh / 2,048              |          79.237 [78.215–80.260] |       0.0700 [0.0698–0.0702] | -99.91% |
+| Mixed circle / 2,048             |          38.389 [38.044–38.734] |       0.0897 [0.0894–0.0900] | -99.77% |
+| Mixed false-positive / 2,048     |          53.523 [53.516–53.529] |       0.1572 [0.1545–0.1600] | -99.71% |
 
-All windows allocate **0 bytes**. Collider count remains one and authored triangle
-candidate counts remain 128/2,048. Dense hits keep raw distance `10737418240`
-(2.5); false-positive rows remain misses. Sphere fields match exactly. Convex
-and mixed paths may change finite physical witnesses; convex points remain on
-both the cube's leading face and target patch, and mixed paired witnesses retain
-the physical supporting-face normal. Legacy dense mixed output uses an invalid
-center-to-witness diagonal normal; the final face normal is world -X. Repeated
-same-version queries retain exact outputs and collider ordering. Cross-version
-query/replay result hashes need not match when these fields change.
+All windows allocate **0 bytes**. Collider count remains one and authored
+triangle candidate counts remain 128/2,048. Dense hits keep raw distance
+`10737418240` (2.5); false-positive rows remain misses. Sphere fields match
+exactly. Convex and mixed paths may change finite physical witnesses; convex
+points remain on both the cube's leading face and target patch, and mixed paired
+witnesses retain the physical supporting-face normal. Legacy dense mixed output
+uses an invalid center-to-witness diagonal normal; the final face normal is
+world -X. Repeated same-version queries retain exact outputs and collider
+ordering. Cross-version query/replay result hashes need not match when these
+fields change.
 
 Nonfan controls use two explicit finite layouts: a bent four-triangle strip with
 vertices `(0,-1,-1),(0,1,-1),(0,-1,0),(0,1,0),(0.5,-1,1),(0.5,1,1)` and indices
-`0,1,2;2,1,3;2,3,4;4,3,5`; and an eight-triangle coplanar square ring, outer
-Y/Z corners `+-1`, inner corners `+-0.25`, with the center left empty. They use
-the same chord/radius/slab and closed cube source. The full-step control is
+`0,1,2;2,1,3;2,3,4;4,3,5`; and an eight-triangle coplanar square ring, outer Y/Z
+corners `+-1`, inner corners `+-0.25`, with the center left empty. They use the
+same chord/radius/slab and closed cube source. The full-step control is
 `JoinedStaticSolidMixedSimulationBenchmarks`, `Shape=OpenMesh`,
 `Layout=Continuous`; invoke its existing 64-step operation, divide time by 64,
 and retain its per-step tangential-motion/nonpenetration assertions. Fixed
 post-setup observations agree before timing; all nonfan query fields agree.
 
-Small-patch mixed controls use the same fixed dense quad with subdivisions
-1/2/4 (2/8/32 triangles). The five four-triangle controls use corners
+Small-patch mixed controls use the same fixed dense quad with subdivisions 1/2/4
+(2/8/32 triangles). The five four-triangle controls use corners
 `(0,-1,-1),(0,1,-1),(0,1,1),(0,-1,1)` plus center `(0,0,0)`, indexed
 `0,1,4;1,2,4;2,3,4;3,0,4`, with radius/half-thickness 0.5. Their chords are:
 
-| Four-triangle layout | Start | End |
-| --- | --- | --- |
-| Face | `(-3,0,0)` | `(3,0,0)` |
-| Oblique rim | `(-3,0,-0.2)` | `(3,0,2.8)` |
-| Tangent | `(-0.5,0,-3)` | `(-0.5,0,3)` |
-| Partial-height slab | `(-3,1.25,0)` | `(3,1.25,0)` |
-| Tilted face | `(-3,0,0)` | `(3,0,0)` |
+| Four-triangle layout | Start         | End          |
+| -------------------- | ------------- | ------------ |
+| Face                 | `(-3,0,0)`    | `(3,0,0)`    |
+| Oblique rim          | `(-3,0,-0.2)` | `(3,0,2.8)`  |
+| Tangent              | `(-0.5,0,-3)` | `(-0.5,0,3)` |
+| Partial-height slab  | `(-3,1.25,0)` | `(3,1.25,0)` |
+| Tilted face          | `(-3,0,0)`    | `(3,0,0)`    |
 
-The tilted layout instead uses `(1,-1,-1),(-1,1,-1),(-1,1,1),(1,-1,1)`
-plus center zero with the same indices, giving plane X+Y=0.
+The tilted layout instead uses `(1,-1,-1),(-1,1,-1),(-1,1,1),(1,-1,1)` plus
+center zero with the same indices, giving plane X+Y=0.
 
-| Control | Baseline us [launch range] | Final us [launch range] | Change |
-| --- | ---: | ---: | ---: |
-| Certified mixed quad / 2 triangles | 73.088 [73.087–73.088] | 71.778 [71.574–71.982] | -1.79% |
-| Certified mixed quad / 8 triangles | 208.071 [207.260–208.882] | 49.379 [49.325–49.433] | -76.27% |
-| Certified mixed quad / 32 triangles | 744.821 [742.227–747.414] | 49.776 [49.622–49.929] | -93.32% |
-| Four-triangle face | 155.333 [153.402–157.264] | 49.612 [49.410–49.814] | -68.06% |
-| Four-triangle oblique rim | 136.348 [135.897–136.799] | 137.969 [137.269–138.669] | +1.19% |
-| Four-triangle tangent | 116.185 [116.019–116.351] | 117.051 [116.552–117.551] | +0.75% |
-| Four-triangle partial-height slab | 74.484 [74.387–74.581] | 73.840 [73.810–73.871] | -0.86% |
-| Four-triangle tilted face | 219.554 [218.532–220.576] | 68.892 [67.824–69.960] | -68.62% |
-| Bent strip / sphere | 67.909 [67.734–68.083] | 67.367 [66.971–67.762] | -0.80% |
-| Bent strip / convex mesh | 173.955 [172.954–174.955] | 172.514 [172.175–172.854] | -0.83% |
-| Bent strip / mixed circle | 139.903 [136.984–142.821] | 143.748 [142.256–145.240] | +2.75% |
-| Square ring / sphere | 164.516 [164.316–164.717] | 164.214 [163.757–164.671] | -0.18% |
-| Square ring / convex mesh | 240.590 [239.965–241.214] | 238.740 [237.850–239.631] | -0.77% |
-| Square ring / mixed circle | 321.082 [319.067–323.097] | 323.245 [321.152–325.338] | +0.67% |
-| Open-mesh host step (one step) | 4641.734 [4595.663–4687.806] | 4569.367 [4563.603–4575.131] | -1.56% |
+| Control                             |   Baseline us [launch range] |      Final us [launch range] |  Change |
+| ----------------------------------- | ---------------------------: | ---------------------------: | ------: |
+| Certified mixed quad / 2 triangles  |       73.088 [73.087–73.088] |       71.778 [71.574–71.982] |  -1.79% |
+| Certified mixed quad / 8 triangles  |    208.071 [207.260–208.882] |       49.379 [49.325–49.433] | -76.27% |
+| Certified mixed quad / 32 triangles |    744.821 [742.227–747.414] |       49.776 [49.622–49.929] | -93.32% |
+| Four-triangle face                  |    155.333 [153.402–157.264] |       49.612 [49.410–49.814] | -68.06% |
+| Four-triangle oblique rim           |    136.348 [135.897–136.799] |    137.969 [137.269–138.669] |  +1.19% |
+| Four-triangle tangent               |    116.185 [116.019–116.351] |    117.051 [116.552–117.551] |  +0.75% |
+| Four-triangle partial-height slab   |       74.484 [74.387–74.581] |       73.840 [73.810–73.871] |  -0.86% |
+| Four-triangle tilted face           |    219.554 [218.532–220.576] |       68.892 [67.824–69.960] | -68.62% |
+| Bent strip / sphere                 |       67.909 [67.734–68.083] |       67.367 [66.971–67.762] |  -0.80% |
+| Bent strip / convex mesh            |    173.955 [172.954–174.955] |    172.514 [172.175–172.854] |  -0.83% |
+| Bent strip / mixed circle           |    139.903 [136.984–142.821] |    143.748 [142.256–145.240] |  +2.75% |
+| Square ring / sphere                |    164.516 [164.316–164.717] |    164.214 [163.757–164.671] |  -0.18% |
+| Square ring / convex mesh           |    240.590 [239.965–241.214] |    238.740 [237.850–239.631] |  -0.77% |
+| Square ring / mixed circle          |    321.082 [319.067–323.097] |    323.245 [321.152–325.338] |  +0.67% |
+| Open-mesh host step (one step)      | 4641.734 [4595.663–4687.806] | 4569.367 [4563.603–4575.131] |  -1.56% |
 
-The dense gains hold in both launch orders. Small controls do not establish
-an equivalence result: the bent mixed mean is +2.75% (+3.85 us), with overlapping
+The dense gains hold in both launch orders. Small controls do not establish an
+equivalence result: the bent mixed mean is +2.75% (+3.85 us), with overlapping
 launch ranges; the oblique rim is +1.19% (+1.62 us), tangent +0.75% (+0.87 us),
 and ring mixed +0.67% (+2.16 us). Preserve these positive estimates rather than
 calling them zero overhead. The remaining control point contrasts range down to
@@ -845,48 +851,48 @@ calling them zero overhead. The remaining control point contrasts range down to
 A subsequent identical-binary baseline/clone comparison uses the same driver,
 affinity, warmup/windows and actual binding checks in four fresh processes
 (controls and rims in each variant). Across the control set, sham contrasts
-range from -2.85% to +2.13%, while the original baseline bent-mixed process means
-span 136.98–142.82 us. These expose process/environmental uncertainty, not an
-isolated cause or proof that each positive contrast is noise. These runs do not
-settle the small positive estimates; do not infer exact zero cost or a control
-speedup. Reopen small-control attribution if longer matched runs establish a reproducible
-cost that matters to the host's query budget.
+range from -2.85% to +2.13%, while the original baseline bent-mixed process
+means span 136.98–142.82 us. These expose process/environmental uncertainty, not
+an isolated cause or proof that each positive contrast is noise. These runs do
+not settle the small positive estimates; do not infer exact zero cost or a
+control speedup. Reopen small-control attribution if longer matched runs
+establish a reproducible cost that matters to the host's query budget.
 
 | Identical-binary control | Baseline us | Clone us | Sham contrast |
-| --- | ---: | ---: | ---: |
-| Bent2 | 142.302 | 143.843 | +1.08% |
-| Ring2 | 321.266 | 328.094 | +2.13% |
-| OpenMeshFullStep64 | 4564.768 | 4606.623 | +0.92% |
-| PatchRim | 134.634 | 134.341 | -0.22% |
-| PatchTangent | 115.989 | 116.974 | +0.85% |
+| ------------------------ | ----------: | -------: | ------------: |
+| Bent2                    |     142.302 |  143.843 |        +1.08% |
+| Ring2                    |     321.266 |  328.094 |        +2.13% |
+| OpenMeshFullStep64       |    4564.768 | 4606.623 |        +0.92% |
+| PatchRim                 |     134.634 |  134.341 |        -0.22% |
+| PatchTangent             |     115.989 |  116.974 |        +0.85% |
 
 Earlier, rejected controls are retained. Full finite-face reconstruction costs
 about 23 ms at 2,048 triangles. A corner-face build costs 3.20–3.28 ms at 128
 triangles versus 2.613–2.646 ms baseline. Its plane-support replacement still
 costs 349–351 us at eight triangles versus 211–212 us baseline. A scalar-support
-replacement reduces that face cost but raises the four-triangle rim control
-from about 136 to 241 us and tangent control from 116 to 191 us before authored
-retry. All reconstruction helpers and temporary scratch state are removed by
-the retained face certificate. An unconditional wide sphere projection adds
-about 10–15% in bent/ring controls; the predicate is now confined to replacement
-fans. These adverse results are not folded into final acceptance averages.
+replacement reduces that face cost but raises the four-triangle rim control from
+about 136 to 241 us and tangent control from 116 to 191 us before authored
+retry. All reconstruction helpers and temporary scratch state are removed by the
+retained face certificate. An unconditional wide sphere projection adds about
+10–15% in bent/ring controls; the predicate is now confined to replacement fans.
+These adverse results are not folded into final acceptance averages.
 
 #### Correctness, coverage and reproduction
 
 `CertifiedMeshSweepTests` adds 34 maintained production-behavior cases: three
-source families, both windings, common yaw, affine half-raw placement, near-limit
-translation, exact repeat/order checks, finite rims and misses, tilted/horizontal
-faces, tangential entry, offset slabs, partial candidates, conservative initial
-bounds, duplicate hits/misses, changed radius, reversed sides, nearly aligned
-casts and endpoint radius hits without a center crossing. A tetrahedral source whose
-inspection center lies outside its hull verifies that the new GJK attempt does
-not invent a center contact.
+source families, both windings, common yaw, affine half-raw placement,
+near-limit translation, exact repeat/order checks, finite rims and misses,
+tilted/horizontal faces, tangential entry, offset slabs, partial candidates,
+conservative initial bounds, duplicate hits/misses, changed radius, reversed
+sides, nearly aligned casts and endpoint radius hits without a center crossing.
+A tetrahedral source whose inspection center lies outside its hull verifies that
+the new GJK attempt does not invent a center contact.
 
 The micro regression uses a quad with Y/Z half-extents 0.005, sphere radius
-0.00025 and chord X=-0.01 to +0.01 at Y=+0.0002, Z=-0.0002. The prototype
-misses after removing the internal diagonals because the public triangle normal
-and projection use a squared-area epsilon; baseline and final hit. A vertical
-quad with Y/Z half-extents 0.5 and a slab centered at Y=-0.5 reproduces the
+0.00025 and chord X=-0.01 to +0.01 at Y=+0.0002, Z=-0.0002. The prototype misses
+after removing the internal diagonals because the public triangle normal and
+projection use a squared-area epsilon; baseline and final hit. A vertical quad
+with Y/Z half-extents 0.5 and a slab centered at Y=-0.5 reproduces the
 prototype's invalid diagonal normal; final publishes -X. Centered/+0.5 slab
 variants also expose the legacy normal issue. These regressions were verified
 before accepting the corrections; no claim is made about every legacy fallback
@@ -897,17 +903,17 @@ with zero errors. Full suites pass **8,327 Release / 8,256 ReleaseLean tests**,
 without failures or skips. Each final configuration uses one fresh full-suite
 coverage capture, with no merged partial or historical acceptance coverage:
 
-| Configuration | Raw sequence points | Raw branches | Raw methods |
-| --- | ---: | ---: | ---: |
-| Release | 53,540 / 53,540 | 21,766 / 21,766 | 5,602 / 5,602 |
-| ReleaseLean | 53,538 / 53,538 | 21,766 / 21,766 | 5,601 / 5,601 |
+| Configuration | Raw sequence points |    Raw branches |   Raw methods |
+| ------------- | ------------------: | --------------: | ------------: |
+| Release       |     53,540 / 53,540 | 21,766 / 21,766 | 5,602 / 5,602 |
+| ReleaseLean   |     53,538 / 53,538 | 21,766 / 21,766 | 5,601 / 5,601 |
 
-Recreate the source graph at the revisions above, retain committed project files,
-and apply this change. Build/test with `-p:UseLocalLsfStack=true
--p:DisableTransitiveProjectReferences=true`; source mode expects all siblings.
-The maintained workloads can be reproduced through BenchmarkDotNet as follows;
-the direct ABBA protocol above, rather than a BDN short-job mean, supplies this
-record's acceptance numbers:
+Recreate the source graph at the revisions above, retain committed project
+files, and apply this change. Build/test with
+`-p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true`; source
+mode expects all siblings. The maintained workloads can be reproduced through
+BenchmarkDotNet as follows; the direct ABBA protocol above, rather than a BDN
+short-job mean, supplies this record's acceptance numbers:
 
 ```powershell
 $env:UseLocalLsfStack = 'true'
@@ -918,24 +924,25 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release -p:UseLocalLsf
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c ReleaseLean -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true --collect:'XPlat Code Coverage' --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/coverage-lean
 ```
 
-Captures under `artifacts/grv-benchmark-029/` contain source archives/`heads.json`,
-raw baseline/final profiles, rejected `accept-*`, `final-*`, `small-*` and
-`rims-*` controls, accepted `carrier-*` timings and actual bindings, identical-
-binary `aa-*` controls, focused regressions, full-suite logs and the separate
-`coverage-{release,lean}-carrier` reports. Disposable probes stay outside maintained
-tests/benchmarks; the inputs, revisions, protocol, results and limits above remain
-tracked if those artifacts are deleted. Independent connected-source review
-found no unresolved correctness/complexity findings after the revisions.
+Captures under `artifacts/grv-benchmark-029/` contain source
+archives/`heads.json`, raw baseline/final profiles, rejected `accept-*`,
+`final-*`, `small-*` and `rims-*` controls, accepted `carrier-*` timings and
+actual bindings, identical- binary `aa-*` controls, focused regressions,
+full-suite logs and the separate `coverage-{release,lean}-carrier` reports.
+Disposable probes stay outside maintained tests/benchmarks; the inputs,
+revisions, protocol, results and limits above remain tracked if those artifacts
+are deleted. Independent connected-source review found no unresolved
+correctness/complexity findings after the revisions.
 
 #### Remaining cost and reopening criteria
 
 Final managed stack samples put 95.8% of the dense sphere loop under hit
 publication and 90.4% under swept-sphere contact resolution, including 64.5% in
-per-triangle closest-point reduction; only 5.4% remains in the mesh sweep worker.
-Mixed attribution now includes 32.8% finite chord intersection, 30.6% in the
-single analytic carrier and 21.9% in mesh triangle gathering. These inclusive
-weights overlap and include the same one-second warmup plus 12-second loop;
-they are attribution, not operation-time fractions to add together.
+per-triangle closest-point reduction; only 5.4% remains in the mesh sweep
+worker. Mixed attribution now includes 32.8% finite chord intersection, 30.6% in
+the single analytic carrier and 21.9% in mesh triangle gathering. These
+inclusive weights overlap and include the same one-second warmup plus 12-second
+loop; they are attribution, not operation-time fractions to add together.
 
 BVH gathering and candidate scans remain proportional to admitted triangles.
 Sphere publication still resolves the globally closest finite feature through
@@ -1021,8 +1028,8 @@ reopening the already-closed upstream signal.
 
 ### GRV-Benchmark-028 — Mixed Broad-Phase Work With An Empty Opposite Dimension
 
-**Discovered:** 2026-10-15 during #135/#136 warm validation.
-**Closed:** 2026-10-31. **Owner:** Gravitas mixed candidate distribution.
+**Discovered:** 2026-10-15 during #135/#136 warm validation. **Closed:**
+2026-10-31. **Owner:** Gravitas mixed candidate distribution.
 
 `ProcessMixedContacts` now skips copying, sorting and distributing active mixed
 partitions when either live dimensional collider registry is empty. Index
@@ -1042,7 +1049,8 @@ the corresponding forward offset and 6×1 floor. Automatic grounding crosses a
 real 1/2-unit collider gap; there are no supporting contact manifolds. Setup
 settles 16 steps, explicitly sleeps the movers and warms 33 more steps. Setup
 and cleanup verify stable grounded sleep, zero velocity, the physical gap,
-unchanged heights and the empty opposite registry. Pure 3D/2D modes are controls.
+unchanged heights and the empty opposite registry. Pure 3D/2D modes are
+controls.
 
 #### Comparable source and measurement
 
@@ -1051,10 +1059,11 @@ unchanged benchmark fixture. Both versions use frozen committed FixedMathSharp
 `b4a489de5ae5ba178a5970499e7d90f7847fe0f9`, SwiftCollections
 `0418123fa52f78cbff551e6ca291ef816493069b`, GridForge
 `76e2bd46380664cfa5403d3b57eca6a82cb6b88a` and Chronicler
-`c45f9ab53913e5b1692f0717733425e0f4defeb2`. Source archives preserve the baseline;
-the isolated build graph is updated only after freezing baseline binaries and
-completing baseline benchmarks/tests. The candidate changes only the candidate-distribution
-phase. Among the 35 DLLs in the direct A/B payloads, only `Gravitas.dll` differs; module hashes are retained.
+`c45f9ab53913e5b1692f0717733425e0f4defeb2`. Source archives preserve the
+baseline; the isolated build graph is updated only after freezing baseline
+binaries and completing baseline benchmarks/tests. The candidate changes only
+the candidate-distribution phase. Among the 35 DLLs in the direct A/B payloads,
+only `Gravitas.dll` differs; module hashes are retained.
 
 Windows 11 x64, i7-9700K, SDK 10.0.302, .NET 10.0.10, Release,
 `UseLocalLsfStack=true`, `DisableTransitiveProjectReferences=true`,
@@ -1072,12 +1081,12 @@ dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:
 dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll --filter '*MixedEmptyDimensionBenchmarks*' --job short --warmupCount 5 --iterationCount 8 --launchCount 2 --invocationCount 512 --unrollFactor 1 --exporters json --artifacts artifacts/benchmark-028
 ```
 
-| Complete step | Baseline mean (SD) | Final mean (SD) | Change | Allocated |
-| --- | ---: | ---: | ---: | ---: |
-| 3D population, Mixed runtime | 837.96 (30.05) us | 485.33 (3.54) us | -42.1% | 0 B/op |
-| 3D population, pure 3D control | 413.02 (5.22) us | 399.08 (2.55) us | -3.4% | 0 B/op |
-| 2D population, Mixed runtime | 687.84 (19.21) us | 441.28 (3.77) us | -35.8% | 0 B/op |
-| 2D population, pure 2D control | 367.92 (9.03) us | 352.46 (2.06) us | -4.2% | 0 B/op |
+| Complete step                  | Baseline mean (SD) |  Final mean (SD) | Change | Allocated |
+| ------------------------------ | -----------------: | ---------------: | -----: | --------: |
+| 3D population, Mixed runtime   |  837.96 (30.05) us | 485.33 (3.54) us | -42.1% |    0 B/op |
+| 3D population, pure 3D control |   413.02 (5.22) us | 399.08 (2.55) us |  -3.4% |    0 B/op |
+| 2D population, Mixed runtime   |  687.84 (19.21) us | 441.28 (3.77) us | -35.8% |    0 B/op |
+| 2D population, pure 2D control |   367.92 (9.03) us | 352.46 (2.06) us |  -4.2% |    0 B/op |
 
 Every BDN child exits zero: eight children and exactly 64 Workload/Actual
 measurements per payload (four rows × two launches × eight iterations). Pure
@@ -1089,19 +1098,21 @@ targeting 30 ms each (1–4,096 steps per window). ABBA processes cover the same
 four complete-step rows plus maintained sparse mixed broad-phase controls with
 32 and 1,024 registered pairs. These existing controls eventually auto-sleep:
 their steady broad-phase candidate count is zero, so they measure populated,
-sleeping distribution overhead rather than awake pair generation. All measured windows allocate zero bytes. The four supported-sleep rows retain
-all sixteen returned checksums and all 64 final body positions, linear velocities
-and grounding/sleep flags. The sparse controls retain their returned candidate
-counts. These comparisons match exactly across all four processes. Final balanced means:
+sleeping distribution overhead rather than awake pair generation. All measured
+windows allocate zero bytes. The four supported-sleep rows retain all sixteen
+returned checksums and all 64 final body positions, linear velocities and
+grounding/sleep flags. The sparse controls retain their returned candidate
+counts. These comparisons match exactly across all four processes. Final
+balanced means:
 
-| Direct complete step | Baseline us | Final us | Change |
-| --- | ---: | ---: | ---: |
-| 3D / pure | 395.91 | 397.45 | +0.39% |
-| 3D / Mixed | 704.30 | 492.13 | -30.13% |
-| 2D / pure | 364.22 | 361.84 | -0.65% |
-| 2D / Mixed | 659.23 | 451.71 | -31.48% |
-| Sleeping populated control, 32 pairs | 204.06 | 205.42 | +0.67% |
-| Sleeping populated control, 1,024 pairs | 17880.70 | 17970.28 | +0.50% |
+| Direct complete step                    | Baseline us | Final us |  Change |
+| --------------------------------------- | ----------: | -------: | ------: |
+| 3D / pure                               |      395.91 |   397.45 |  +0.39% |
+| 3D / Mixed                              |      704.30 |   492.13 | -30.13% |
+| 2D / pure                               |      364.22 |   361.84 |  -0.65% |
+| 2D / Mixed                              |      659.23 |   451.71 | -31.48% |
+| Sleeping populated control, 32 pairs    |      204.06 |   205.42 |  +0.67% |
+| Sleeping populated control, 1,024 pairs |    17880.70 | 17970.28 |  +0.50% |
 
 The sleeping controls' process ranges are 203.98–204.13 us baseline versus
 204.79–206.04 us final at 32 pairs, and 17.789–17.973 ms versus 17.699–18.242 ms
@@ -1115,21 +1126,22 @@ The initial inline guard repeatedly slowed the 32-pair sleeping control:
 (+2.2%), then 188.83/189.13 versus 195.59/194.62 us in isolated BAAB processes
 (+3.2%). Those results are retained as adverse evidence, not called noise or
 zero overhead. A diagnostic with TieredPGO disabled reduces the gap to 0.5%;
-evaluating both Boolean comparisons without short circuiting does not resolve it.
-Neither experimental configuration nor Boolean rewrite is retained. Extracting
-the existing distribution phase gives overlapping default-runtime process ranges:
-187.91–191.33 us baseline versus 189.53–191.48 us final (+0.5% mean). This is a
-measured mitigation, not proof of a particular JIT/PGO/layout cause. The final
-full matrix checks both population directions and preserves the original
-controls; no universal zero-overhead claim is made.
+evaluating both Boolean comparisons without short circuiting does not resolve
+it. Neither experimental configuration nor Boolean rewrite is retained.
+Extracting the existing distribution phase gives overlapping default-runtime
+process ranges: 187.91–191.33 us baseline versus 189.53–191.48 us final (+0.5%
+mean). This is a measured mitigation, not proof of a particular JIT/PGO/layout
+cause. The final full matrix checks both population directions and preserves the
+original controls; no universal zero-overhead claim is made.
 
 Fresh sampled-thread-time profiling reproduces the original signal: 43.9% of
 inclusive full-step loop weight is below `ProcessMixedContacts` in the baseline
-3D-only scene. The guarded profile puts 24.9% below mixed processing, almost entirely in index refresh (24.8%). The driver setup is outside the sampled method;
-the loop includes its additional 1.5-second warmup and 15 seconds of repeated
-steps. Inclusive weights overlap and are not exclusive CPU shares. The remaining
-mixed indexing serves explicit queries and future population changes; it is not
-claimed to disappear or reach pure-runtime cost.
+3D-only scene. The guarded profile puts 24.9% below mixed processing, almost
+entirely in index refresh (24.8%). The driver setup is outside the sampled
+method; the loop includes its additional 1.5-second warmup and 15 seconds of
+repeated steps. Inclusive weights overlap and are not exclusive CPU shares. The
+remaining mixed indexing serves explicit queries and future population changes;
+it is not claimed to disappear or reach pure-runtime cost.
 
 #### Correctness, validation and closure
 
@@ -1138,8 +1150,8 @@ including six new source-behavior cases for both empty-dimension directions.
 They check query candidates after movement, version advancement, retained
 partition retirement after the final removal, repeated last-collider removal
 inside trigger callbacks and respawn, stale candidate clearing, pair/exit event
-counts and zero warm allocations. No tests or maintained verification
-harnesses around benchmark/test infrastructure are added.
+counts and zero warm allocations. No tests or maintained verification harnesses
+around benchmark/test infrastructure are added.
 
 Full source-stack gates pass **8,293 Release tests** and **8,222 ReleaseLean
 tests**, with no failures or skips. Both library targets (`netstandard2.1` and
@@ -1148,9 +1160,9 @@ one fresh coverage capture; no historical coverage is merged into acceptance.
 All reachable sequence points, branches and methods are covered:
 
 | Configuration | Raw covered / total sequence points | Raw covered / total branches | Raw covered / total methods |
-| --- | ---: | ---: | ---: |
-| Release | 53,477 / 53,477 | 21,710 / 21,710 | 5,602 / 5,602 |
-| ReleaseLean | 53,475 / 53,475 | 21,710 / 21,710 | 5,601 / 5,601 |
+| ------------- | ----------------------------------: | ---------------------------: | --------------------------: |
+| Release       |                     53,477 / 53,477 |              21,710 / 21,710 |               5,602 / 5,602 |
+| ReleaseLean   |                     53,475 / 53,475 |              21,710 / 21,710 |               5,601 / 5,601 |
 
 Reproduce full-suite coverage from either configuration's freshly built source:
 
@@ -1159,35 +1171,38 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release -p:UseLocalLsf
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c ReleaseLean -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true --collect:"XPlat Code Coverage" --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/coverage-lean
 ```
 
-The Release execution reused built tests with the final runtime DLL/PDB installed;
-its runtime DLL exactly matches the final measured payload. Lean compiles its own
-configuration. Source/test bytes match the isolated graph. Existing replay,
-allocation, query, response and lifecycle regressions remain in the full runs.
+The Release execution reused built tests with the final runtime DLL/PDB
+installed; its runtime DLL exactly matches the final measured payload. Lean
+compiles its own configuration. Source/test bytes match the isolated graph.
+Existing replay, allocation, query, response and lifecycle regressions remain in
+the full runs.
 
 Independent review found no actionable runtime/test/benchmark issue. This closes
 the impossible-distribution signal; remaining mixed index refresh is required
 work. Reopen for a representative empty-population workload that still spends
 material time in distribution, a measured populated-path regression, stale query
-results, missed post-registration pairs, nondeterministic order, retained-payload
-leaks, incorrect callback lifetime behavior or new warm allocation.
+results, missed post-registration pairs, nondeterministic order,
+retained-payload leaks, incorrect callback lifetime behavior or new warm
+allocation.
 
 An additional awake control wraps two successive
-`MixedBroadPhaseBenchmarks.RetainedPartitionCleanupAfterChurn` calls per measured
-operation, moving 32 planar bodies between the existing fixture's 16/32-unit
-X offsets. This keeps the mixed distribution path populated and ends each cycle
-with **32 broad-phase candidates**. Default-runtime BAAB process means are
-1,380.04/1,367.35 us per two-step cycle baseline versus 1,416.80/1,367.99 us final
-(+1.4% aggregate, overlapping process ranges). Every window allocates zero bytes;
-all sixteen retained/pool return values and final candidate/collider counts match.
-The variation is retained without claiming exact equivalence or a speedup for
-populated moving scenes. The disposable `churn` driver mode reuses the same warmup,
-calibration, window, GC, affinity and priority protocol as the other direct runs.
+`MixedBroadPhaseBenchmarks.RetainedPartitionCleanupAfterChurn` calls per
+measured operation, moving 32 planar bodies between the existing fixture's
+16/32-unit X offsets. This keeps the mixed distribution path populated and ends
+each cycle with **32 broad-phase candidates**. Default-runtime BAAB process
+means are 1,380.04/1,367.35 us per two-step cycle baseline versus
+1,416.80/1,367.99 us final (+1.4% aggregate, overlapping process ranges). Every
+window allocates zero bytes; all sixteen retained/pool return values and final
+candidate/collider counts match. The variation is retained without claiming
+exact equivalence or a speedup for populated moving scenes. The disposable
+`churn` driver mode reuses the same warmup, calibration, window, GC, affinity
+and priority protocol as the other direct runs.
 
-Supplemental ignored evidence is under `artifacts/grv-benchmark-028`: `heads.json`,
-five source archives, frozen baseline/final payloads, `final-payload-hashes.json`, the exact
-`final-matrix-driver`, BDN JSON and
-child logs, ABBA direct logs/driver, paired Speedscope traces, focused runs and
-final raw coverage captures. The maintained fixture and the revisions, inputs,
+Supplemental ignored evidence is under `artifacts/grv-benchmark-028`:
+`heads.json`, five source archives, frozen baseline/final payloads,
+`final-payload-hashes.json`, the exact `final-matrix-driver`, BDN JSON and child
+logs, ABBA direct logs/driver, paired Speedscope traces, focused runs and final
+raw coverage captures. The maintained fixture and the revisions, inputs,
 commands, outcomes and reopening criteria here stand independently of those
 disposable artifacts. Changes were left unstaged/uncommitted for review; no
 released-package or cross-platform validation is claimed.
@@ -1197,10 +1212,10 @@ released-package or cross-platform validation is claimed.
 The following original profile describes the pre-#135/#136 stack; its timings
 are not mixed with the current comparison above.
 
-**Discovered:** 2026-10-15 during #135/#136 warm validation. **Original intake status:**
-Profiled pre-existing opportunity; the benefit of a distribution gate has not
-been measured. **Owner:** Gravitas mixed candidate distribution and partition
-maintenance.
+**Discovered:** 2026-10-15 during #135/#136 warm validation. **Original intake
+status:** Profiled pre-existing opportunity; the benefit of a distribution gate
+has not been measured. **Owner:** Gravitas mixed candidate distribution and
+partition maintenance.
 
 The isolated `QueryOnly136WarmBenchmarks.Stable64Frame(Domain: "Mixed")`
 contains 64 sleeping 3D spheres and their 3D static floors, with **zero 2D
@@ -1225,25 +1240,24 @@ $env:UseLocalLsfStack = 'true'
 pwsh -NoProfile -File artifacts/grv-issue-135/perf/run-native.ps1 -Variant original -Label empty-dimension-repro -Filters '*QueryOnly136WarmBenchmarks*'
 ```
 
-**Next isolation at intake:** Promote the bounded fixture into the maintained benchmark
-suite, then measure skipping only impossible candidate distribution while
-preserving partition/query freshness, pair retirement, deterministic ordering
-and `0 B` warm behavior. Exercise both empty-dimension directions and repeated
-spawn/despawn transitions. Keep the #135/#136 regression gate independent of
-this pre-existing follow-up.
+**Next isolation at intake:** Promote the bounded fixture into the maintained
+benchmark suite, then measure skipping only impossible candidate distribution
+while preserving partition/query freshness, pair retirement, deterministic
+ordering and `0 B` warm behavior. Exercise both empty-dimension directions and
+repeated spawn/despawn transitions. Keep the #135/#136 regression gate
+independent of this pre-existing follow-up.
 
 Ignored `artifacts/grv-issue-135/perf/` retains the frozen original eight-module
 stack (`89C15FBD...` core), unchanged fixture inputs, native rows,
 `profile-attribution.json`, paired CPU traces and zero-ground-probe diagnostics.
 
-
 ### GRV-Benchmark-027 — Nonconvex Rotational CCD Step Cost
 
-**Discovered:** 2026-10-12 during GRV-Issue-101 validation.
-**Closed:** 2026-10-31 as measured cost hardening and a bounded no-further-change
-decision. The conservative capsule progress limit below remains reproducible;
-closure does not claim unrestricted rotational capacity or a host frame budget.
-**Owner:** Gravitas rotational interval search and finite-contact admission.
+**Discovered:** 2026-10-12 during GRV-Issue-101 validation. **Closed:**
+2026-10-31 as measured cost hardening and a bounded no-further-change decision.
+The conservative capsule progress limit below remains reproducible; closure does
+not claim unrestricted rotational capacity or a host frame budget. **Owner:**
+Gravitas rotational interval search and finite-contact admission.
 
 #### Retained implementation
 
@@ -1254,20 +1268,20 @@ The continuation removes repeated contact materialization:
 - Standalone open/concave mesh versus cone interval samples use the existing
   exact finite triangle/cone Boolean predicate in the mesh geometry chart. One
   local plane frame is reused for consecutive triangles with the same canonical
-  owner. Closed convex containment and declared static-surface response ownership
-  retain their complete existing admission path.
+  owner. Closed convex containment and declared static-surface response
+  ownership retain their complete existing admission path.
 - The complete matched cone manifold and closing velocity are reconstructed at
   the retained witness only when its time equals the admitted safe frontier.
   Moving source and target are both sampled at that exact time. A later witness
   cannot authorize an impulse at an earlier unresolved frontier.
 - Both mixed directions apply the same frontier equality before reconstructing
-  response rows. T0 response, geometric upper bounds, candidate order, conservative
-  terminal classification and retained momentum are unchanged.
+  response rows. T0 response, geometric upper bounds, candidate order,
+  conservative terminal classification and retained momentum are unchanged.
 
 No budget, tolerance, response deadband, support-pair approximation, cross-call
-cache or public API is added. The 3D interval method moves to its existing search
-partial; the five production files grow by **34 net lines**. No lower-stack
-source change is retained.
+cache or public API is added. The 3D interval method moves to its existing
+search partial; the five production files grow by **34 net lines**. No
+lower-stack source change is retained.
 
 #### Frozen comparison and reproducible procedure
 
@@ -1281,16 +1295,17 @@ match this change byte-for-byte. Among the 35 DLLs in the direct A/B measurement
 payloads, **only `Gravitas.dll` differs**. This is source-stack validation, not
 validation of the subsequently edited CI dependency pin or a released package.
 
-Host: Windows 11 x64, i7-9700K (8 cores), SDK 10.0.302, .NET 10.0.10,
-Release, `UseLocalLsfStack=true`, `DisableTransitiveProjectReferences=true`,
+Host: Windows 11 x64, i7-9700K (8 cores), SDK 10.0.302, .NET 10.0.10, Release,
+`UseLocalLsfStack=true`, `DisableTransitiveProjectReferences=true`,
 `DOTNET_PROCESSOR_COUNT=2`. Acceptance timings run without competing builds,
 tests or profilers. BenchmarkDotNet 0.15.8 uses concurrent workstation GC;
 disposable direct drivers use blocking GC. BDN requested affinity 192 but every
 child reported that setting failed; **these BDN runs are unpinned**. The later
 direct probes successfully set affinity 192 and High process priority.
 
-Build and run each frozen graph separately; carry the local-stack properties into
-generated benchmark children through the environment. Representative commands:
+Build and run each frozen graph separately; carry the local-stack properties
+into generated benchmark children through the environment. Representative
+commands:
 
 ```powershell
 $env:UseLocalLsfStack = 'true'
@@ -1306,10 +1321,10 @@ Each maintained nonconvex operation includes a pose reset and a complete
 forces disabled and frictionless materials. They deliberately stress refinement;
 their iteration statistics are not gameplay-frame percentiles.
 
-| Complete host-step fixture | Baseline | Final | Change | Warm allocation |
-| --- | ---: | ---: | ---: | ---: |
-| Joined cone floor/wall first impact | 6.596 ms | 2.350 ms | **-64.4%** | 0 B/op |
-| Floor-only cone first impact | 5.238 ms | 2.152 ms | **-58.9%** | 0 B/op |
+| Complete host-step fixture          | Baseline |    Final |     Change | Warm allocation |
+| ----------------------------------- | -------: | -------: | ---------: | --------------: |
+| Joined cone floor/wall first impact | 6.596 ms | 2.350 ms | **-64.4%** |          0 B/op |
+| Floor-only cone first impact        | 5.238 ms | 2.152 ms | **-58.9%** |          0 B/op |
 
 Joined baseline/final standard deviations are 0.0681/0.0258 ms; floor deviations
 are 0.0066/0.0631 ms. Each payload has four successful child exits and exactly
@@ -1318,45 +1333,46 @@ Fixed 128-invocation confirmations supersede the shorter auto-calibrated runs.
 
 Twelve existing interval/moving controls cover pure 2D, pure 3D and both mixed
 directions at 1/32 candidates or pairs. These methods run `LateSimulate` only.
-Quiet direct ABBA runs retain every returned value and final raw body state at
-0 B. Initial adverse means included +7.5% for the one-pair pure-2D moving row and
-+6.3% for the 32-pair mixed 3D-source row. Focused checks did not reproduce those
-slowdowns: six-second-warmup BAAB pure-2D process means are 424.93/433.37 us
-baseline and 431.93/430.68 us final (+0.5% aggregate, overlapping ranges).
-The mixed 32-pair BDN control is 63.983 ms baseline versus 58.733 ms final
-(SD 4.079/0.324 ms), at 0 B/op. Its one/eight-pair rows are 4.953/15.294 ms
-baseline and 4.907/15.165 ms final; the one-pair row has large startup-sensitive
+Quiet direct ABBA runs retain every returned value and final raw body state at 0
+B. Initial adverse means included +7.5% for the one-pair pure-2D moving row and
++6.3% for the 32-pair mixed 3D-source row. Focused checks did not reproduce
+those slowdowns: six-second-warmup BAAB pure-2D process means are 424.93/433.37
+us baseline and 431.93/430.68 us final (+0.5% aggregate, overlapping ranges).
+The mixed 32-pair BDN control is 63.983 ms baseline versus 58.733 ms final (SD
+4.079/0.324 ms), at 0 B/op. Its one/eight-pair rows are 4.953/15.294 ms baseline
+and 4.907/15.165 ms final; the one-pair row has large startup-sensitive
 variation. Each payload has six successful children and 60 Actual measurements.
 These controls support absence of a reproduced regression, not universal zero
 overhead or an advertised speedup for unchanged paths. Adverse captures remain
 part of the investigation.
 
-Facet probes use a floor spanning X `[0,2]`, Z `[-2,2]`, divided into N by N cells
-(two triangles each; N = 1/4/8/16), with a unit-mass kinematic cone at
-`(3/5,11/20,0)`, radius 1/2 and height 1. Each operation resets pose, authors
-1 or 90 degrees about -Z, and runs a complete step. After at least one second of
+Facet probes use a floor spanning X `[0,2]`, Z `[-2,2]`, divided into N by N
+cells (two triangles each; N = 1/4/8/16), with a unit-mass kinematic cone at
+`(3/5,11/20,0)`, radius 1/2 and height 1. Each operation resets pose, authors 1
+or 90 degrees about -Z, and runs a complete step. After at least one second of
 warmup and 200 ms calibration, each process measures 24 windows, choosing
 1–4,096 operations per window to target approximately 30 ms. ABBA means:
 
 | Floor triangles | 1 degree baseline → final | 90 degrees baseline → final |
-| ---: | ---: | ---: |
-| 2 | 110.78 → 108.60 us | 5.321 → 2.061 ms |
-| 32 | 140.05 → 139.42 us | 6.771 → 2.284 ms |
-| 128 | 225.22 → 221.01 us | 10.267 → 3.260 ms |
-| 512 | 548.59 → 536.15 us | 18.297 → 5.991 ms |
+| --------------: | ------------------------: | --------------------------: |
+|               2 |        110.78 → 108.60 us |            5.321 → 2.061 ms |
+|              32 |        140.05 → 139.42 us |            6.771 → 2.284 ms |
+|             128 |        225.22 → 221.01 us |           10.267 → 3.260 ms |
+|             512 |        548.59 → 536.15 us |           18.297 → 5.991 ms |
 
 Every measured window allocates zero bytes. Sixteen returned values and final
-pose/velocity/TOI snapshots per row match baseline exactly. Small-angle differences
-are controls, not claimed improvements. The seven maintained nonconvex full-step
-fixtures also retain their returned values and final raw states.
+pose/velocity/TOI snapshots per row match baseline exactly. Small-angle
+differences are controls, not claimed improvements. The seven maintained
+nonconvex full-step fixtures also retain their returned values and final raw
+states.
 
 #### Preserved capsule capacity boundary and stopping decision
 
 The historical inputs below remain the reproduction. Fresh and warmed 12-frame
 episodes explicitly set unit mass, zero gravity/air/damping, MinSpeed 0,
 MaxSpeed/MaxFallSpeed 1,024, manual grounding, disabled sleep and frictionless
-materials. The driver asserts that the prescribed initial impulse produces
-X velocity 1; earlier probes lacking explicit unit mass are discarded.
+materials. The driver asserts that the prescribed initial impulse produces X
+velocity 1; earlier probes lacking explicit unit mass are discarded.
 
 The pressed planar capsule versus the vertical concave quad reaches the depth
 frontier in **7/12 frames**. A measured operation includes reset, impulses and
@@ -1368,11 +1384,11 @@ episodes matches baseline in all four processes.
 
 Exact final Q32.32 states for the retained probes:
 
-| Probe | Position | Rotation | Linear velocity | Angular velocity | Limits / 12 |
-| --- | --- | --- | --- | --- | ---: |
-| Planar capsule / concave quad | (268435456,4294748103) | yaw 62586953 | (4294967296,-538094915) | 213505992 | 7 |
-| Spatial capsule / declared split slabs | (-1073348608,0,2147483648) | (0,0,10152,4294967296) | (4294967296,0,1) | (1,-19,221847484) | 12 |
-| Spatial capsule / unsplit slab, or split with RotationX/Y frozen | (2147483648,0,2147483648) | (0,0,83187535,4294161607) | (4294967296,0,0) | (0,0,221847484) | 0 |
+| Probe                                                            | Position                   | Rotation                  | Linear velocity         | Angular velocity  | Limits / 12 |
+| ---------------------------------------------------------------- | -------------------------- | ------------------------- | ----------------------- | ----------------- | ----------: |
+| Planar capsule / concave quad                                    | (268435456,4294748103)     | yaw 62586953              | (4294967296,-538094915) | 213505992         |           7 |
+| Spatial capsule / declared split slabs                           | (-1073348608,0,2147483648) | (0,0,10152,4294967296)    | (4294967296,0,1)        | (1,-19,221847484) |          12 |
+| Spatial capsule / unsplit slab, or split with RotationX/Y frozen | (2147483648,0,2147483648)  | (0,0,83187535,4294161607) | (4294967296,0,0)        | (0,0,221847484)   |           0 |
 
 Diagnostic-only instrumentation, removed before final builds, records 22 planar
 and 24 declared-spatial search-limit returns across two episodes each. **Every
@@ -1388,15 +1404,15 @@ contact construction and 28.1% in shape preparation; these overlapping shares
 are not exclusive CPU percentages. The planar episode spends about 99% in
 required complete mixed mesh/slab contacts, including 93.9% in finite root
 comparison. Two disposable upstream clipping/sign experiments gave no convincing
-improvement and were removed. A whole-yaw orbit-envelope certificate was rejected
-before implementation: the pressed planar trajectory moves its center below
-that envelope's separation plane, so it would not cover the maintained workload.
-No original-search fallback or higher search budget is introduced.
+improvement and were removed. A whole-yaw orbit-envelope certificate was
+rejected before implementation: the pressed planar trajectory moves its center
+below that envelope's separation plane, so it would not cover the maintained
+workload. No original-search fallback or higher search budget is introduced.
 
 This closes the repeated-work investigation with substantial measured gains and
 an explicit no-further-change decision for the residual capacity limit. A useful
-next improvement requires a stronger directional/time-dependent support proof
-or constraint-aware continuation; it is not a small bookkeeping optimization.
+next improvement requires a stronger directional/time-dependent support proof or
+constraint-aware continuation; it is not a small bookkeeping optimization.
 Reopen when such a certificate covers the maintained pressed trajectory, a
 representative host budget rejects the remaining cost, or a concrete case
 violates blocking, momentum, witness, determinism or limit-reporting contracts.
@@ -1411,9 +1427,9 @@ coverage capture; no historical/failed-run coverage is merged into acceptance.
 Every reachable sequence point, branch and method is covered:
 
 | Configuration | Covered / total sequence points | Covered / total branches | Covered / total methods |
-| --- | ---: | ---: | ---: |
-| Release | 53,473 / 53,473 | 21,706 / 21,706 | 5,601 / 5,601 |
-| ReleaseLean | 53,471 / 53,471 | 21,706 / 21,706 | 5,600 / 5,600 |
+| ------------- | ------------------------------: | -----------------------: | ----------------------: |
+| Release       |                 53,473 / 53,473 |          21,706 / 21,706 |           5,601 / 5,601 |
+| ReleaseLean   |                 53,471 / 53,471 |          21,706 / 21,706 |           5,600 / 5,600 |
 
 Both library target frameworks (`netstandard2.1` and `net10.0`) build in Release
 and ReleaseLean with zero errors. Full test/coverage commands, run once per
@@ -1424,37 +1440,37 @@ dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release -p:UseLocalLsf
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c ReleaseLean -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false --collect:"XPlat Code Coverage" --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/coverage-lean-final
 ```
 
-
 New library-behavior tests cover exact Boolean/full finite admission against
 independent hit/miss oracles (18 theory rows, 108 placements, including common
 rigid rotations, affine half-raw charts, extreme translations, hole/disconnected
-patches, tangencies and a one-raw positive cone), both moving mesh/cone directions,
-dynamic stopping at the retained witness, open convex admission, closed convex
-containment and declared-surface exclusions. Existing moving-pair, replay,
-allocation and static-continuity regressions remain in the full runs. No tests
-of benchmark/test infrastructure are added. Independent review found no remaining
-runtime/test defect; the limit above is retained deliberately.
+patches, tangencies and a one-raw positive cone), both moving mesh/cone
+directions, dynamic stopping at the retained witness, open convex admission,
+closed convex containment and declared-surface exclusions. Existing moving-pair,
+replay, allocation and static-continuity regressions remain in the full runs. No
+tests of benchmark/test infrastructure are added. Independent review found no
+remaining runtime/test defect; the limit above is retained deliberately.
 
-Ignored supplemental evidence is under `artifacts/grv-benchmark-027/continuation`:
-`measured-payload-hashes.json`, `measured-driver`, `bdn-*-confirmation`,
-`bdn-moving-*`, `q-*-controls.log`, `l-*-moving2d.log`, `v-*-facets.log`,
-`c-*-capacity.log`, `*-final-snapshots.log`, `capacity-trace.txt`, final
-Speedscope traces, `multitarget-*.log`, and final raw coverage captures.
-The revisions, inputs, procedure, outcomes and reopening criteria in this tracked
-record stand independently of those disposable files. Changes were left
-unstaged/uncommitted for review; no package or cross-platform release is claimed.
+Ignored supplemental evidence is under
+`artifacts/grv-benchmark-027/continuation`: `measured-payload-hashes.json`,
+`measured-driver`, `bdn-*-confirmation`, `bdn-moving-*`, `q-*-controls.log`,
+`l-*-moving2d.log`, `v-*-facets.log`, `c-*-capacity.log`,
+`*-final-snapshots.log`, `capacity-trace.txt`, final Speedscope traces,
+`multitarget-*.log`, and final raw coverage captures. The revisions, inputs,
+procedure, outcomes and reopening criteria in this tracked record stand
+independently of those disposable files. Changes were left unstaged/uncommitted
+for review; no package or cross-platform release is claimed.
 
 #### Historical evidence through the first refinement
 
 The following checkpoint predates the continuation above. Its timings, status
 and suggested next isolation describe that checkpoint, not the closure state.
 
-**Discovered:** 2026-10-12 during GRV-Issue-101 validation. **Status at this checkpoint:** Open;
-single-source gathering optimized in both dimensions. Exact cone-contact cost
-and general rotational-refinement capacity remain separate unresolved costs.
-**Owner:** Gravitas bounded rotational interval
-search and exact finite-contact admission; FixedMathSharp only where profiles
-identify reusable geometry work.
+**Discovered:** 2026-10-12 during GRV-Issue-101 validation. **Status at this
+checkpoint:** Open; single-source gathering optimized in both dimensions. Exact
+cone-contact cost and general rotational-refinement capacity remain separate
+unresolved costs. **Owner:** Gravitas bounded rotational interval search and
+exact finite-contact admission; FixedMathSharp only where profiles identify
+reusable geometry work.
 
 `NonconvexRotationalCcdBenchmarks` runs complete `Simulate`/`LateSimulate` steps
 with an authored 90-degree rotation at frame rate 1, disabled forces and
@@ -1521,57 +1537,58 @@ attributes 62% to complete mesh/cone contact construction, including 53% in
 cone-plane ray events; its exact curved-contact frequency also belongs to
 GRV-Benchmark-024.
 
-**2026-10-31 refinement:** Fresh steady-loop profiles of the maintained full-step
-fixtures exclude setup. In the mixed mesh/prism case, same-dimensional gathering
-occupies 26.4% of sampled loop time, including 18.2% below dense voxel range
-collection, although the source is the only registered 3D collider. Both body
-owners now clear retained hits/IDs and skip this gather only when their live
-dimensional registry contains exactly their own collider root. Mixed gathering
-still runs; registration/removal needs no cache invalidation or new counters.
-The post-change trace has no samples below the skipped 3D query; exact Boolean
-mixed admission now accounts for 42.7% and mixed gathering for 19.4% of inclusive
-sampled loop time. These shares overlap and are not exclusive CPU percentages.
+**2026-10-31 refinement:** Fresh steady-loop profiles of the maintained
+full-step fixtures exclude setup. In the mixed mesh/prism case, same-dimensional
+gathering occupies 26.4% of sampled loop time, including 18.2% below dense voxel
+range collection, although the source is the only registered 3D collider. Both
+body owners now clear retained hits/IDs and skip this gather only when their
+live dimensional registry contains exactly their own collider root. Mixed
+gathering still runs; registration/removal needs no cache invalidation or new
+counters. The post-change trace has no samples below the skipped 3D query; exact
+Boolean mixed admission now accounts for 42.7% and mixed gathering for 19.4% of
+inclusive sampled loop time. These shares overlap and are not exclusive CPU
+percentages.
 
 Frozen source baseline: Gravitas `68ca89f`, FixedMathSharp `0e7a8e5`,
-SwiftCollections `d605ec1`, GridForge `76e2bd4`, Chronicler `0a5f962`.
-Release source-stack builds use SDK 10.0.302 / .NET 10.0.10 on Windows x64,
-i7-9700K, blocking GC and `DOTNET_PROCESSOR_COUNT=2`. Only `Gravitas.dll`
-differs among the 35 assemblies in the frozen A/B payloads. A disposable driver
-calls the existing benchmark methods, with setup outside measurement, at least
-one second of warmup per row, 200 ms calibration and 24 approximately 30 ms
-measurement windows per process. These are direct fixture timings, not BDN
-results or gameplay frame percentiles. Four independent processes per payload
-run in ABBA then BAAB order:
+SwiftCollections `d605ec1`, GridForge `76e2bd4`, Chronicler `0a5f962`. Release
+source-stack builds use SDK 10.0.302 / .NET 10.0.10 on Windows x64, i7-9700K,
+blocking GC and `DOTNET_PROCESSOR_COUNT=2`. Only `Gravitas.dll` differs among
+the 35 assemblies in the frozen A/B payloads. A disposable driver calls the
+existing benchmark methods, with setup outside measurement, at least one second
+of warmup per row, 200 ms calibration and 24 approximately 30 ms measurement
+windows per process. These are direct fixture timings, not BDN results or
+gameplay frame percentiles. Four independent processes per payload run in ABBA
+then BAAB order:
 
-| Complete host-step fixture | Baseline | Candidate | Change |
-| --- | ---: | ---: | ---: |
-| Joined cone floor/wall | 6.340 ms | 6.455 ms | +1.8% |
-| Floor-only cone | 5.131 ms | 5.065 ms | -1.3% |
-| Empty 3D triangle corner | 172.0 us | 169.5 us | -1.4% |
-| 2D compound first impact | 628.6 us | 624.7 us | -0.6% |
-| Empty 2D compound bounds | 24.33 us | 23.73 us | -2.5% |
-| Moving 3D mesh / 2D prism | 5.307 ms | 4.170 ms | **-21.4%** |
-| Moving 2D prism / empty mesh corner | 150.5 us | 137.9 us | **-8.4%** |
+| Complete host-step fixture          | Baseline | Candidate |     Change |
+| ----------------------------------- | -------: | --------: | ---------: |
+| Joined cone floor/wall              | 6.340 ms |  6.455 ms |      +1.8% |
+| Floor-only cone                     | 5.131 ms |  5.065 ms |      -1.3% |
+| Empty 3D triangle corner            | 172.0 us |  169.5 us |      -1.4% |
+| 2D compound first impact            | 628.6 us |  624.7 us |      -0.6% |
+| Empty 2D compound bounds            | 24.33 us |  23.73 us |      -2.5% |
+| Moving 3D mesh / 2D prism           | 5.307 ms |  4.170 ms | **-21.4%** |
+| Moving 2D prism / empty mesh corner | 150.5 us |  137.9 us |  **-8.4%** |
 
 All measured windows allocate 0 B. Sixteen returned values per fixture and each
 final raw pose/velocity/TOI-count/limit snapshot match exactly. Twelve existing
 interval/moving-target controls cover 1/32 candidates or pairs in pure 2D, pure
 3D and both mixed directions. Across the same ABBA/BAAB process orders, their
-mean changes span -3.8% to +1.2%; every raw returned value and body-state snapshot
-matches, and every measured window allocates 0 B. These interval/moving fixture
-methods run `LateSimulate` only; they are controls, not the full-step rows above.
-The joined-cone
-candidate process means span 6.328-6.739 ms versus 6.295-6.376 ms baseline;
-the reversed-order pair is 6.377 ms versus 6.336 ms (+0.6%). Its aggregate +1.8%
-is retained, not described as a cone improvement or proof of zero overhead.
+mean changes span -3.8% to +1.2%; every raw returned value and body-state
+snapshot matches, and every measured window allocates 0 B. These interval/moving
+fixture methods run `LateSimulate` only; they are controls, not the full-step
+rows above. The joined-cone candidate process means span 6.328-6.739 ms versus
+6.295-6.376 ms baseline; the reversed-order pair is 6.377 ms versus 6.336 ms
+(+0.6%). Its aggregate +1.8% is retained, not described as a cone improvement or
+proof of zero overhead.
 
 Smaller-angle probes reuse the same cone and mixed geometry, resets and complete
 host step, changing only the authored angle. Candidate 1/5-degree joined-cone
 steps cost 117/332 us, floor-only 108/314 us, mixed mesh/prism 1.123/1.166 ms,
 and mixed empty-corner 147/161 us. All reach the complete authored angle with
 zero TOI iterations and no limit, exactly matching baseline raw states and
-allocating 0 B. They are isolated process timings, not evidence that the separate
-small-angle capsule/frontier reproductions below are solved.
+allocating 0 B. They are isolated process timings, not evidence that the
+separate small-angle capsule/frontier reproductions below are solved.
 
 The joined-cone profile puts 84.9% below manifold construction and 64.3% below
 `MeshConeFaceRegions.Build`. Closing admission uses exact velocities at matched
@@ -1583,30 +1600,30 @@ is retained in this refinement.
 Validation uses `UseLocalLsfStack=true`: Release passes 8,262 tests and
 ReleaseLean passes 8,191. Raw covered/total counts are 53,456/53,456 lines,
 21,678/21,678 branches and 5,599/5,599 methods in Release; Lean retains
-53,454/53,454, 21,678/21,678 and 5,598/5,598 respectively. Four new source-behavior
-theory cases cover static/moving target registration, removal, re-registration,
-a complete rotating step after removal, a lone other target and an empty
-registry. Independent review finds no remaining runtime/test issue. No maintained
-benchmark/test-infrastructure tests or new runtime helpers are added.
+53,454/53,454, 21,678/21,678 and 5,598/5,598 respectively. Four new
+source-behavior theory cases cover static/moving target registration, removal,
+re-registration, a complete rotating step after removal, a lone other target and
+an empty registry. Independent review finds no remaining runtime/test issue. No
+maintained benchmark/test-infrastructure tests or new runtime helpers are added.
 
 Ignored `artifacts/grv-benchmark-027` contains `heads.json`, frozen source
 archives/payloads, `payload-hashes.json`, `loaded-bindings.json`, driver source,
-raw timing/snapshot logs
-and 15-second sampled-thread-time traces. Reproduce the workloads through
-`NonconvexRotationalCcdBenchmarks`, `RotationalCcdIntervalBenchmarks` (1/32
-candidates) and `RotationalMovingPairCcdBenchmarks` (1/32 pairs), using the build
-command above with current `net10.0` output. Profile warmed method loops with
+raw timing/snapshot logs and 15-second sampled-thread-time traces. Reproduce the
+workloads through `NonconvexRotationalCcdBenchmarks`,
+`RotationalCcdIntervalBenchmarks` (1/32 candidates) and
+`RotationalMovingPairCcdBenchmarks` (1/32 pairs), using the build command above
+with current `net10.0` output. Profile warmed method loops with
 `dotnet-trace collect --profile dotnet-sampled-thread-time --format Speedscope`;
 filter stacks to the measured loop before attributing inclusive sample shares.
-The retained inputs, revisions, timing procedure and outputs here are the record;
-ignored captures are supplemental.
+The retained inputs, revisions, timing procedure and outputs here are the
+record; ignored captures are supplemental.
 
-**Next isolation at this checkpoint:** Profile exact finite-prism admission and increasing facet
-counts separately from required cone response contacts and outer conservative
-refinements. Preserve the capsule/frontier reproductions below before changing
-motion admission or assigning a host step budget.
-Preserve whole-shape separation, earliest frontiers, closing admission, matched
-anchors, authored ties and 0 B/op; never replace an unresolved interval with a
+**Next isolation at this checkpoint:** Profile exact finite-prism admission and
+increasing facet counts separately from required cone response contacts and
+outer conservative refinements. Preserve the capsule/frontier reproductions
+below before changing motion admission or assigning a host step budget. Preserve
+whole-shape separation, earliest frontiers, closing admission, matched anchors,
+authored ties and 0 B/op; never replace an unresolved interval with a
 sample-only miss or weaken the manifold to one support pair.
 
 **Small-angle isolation, 2026-10-28:** The static-continuity CCD regressions
@@ -1672,7 +1689,6 @@ and RotationY and require actual seam crossing and a later closing wall
 response. The inputs and raw states above are the retained reproduction; ignored
 `artifacts/static-surface/phase13/rotational-control-baseline-p.txt` and
 `free-capsule-after-t0.txt` contain the supplemental traces.
-
 
 ### GRV-Benchmark-032 — First Isolated 2D Pair-Owner Deactivation Allocation
 
@@ -2370,8 +2386,7 @@ refinement passes. **Owners:** FixedMathSharp's triangle/cone support selection,
 rim roots and paired witnesses; Gravitas's mesh candidate traversal.
 
 Correctness, resource proofs and shared-owner control evidence are retained in
-the
-[completed contact plan](2026-09-28-complete-triangle-cone-contact-plan.md).
+the [completed contact plan](2026-09-28-complete-triangle-cone-contact-plan.md).
 
 The complete contact query replaces missed intersections and inconsistent
 normal/depth/anchor output. Its exact geometry is the correctness baseline. The
@@ -2436,8 +2451,7 @@ from 1,444.04 to 463.18 us. Oblique/interior rim fall from 826.45/1,229.16 to
 report records the complete matrix, uncertainty, private child IL identities,
 exact-bound proofs, shared controls, resource tests and coverage gates.
 
-The
-[generator refinement](2026-10-06-triangle-cone-generator-refinement.md)
+The [generator refinement](2026-10-06-triangle-cone-generator-refinement.md)
 retains one local winner, transforms only final analytic normals, shares
 generator branch coefficients/denominators and directly squares quadratic gaps
 with canonical coefficient signs. A fresh two-launch comparison lowers gap
@@ -2457,8 +2471,7 @@ removed. Paired cylinder/slab controls retain small visible differences without
 establishing a material regression. The linked report records the full matrices,
 proofs, profiles and validation.
 
-The
-[final root-sign refinement](2026-10-06-triangle-cone-final-refinement.md)
+The [final root-sign refinement](2026-10-06-triangle-cone-final-refinement.md)
 strengthens the existing retained-cell certificate and defers unused defining
 height scans. A fresh matched two-launch interior-rim mean falls from 966.98 to
 927.41 us/query (4.1%), with separated 99.9% confidence intervals; other cone
@@ -2524,8 +2537,8 @@ canonical contact. Their difference does not isolate adapter overhead, and there
 is no historical 3D baseline for these new fixtures.
 
 **2026-10-05 progress:**
-[Exact output refinement](2026-10-05-capsule-circle-cost-refinement.md)
-reuses rigorous magnitude-floor bounds and one jointly scaled depth-polynomial
+[Exact output refinement](2026-10-05-capsule-circle-cost-refinement.md) reuses
+rigorous magnitude-floor bounds and one jointly scaled depth-polynomial
 reduction. Fresh committed/retained mixed oblique means improve from 1,186.47 to
 **745.01 microseconds**; equivalent 3D improves from 1,124.91 to **724.62
 microseconds** (37.2% / 35.6%). All twelve rows remain 0 B/op and both
@@ -2535,17 +2548,16 @@ cap repeats, resource proofs and actual timed-child assembly verification;
 stale-cache captures are excluded. The signal remained open after that phase.
 
 **2026-10-05 closure:** The same
-[refinement report](2026-10-05-capsule-circle-cost-refinement.md) now
-records certified Sturm point signs, hoisted invariant normal products and
-factored radical bounds, all in existing FixedMathSharp owners. The final mixed
-/ 3D endpoint means are **36.578 / 38.962 µs**, versus the fresh committed
-control's 86.95 / 88.25 µs (about **57.9% / 55.9%** lower). Cap, side and
-zero-core output are roughly **10–11.5 µs**. Representative oblique means are
-**696.036 / 699.465 µs**; across the full investigation they fall from the first
-phase's fresh 1,186.47 / 1,124.91 µs control by about **41.3% / 37.8%**. These
-cumulative figures compare recorded captures across refinements, not one new
-paired run; the report retains the stage-specific confidence intervals and
-repeats.
+[refinement report](2026-10-05-capsule-circle-cost-refinement.md) now records
+certified Sturm point signs, hoisted invariant normal products and factored
+radical bounds, all in existing FixedMathSharp owners. The final mixed / 3D
+endpoint means are **36.578 / 38.962 µs**, versus the fresh committed control's
+86.95 / 88.25 µs (about **57.9% / 55.9%** lower). Cap, side and zero-core output
+are roughly **10–11.5 µs**. Representative oblique means are **696.036 / 699.465
+µs**; across the full investigation they fall from the first phase's fresh
+1,186.47 / 1,124.91 µs control by about **41.3% / 37.8%**. These cumulative
+figures compare recorded captures across refinements, not one new paired run;
+the report retains the stage-specific confidence intervals and repeats.
 
 All twelve final circle/slab rows, all thirty-two before/after shared controls
 and the sixteen-row final-source shared recheck report **0 B/op**. The paired
@@ -2595,18 +2607,18 @@ The 2026-10-04 coordinated profiles now distinguish their expensive owners:
 circle/cylinder ellipse magnitude-to-raw comparison takes about 53-55% inclusive
 sampled CPU, while stadium constrained root acquisition, sign refinement and
 value mapping remain expensive. The
-[refinement evidence](2026-10-04-capsule-slab-cost-refinement.md) retains
-both profiles and mixed/3D/triangle controls. This does not establish a single
-shared dominant leaf or justify merging the specialized solvers. The 2026-10-05
-[certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md)
-moves the stadium analytic-winner bottleneck toward root acquisition, while
-circle mixed/3D controls retain their distinct ellipse path. The subsequent
+[refinement evidence](2026-10-04-capsule-slab-cost-refinement.md) retains both
+profiles and mixed/3D/triangle controls. This does not establish a single shared
+dominant leaf or justify merging the specialized solvers. The 2026-10-05
+[certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md) moves
+the stadium analytic-winner bottleneck toward root acquisition, while circle
+mixed/3D controls retain their distinct ellipse path. The subsequent
 [root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
 closes #021 with reproduced gains, bounded resources and published remaining
 cost. The subsequent circle/slab
-[output refinement](2026-10-05-capsule-circle-cost-refinement.md) closes
-#020 with both dimensional controls and measured shared-consumer gains. Both
-signals are closed; shared algebra does not imply shared root-selection policy.
+[output refinement](2026-10-05-capsule-circle-cost-refinement.md) closes #020
+with both dimensional controls and measured shared-consumer gains. Both signals
+are closed; shared algebra does not imply shared root-selection policy.
 
 The fixture names describe different features:
 
@@ -4348,4 +4360,3 @@ positive unequal inputs multiply separately rounded square roots so coefficient
 products cannot saturate or quantize away before the root. The revised path is
 deterministic, allocation-free, symmetric in sampled review, and showed no
 credible regression in the default contact-response benchmark.
-

@@ -1,10 +1,10 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -260,9 +260,9 @@ public sealed partial class JoinedStaticSolidMixedTests
             Configure(scene.Context);
             FixedQuaternion placement = FixedQuaternion.FromAxisAngle(Vector3d.Up, -Fixed64.Pi / 7);
             var left = new LSPolygonCollider2D(new(-4, -2), new(0, -2), new(0, 0), new(-4, 0))
-                { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
             var right = new LSPolygonCollider2D(new(0, -1), new(4, -1), new(4, 0), new(0, 0))
-                { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
             foreach (LSCollider2D member in new[] { left, right })
                 member.InitializeWithNoBody(new TestMatterAgent(scene.Context,
                     new FixedTransform(Vector3d.Zero, placement, Vector3d.One)));

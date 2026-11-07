@@ -1,15 +1,15 @@
 //=======================================================================
 // Physics3DHit.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
 
@@ -98,8 +98,13 @@ public readonly struct Physics3DHit
     public Vector3d Normal { get; }
 
     /// <summary>
-    /// Gets the distance from the query origin to the hit.
+    /// Gets the query-specific distance used to rank this hit.
     /// </summary>
+    /// <remarks>
+    /// Rays and sweeps report query travel; cone volumes report axial distance.
+    /// Projected overlaps use their overlap ranking distance, which can be zero
+    /// for a contained origin. This need not equal origin-to-witness distance.
+    /// </remarks>
     public Fixed64 Distance { get; }
 
     /// <summary>

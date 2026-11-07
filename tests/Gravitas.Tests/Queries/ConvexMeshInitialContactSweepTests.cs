@@ -44,7 +44,7 @@ public sealed class ConvexMeshInitialContactSweepTests
         // the separately tracked initial-sweep triangulation seam defect.
         var target = new LSMeshCollider(new[]
             { new Vector3d(-4,0,-4), new Vector3d(0,0,4), new Vector3d(4,0,-4) },
-            reverseWinding ? new[] { 2,1,0 } : new[] { 0,1,2 }, MeshColliderMode.Concave,
+            reverseWinding ? new[] { 2, 1, 0 } : new[] { 0, 1, 2 }, MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
         scenario.InitializeStaticCollider(target, Vector3d.Zero);
         var source = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new Vector3d(1, 2, 1) };
@@ -72,34 +72,34 @@ public sealed class ConvexMeshInitialContactSweepTests
         ColliderType sourceType, bool reverseWinding)
     {
         foreach (int side in new[] { -1, 1 })
-        foreach (bool overlapping in new[] { false, true })
-        {
-            using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-            LSCollider target = AddTarget(scenario, MeshColliderMode.Concave, reverseWinding, false);
-            LSCollider source = sourceType switch
+            foreach (bool overlapping in new[] { false, true })
             {
-                ColliderType.Capsule => new LSCapsuleCollider { Size = new Vector3d(1, 2, 1) },
-                ColliderType.Cylinder => new LSCylinderCollider(),
-                _ => new LSConeCollider()
-            };
-            Fixed64 halfHeight = sourceType == ColliderType.Capsule ? Fixed64.One : Fixed64.Half;
-            Vector3d expected = Vector3d.Up * (Fixed64)side;
-            scenario.CreateBody(source, expected * (overlapping ? halfHeight - Fixed64.Quarter : halfHeight),
-                FixedQuaternion.Identity);
-
-            foreach (Vector3d travel in new[] { expected, -expected, Vector3d.Right })
-            {
-                Physics3DHit hit;
-                bool found = source switch
+                using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+                LSCollider target = AddTarget(scenario, MeshColliderMode.Concave, reverseWinding, false);
+                LSCollider source = sourceType switch
                 {
-                    LSCapsuleCollider capsule => scenario.Context.Query3D.SweepCapsule(capsule, travel, LayerZero, out hit),
-                    LSCylinderCollider cylinder => scenario.Context.Query3D.SweepCylinder(cylinder, travel, LayerZero, out hit),
-                    _ => scenario.Context.Query3D.SweepCone((LSConeCollider)source, travel, LayerZero, out hit)
+                    ColliderType.Capsule => new LSCapsuleCollider { Size = new Vector3d(1, 2, 1) },
+                    ColliderType.Cylinder => new LSCylinderCollider(),
+                    _ => new LSConeCollider()
                 };
-                found.Should().BeTrue();
-                AssertInitialNormal(hit, target, expected);
+                Fixed64 halfHeight = sourceType == ColliderType.Capsule ? Fixed64.One : Fixed64.Half;
+                Vector3d expected = Vector3d.Up * (Fixed64)side;
+                scenario.CreateBody(source, expected * (overlapping ? halfHeight - Fixed64.Quarter : halfHeight),
+                    FixedQuaternion.Identity);
+
+                foreach (Vector3d travel in new[] { expected, -expected, Vector3d.Right })
+                {
+                    Physics3DHit hit;
+                    bool found = source switch
+                    {
+                        LSCapsuleCollider capsule => scenario.Context.Query3D.SweepCapsule(capsule, travel, LayerZero, out hit),
+                        LSCylinderCollider cylinder => scenario.Context.Query3D.SweepCylinder(cylinder, travel, LayerZero, out hit),
+                        _ => scenario.Context.Query3D.SweepCone((LSConeCollider)source, travel, LayerZero, out hit)
+                    };
+                    found.Should().BeTrue();
+                    AssertInitialNormal(hit, target, expected);
+                }
             }
-        }
     }
 
     [Theory]
@@ -143,25 +143,25 @@ public sealed class ConvexMeshInitialContactSweepTests
         MeshColliderMode mode, bool reverseWinding, bool compoundTarget)
     {
         foreach (int side in new[] { -1, 1 })
-        foreach (Fixed64 gap in new[] { Fixed64.Quarter, Fixed64.Half })
-        {
-            using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-            LSCollider target = AddTarget(scenario, mode, reverseWinding, compoundTarget);
-            var source = new LSCuboidCollider();
-            scenario.CreateBody(source, Vector3d.Up * (Fixed64)side * gap, FixedQuaternion.Identity);
-            Vector3d expected = Vector3d.Up * (Fixed64)side;
-            var hits = new SwiftList<Physics3DHit>();
-
-            foreach (Vector3d travel in new[] { expected, -expected, Vector3d.Right })
+            foreach (Fixed64 gap in new[] { Fixed64.Quarter, Fixed64.Half })
             {
-                scenario.Context.Query3D.SweepCuboid(source, travel, LayerZero, out Physics3DHit hit)
-                    .Should().BeTrue();
-                scenario.Context.Query3D.SweepCuboidAll(source, travel, LayerZero, hits).Should().Be(1);
+                using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+                LSCollider target = AddTarget(scenario, mode, reverseWinding, compoundTarget);
+                var source = new LSCuboidCollider();
+                scenario.CreateBody(source, Vector3d.Up * (Fixed64)side * gap, FixedQuaternion.Identity);
+                Vector3d expected = Vector3d.Up * (Fixed64)side;
+                var hits = new SwiftList<Physics3DHit>();
 
-                AssertInitialNormal(hit, target, expected);
-                hits[0].Should().Be(hit);
+                foreach (Vector3d travel in new[] { expected, -expected, Vector3d.Right })
+                {
+                    scenario.Context.Query3D.SweepCuboid(source, travel, LayerZero, out Physics3DHit hit)
+                        .Should().BeTrue();
+                    scenario.Context.Query3D.SweepCuboidAll(source, travel, LayerZero, hits).Should().Be(1);
+
+                    AssertInitialNormal(hit, target, expected);
+                    hits[0].Should().Be(hit);
+                }
             }
-        }
     }
 
     [Theory]

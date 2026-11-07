@@ -1,9 +1,9 @@
+using System;
 using Chronicler.Hashing;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;

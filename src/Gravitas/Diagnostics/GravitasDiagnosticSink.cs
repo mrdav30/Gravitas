@@ -1,17 +1,17 @@
 //=======================================================================
 // GravitasDiagnosticSink.cs
 //=======================================================================
-// MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
+// MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Constraints;
 using Gravitas.Queries;
 using SwiftCollections;
-using System;
 
 namespace Gravitas.Diagnostics;
 
@@ -40,11 +40,19 @@ public sealed partial class GravitasDiagnosticSink
     /// <summary>
     /// Gets captured diagnostic events for this context.
     /// </summary>
+    /// <remarks>
+    /// Borrows sink-owned storage. Consume before further capture, clear,
+    /// disable, or context reset; copy the data when retaining it.
+    /// </remarks>
     public ReadOnlySpan<GravitasDiagnosticEvent> Events => _events.AsReadOnlySpan();
 
     /// <summary>
     /// Gets captured engine-agnostic draw commands for this context.
     /// </summary>
+    /// <remarks>
+    /// Borrows sink-owned storage. Consume before further capture, clear,
+    /// disable, or context reset; copy the data when retaining it.
+    /// </remarks>
     public ReadOnlySpan<GravitasDebugDrawCommand> DrawCommands => _drawCommands.AsReadOnlySpan();
 
     /// <summary>

@@ -25,8 +25,8 @@ public sealed class CurvedMeshSurfaceRegionTests
         foreach (LSCollider shape in shapes) scenario.InitializeStaticCollider(shape, Vector3d.Up * Fixed64.Quarter);
         var pairs = new CollisionPair[meshes.Length * shapes.Length];
         for (int mesh = 0; mesh < meshes.Length; mesh++)
-        for (int shape = 0; shape < shapes.Length; shape++)
-            pairs[mesh * shapes.Length + shape] = scenario.CreatePair(meshes[mesh], shapes[shape]);
+            for (int shape = 0; shape < shapes.Length; shape++)
+                pairs[mesh * shapes.Length + shape] = scenario.CreatePair(meshes[mesh], shapes[shape]);
         for (int warmup = 0; warmup < 8; warmup++)
             foreach (CollisionPair pair in pairs) Assert.True(CollisionDetection.DoCollisionCheck(pair));
 

@@ -5,11 +5,11 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
+using System.Runtime.CompilerServices;
 using Chronicler;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
-using System;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 

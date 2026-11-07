@@ -4,17 +4,15 @@
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
 //=======================================================================
-using FixedMathSharp;
-using FixedMathSharp.Geometry;
+
 using System;
 using System.Collections.Generic;
+using FixedMathSharp;
+using FixedMathSharp.Geometry;
 
 namespace Gravitas.CollisionHandling;
 
-internal interface IPlaneContactSample
-{
-    Vector3d Point { get; }
-}
+
 
 /// <summary>Ranks finite plane samples after their exact maximum has seeded the pool.</summary>
 internal static class MeshPlaneSampleReduction

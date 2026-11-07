@@ -1,3 +1,4 @@
+using System.Numerics;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using FluentAssertions;
@@ -6,7 +7,6 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests.Queries;
@@ -85,18 +85,18 @@ public sealed class ProjectedCurvedSweepAccuracyTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-        context.World.TryAddGrid(new GridConfiguration(new Vector3d(-8,-8,-8), new Vector3d(8,8,8)), out _)
+        context.World.TryAddGrid(new GridConfiguration(new Vector3d(-8, -8, -8), new Vector3d(8, 8, 8)), out _)
             .Should().BeTrue();
-        Vector3d first = new(0,-2,0), second = new(0,2,0), fractional = new(Fixed64.Zero, Fixed64.FromRaw(1), (Fixed64)4);
+        Vector3d first = new(0, -2, 0), second = new(0, 2, 0), fractional = new(Fixed64.Zero, Fixed64.FromRaw(1), (Fixed64)4);
         var target = new LSMeshCollider(fractionalSecond ? new[] { first, fractional, second } : new[] { first, second, fractional },
-            new[] { 0,1,2 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+            new[] { 0, 1, 2 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         target.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(Vector3d.Zero,
             FixedQuaternion.Identity, new Vector3d(Fixed64.One, Fixed64.FromRaw(2863311531), Fixed64.One))));
-        Vector2d start = new(-2,1);
-        context.QueryMixed.SweepCircleAgainst3D(start, new(2,1), Fixed64.Half, Fixed64.Zero, Fixed64.Half,
+        Vector2d start = new(-2, 1);
+        context.QueryMixed.SweepCircleAgainst3D(start, new(2, 1), Fixed64.Half, Fixed64.Zero, Fixed64.Half,
             PhysicsLayerMask.FromLayer(0), out PhysicsMixedHit hit).Should().BeTrue();
         hit.Collider3D.Should().BeSameAs(target); hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
-        hit.Distance.Should().Be(Fixed64.FromFraction(3,2));
+        hit.Distance.Should().Be(Fixed64.FromFraction(3, 2));
         context.QueryMixed.SweepCircleAgainst3D(start, new(-Fixed64.Half - Fixed64.MinIncrement, Fixed64.One),
             Fixed64.Half, Fixed64.Zero, Fixed64.Half, PhysicsLayerMask.FromLayer(0), out _).Should().BeFalse();
         context.QueryMixed.SweepCircleAgainst3D(start, new(-Fixed64.Half, Fixed64.One),

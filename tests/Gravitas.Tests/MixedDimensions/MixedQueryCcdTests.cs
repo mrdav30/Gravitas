@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using FluentAssertions;
@@ -10,7 +11,6 @@ using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using SwiftCollections;
 using SwiftCollections.Query;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;

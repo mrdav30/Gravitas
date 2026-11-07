@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using Chronicler.Diagnostics;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Queries;
@@ -8,7 +9,6 @@ using GridForge.Grids.Storage;
 using GridForge.Grids.Topology;
 using GridForge.Spatial;
 using SwiftCollections;
-using Chronicler.Diagnostics;
 
 namespace Gravitas.Benchmarks;
 

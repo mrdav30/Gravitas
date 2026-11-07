@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
@@ -6,7 +7,6 @@ using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -114,7 +114,7 @@ public sealed partial class JoinedStaticSolidMixedTests
         LSPolygonCollider2D Polygon(int first, int last)
         {
             var polygon = new LSPolygonCollider2D(new(first, -2), new(last, -2), new(last, 0), new(first, 0))
-                { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
+            { MixedHalfThicknessOverride = Fixed64.Two, Material = PhysicsMaterial.Frictionless };
             polygon.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(origin, rotation, Vector3d.One)));
             return polygon;
         }
@@ -726,9 +726,12 @@ public sealed partial class JoinedStaticSolidMixedTests
         Fixed64 x = oppositeCuts ? -Fixed64.Two : -Fixed64.FromFraction(2, 5);
         Fixed64 z = oppositeCuts ? -Fixed64.One : x;
         Fixed64 radius = oppositeCuts ? 5 * Fixed64.Quarter : Fixed64.Half;
-        var mover = new LSCapsuleCollider { Radius = radius,
+        var mover = new LSCapsuleCollider
+        {
+            Radius = radius,
             Size = new Vector3d(radius * Fixed64.Two, radius * Fixed64.Two + Fixed64.Quarter, radius * Fixed64.Two),
-            Material = PhysicsMaterial.Frictionless };
+            Material = PhysicsMaterial.Frictionless
+        };
         scene.CreateBody(mover, new(x, Fixed64.FromFraction(9, 10), z), FixedQuaternion.Identity);
         Assert.Equal(Fixed64.Quarter, mover.AxisLength);
         var selected = Assert.Single(Rows(mover, lower));
@@ -904,8 +907,12 @@ public sealed partial class JoinedStaticSolidMixedTests
 
     private static LSCapsuleCollider CapsuleMover(PhysicsScenarioBuilder scene, Vector3d position, bool horizontal, Fixed64 coreLength)
     {
-        var collider = new LSCapsuleCollider { Radius = Fixed64.Half,
-            Size = new Vector3d(Fixed64.One, coreLength + Fixed64.One, Fixed64.One), Material = PhysicsMaterial.Frictionless };
+        var collider = new LSCapsuleCollider
+        {
+            Radius = Fixed64.Half,
+            Size = new Vector3d(Fixed64.One, coreLength + Fixed64.One, Fixed64.One),
+            Material = PhysicsMaterial.Frictionless
+        };
         FixedQuaternion rotation = horizontal
             ? new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized : FixedQuaternion.Identity;
         scene.CreateBody(collider, position, rotation);

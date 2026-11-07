@@ -1,9 +1,9 @@
+using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
-using System;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -737,8 +737,11 @@ public sealed class ColliderGeometryRangeTests
     private static SolidBody CreatePendingCompensatedSphere(GravitasWorldContext context, bool pending = true)
     {
         var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One * (pending ? Limit : Fixed64.One));
-        var collider = new LSSphereCollider { Radius = pending ? Fixed64.Half : Fixed64.Quarter,
-            LocalOffset = pending ? Vector3d.Zero : Vector3d.Right * Fixed64.Half };
+        var collider = new LSSphereCollider
+        {
+            Radius = pending ? Fixed64.Half : Fixed64.Quarter,
+            LocalOffset = pending ? Vector3d.Zero : Vector3d.Right * Fixed64.Half
+        };
         var source = new SolidBody(new TestMatterAgent(context, transform), collider);
         source.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;

@@ -1,11 +1,11 @@
+using System.Collections.Generic;
+using System.Reflection;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using System.Collections.Generic;
-using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests;

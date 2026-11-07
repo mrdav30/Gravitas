@@ -1,7 +1,7 @@
-using FixedMathSharp;
-using Gravitas.Colliders;
 using System;
 using System.Collections.Generic;
+using FixedMathSharp;
+using Gravitas.Colliders;
 
 namespace Gravitas.Tests.Support;
 

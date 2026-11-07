@@ -1,9 +1,9 @@
+using System;
+using System.Reflection;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
-using System;
-using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -18,9 +18,11 @@ public sealed class SolidBodyMassMutationTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         Vector3d size = new(2, 4, 6);
         var source = new SolidBody(new TestMatterAgent(context),
-            new LSCuboidCollider(ColliderShapeDefinition.Cuboid(size))) { Mass = Fixed64.One };
+            new LSCuboidCollider(ColliderShapeDefinition.Cuboid(size)))
+        { Mass = Fixed64.One };
         var reference = new SolidBody(new TestMatterAgent(context),
-            new LSCuboidCollider(ColliderShapeDefinition.Cuboid(size))) { Mass = Fixed64.One };
+            new LSCuboidCollider(ColliderShapeDefinition.Cuboid(size)))
+        { Mass = Fixed64.One };
         source.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         reference.Initialize(Vector3d.Right * 10, FixedQuaternion.FromEulerAnglesInDegrees(
             Fixed64.Zero, Fixed64.Zero, (Fixed64)angle));
@@ -72,7 +74,8 @@ public sealed class SolidBodyMassMutationTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var body = new SolidBody(new TestMatterAgent(context),
-            new LSSphereCollider(ColliderShapeDefinition.Sphere((Fixed64)1024))) { Mass = Fixed64.One };
+            new LSSphereCollider(ColliderShapeDefinition.Sphere((Fixed64)1024)))
+        { Mass = Fixed64.One };
         body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         body.Sleep();
 

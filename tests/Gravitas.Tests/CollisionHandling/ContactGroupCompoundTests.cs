@@ -1,10 +1,10 @@
+using System.Linq;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -46,7 +46,8 @@ public sealed class ContactGroupCompoundTests
         {
             var mesh = new LSMeshCollider(new[] { new Vector3d(minimum, 0, -4), new(maximum, 0, -4),
                 new(minimum, 0, 4), new(maximum, 0, 4) }, new[] { 0, 2, 1, 1, 2, 3 },
-                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = material };
+                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+            { Material = material };
             scene.InitializeStaticCollider(mesh, Vector3d.Zero);
             return mesh;
         }

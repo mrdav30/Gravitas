@@ -1,13 +1,18 @@
+//=======================================================================
+// StaticSurface2D.Mixed.cs
+//=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
+//=======================================================================
+
+using System;
+using System.Collections.Generic;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using SwiftCollections;
-using System;
-using System.Collections.Generic;
 
 namespace Gravitas;
 
@@ -173,15 +178,15 @@ public sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
             _mixedComponents[member] = member;
         }
         for (int member = 0; member < _mixedLocal.Count; member++)
-          for (int band = 0; band < _mixedPrisms[member].BandCount; band++)
-            foreach (var span in _mixedPrisms[member].Bands[band].Boundary.Spans)
-                if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
-                {
-                    _mixedPrisms[member].Joined = true;
-                    int from = _mixedComponents[span.OtherMember], to = _mixedComponents[member];
-                    for (int index = 0; index < _mixedLocal.Count; index++)
-                        if (_mixedComponents[index] == from) _mixedComponents[index] = to;
-                }
+            for (int band = 0; band < _mixedPrisms[member].BandCount; band++)
+                foreach (var span in _mixedPrisms[member].Bands[band].Boundary.Spans)
+                    if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+                    {
+                        _mixedPrisms[member].Joined = true;
+                        int from = _mixedComponents[span.OtherMember], to = _mixedComponents[member];
+                        for (int index = 0; index < _mixedLocal.Count; index++)
+                            if (_mixedComponents[index] == from) _mixedComponents[index] = to;
+                    }
     }
 
     private void PrepareMixedBands(int member)
@@ -565,10 +570,10 @@ public sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
         Vector3d a = prism.Points[start], b = prism.Points[end];
         if (a.Y == b.Y)
         {
-          for (int bandIndex = 0; bandIndex < prism.BandCount; bandIndex++)
-            foreach (var span in prism.Bands[bandIndex].Boundary.Spans)
-                if (span.Interval.TryMapToSegment(new FixedSegment(new(span.Start.X, a.Y, span.Start.Y),
-                    new(span.End.X, a.Y, span.End.Y)), new FixedSegment(a, b), out var mapped)) _mixedIntervals.Add(mapped);
+            for (int bandIndex = 0; bandIndex < prism.BandCount; bandIndex++)
+                foreach (var span in prism.Bands[bandIndex].Boundary.Spans)
+                    if (span.Interval.TryMapToSegment(new FixedSegment(new(span.Start.X, a.Y, span.Start.Y),
+                        new(span.End.X, a.Y, span.End.Y)), new FixedSegment(a, b), out var mapped)) _mixedIntervals.Add(mapped);
         }
         else
         {
@@ -606,18 +611,18 @@ public sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
         // This domain belongs to the current original edge, represented by the
         // two-point visitor as indices 0/1. Preserve its exact parameter.
         if (start == end)
-            {
-                Span<ulong> storage = stackalloc ulong[52]; Span<int> signs = stackalloc int[4];
-                var endpoint = ContactQuadratic.At(storage, signs, 0, 13); var one = ContactQuadratic.At(storage, signs, 1, 13);
-                endpoint.Set(Signed576.ExtendValue(Signed192.Signed(start))); one.Set(Signed576.ExtendValue(Signed192.Signed(1)));
-                if (_mixedEdgeClip[0].IsClipped && !_mixedEdgeClip[0].Contains(endpoint, one, ReadOnlySpan<ulong>.Empty)) return false;
-                start = end = start == 0 ? _mixedEdgeStart : _mixedEdgeEnd;
-            }
-            else
-            {
-                if (_mixedEdgeClip[0].IsClipped && !_mixedEdgeClip[0].Contains(n, d, ReadOnlySpan<ulong>.Empty)) return false;
-                start = _mixedEdgeStart; end = _mixedEdgeEnd;
-            }
+        {
+            Span<ulong> storage = stackalloc ulong[52]; Span<int> signs = stackalloc int[4];
+            var endpoint = ContactQuadratic.At(storage, signs, 0, 13); var one = ContactQuadratic.At(storage, signs, 1, 13);
+            endpoint.Set(Signed576.ExtendValue(Signed192.Signed(start))); one.Set(Signed576.ExtendValue(Signed192.Signed(1)));
+            if (_mixedEdgeClip[0].IsClipped && !_mixedEdgeClip[0].Contains(endpoint, one, ReadOnlySpan<ulong>.Empty)) return false;
+            start = end = start == 0 ? _mixedEdgeStart : _mixedEdgeEnd;
+        }
+        else
+        {
+            if (_mixedEdgeClip[0].IsClipped && !_mixedEdgeClip[0].Contains(n, d, ReadOnlySpan<ulong>.Empty)) return false;
+            start = _mixedEdgeStart; end = _mixedEdgeEnd;
+        }
         MixedPrism source = _mixedPrisms[_mixedMember];
         Vector3d a = source.Points[start], b = source.Points[end];
         FixedSegment footprint = new(new(a.X, Fixed64.Zero, a.Z), new(b.X, Fixed64.Zero, b.Z));
@@ -633,23 +638,23 @@ public sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
                     : SupportsMixedFan(prism.NativeFrame, source.NativeFrame, a, prism.Points, normal);
                 if (!supports) return false;
             }
-          for (int bandIndex = 0; bandIndex < prism.BandCount; bandIndex++)
-          {
-            MixedBand band = prism.Bands[bandIndex];
-            // A reached fan member already contains the queried height. Each
-            // prepared band is covered completely by every Joined neighbor.
-            Fixed64 delta = _mixedLocal[member].MixedSlabCenterY - _mixedLocal[_mixedMember].MixedSlabCenterY;
-            if (!MixedHeightContains(a.Y, b.Y, n, d, delta + band.Lower, delta + band.Upper)) continue;
-            foreach (var span in band.Boundary.Spans)
+            for (int bandIndex = 0; bandIndex < prism.BandCount; bandIndex++)
             {
-                if (span.Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Joined || _mixedFan.Contains(span.OtherMember)) continue;
-                FixedSegment edge = new(new(span.Start.X, Fixed64.Zero, span.Start.Y), new(span.End.X, Fixed64.Zero, span.End.Y));
-                int location = _mixedQuaternion
-                    ? WideTriangleRelations.LocateFrameEdgePoint(footprint, source.FootFrame, n, d, edge, prism.FootFrame, span.Interval)
-                    : WideTriangleRelations.LocateFrameEdgePoint(footprint, source.NativeFootFrame, n, d, edge, prism.NativeFootFrame, span.Interval);
-                if (location >= 0) _mixedFan.Add(span.OtherMember);
+                MixedBand band = prism.Bands[bandIndex];
+                // A reached fan member already contains the queried height. Each
+                // prepared band is covered completely by every Joined neighbor.
+                Fixed64 delta = _mixedLocal[member].MixedSlabCenterY - _mixedLocal[_mixedMember].MixedSlabCenterY;
+                if (!MixedHeightContains(a.Y, b.Y, n, d, delta + band.Lower, delta + band.Upper)) continue;
+                foreach (var span in band.Boundary.Spans)
+                {
+                    if (span.Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Joined || _mixedFan.Contains(span.OtherMember)) continue;
+                    FixedSegment edge = new(new(span.Start.X, Fixed64.Zero, span.Start.Y), new(span.End.X, Fixed64.Zero, span.End.Y));
+                    int location = _mixedQuaternion
+                        ? WideTriangleRelations.LocateFrameEdgePoint(footprint, source.FootFrame, n, d, edge, prism.FootFrame, span.Interval)
+                        : WideTriangleRelations.LocateFrameEdgePoint(footprint, source.NativeFootFrame, n, d, edge, prism.NativeFootFrame, span.Interval);
+                    if (location >= 0) _mixedFan.Add(span.OtherMember);
+                }
             }
-          }
         }
         return true;
     }
