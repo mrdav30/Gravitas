@@ -88,7 +88,7 @@ public sealed partial class CollisionDetection2DTests
         var body = new SolidBody2D(new TestMatterAgent(context),
             CreateContactRectangle(true, new Vector2d(1, 2)));
         body.Initialize(new Vector2d(Fixed64.Quarter, Fixed64.FromFraction(3, 4)),
-            motionType: BodyMotionType.Kinematic);
+            motionType: PhysicsMobilityType.Kinematic);
         Fixed64 angularDelta = Fixed64.FromFraction(1, 100);
         // Inspect the actual CCD search result without adding runtime diagnostics
         // solely to expose its private sampled contact to this regression.

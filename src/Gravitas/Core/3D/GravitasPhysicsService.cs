@@ -275,7 +275,7 @@ public sealed partial class GravitasPhysicsService
         _staticSurfaces.Clear();
     }
 
-    internal int AssimilateBody(SolidBody body, BodyMotionType motionType)
+    internal int AssimilateBody(SolidBody body, PhysicsMobilityType motionType)
     {
         ChronicleGuard.ThrowIfNull(body, nameof(body));
         ChronicleGuard.ThrowIfArgument(
@@ -284,7 +284,7 @@ public sealed partial class GravitasPhysicsService
             "Body must belong to this physics service context.");
 
         int dynamicId = -1;
-        if (motionType != BodyMotionType.Static)
+        if (motionType != PhysicsMobilityType.Static)
         {
             dynamicId = _dynamicBodies.Add(body);
             while (_continuousCollisionCandidateLifetimes.Count <= dynamicId)
@@ -297,11 +297,11 @@ public sealed partial class GravitasPhysicsService
 
     internal void RefreshBodyMotionTypeRegistration(
         SolidBody body,
-        BodyMotionType previousMotionType)
+        PhysicsMobilityType previousMotionType)
     {
-        if (body.MotionType != BodyMotionType.Static && body.Collider is LSMeshCollider mesh)
+        if (body.MotionType != PhysicsMobilityType.Static && body.Collider is LSMeshCollider mesh)
             mesh.StaticSurface?.Remove(mesh);
-        if (previousMotionType == BodyMotionType.Static)
+        if (previousMotionType == PhysicsMobilityType.Static)
         {
             int dynamicId = _dynamicBodies.Add(body);
             while (_continuousCollisionCandidateLifetimes.Count <= dynamicId)
@@ -311,7 +311,7 @@ public sealed partial class GravitasPhysicsService
             return;
         }
 
-        if (body.MotionType == BodyMotionType.Static)
+        if (body.MotionType == PhysicsMobilityType.Static)
         {
             int previousDynamicId = body.DynamicId;
             _dynamicBodies.RemoveAt(previousDynamicId);

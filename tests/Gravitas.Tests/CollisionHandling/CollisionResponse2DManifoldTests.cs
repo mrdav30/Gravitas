@@ -1659,10 +1659,10 @@ public sealed partial class CollisionResponse2DManifoldTests
         body.Initialize(
             position,
             motionType: immovable
-                ? BodyMotionType.Static
+                ? PhysicsMobilityType.Static
                 : isKinematic
-                    ? BodyMotionType.Kinematic
-                    : BodyMotionType.Dynamic);
+                    ? PhysicsMobilityType.Kinematic
+                    : PhysicsMobilityType.Dynamic);
         return body;
     }
 

@@ -267,7 +267,7 @@ public sealed class CollisionPositionCorrectionTests
             SleepEnabled = false
         };
         body.Initialize(Vector2d.Zero, motionType: mass == Fixed64.Zero
-            ? BodyMotionType.Static : BodyMotionType.Dynamic);
+            ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 
@@ -281,7 +281,7 @@ public sealed class CollisionPositionCorrectionTests
         // This fixture isolates contact response from automatic support-height snapping.
         body.UseManualGrounding();
         body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, mass == Fixed64.Zero
-            ? BodyMotionType.Static : BodyMotionType.Dynamic);
+            ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 }

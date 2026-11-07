@@ -94,7 +94,7 @@ public sealed class SolidBodyColliderReconfigurationTests
         actor.Body.AddLinearImpulse(Vector3d.Right);
         actor.Body.AddAngularImpulse(Vector3d.Up);
         int colliderId = actor.Collider.Id;
-        BodyMotionType motionType = actor.Body.MotionType;
+        PhysicsMobilityType motionType = actor.Body.MotionType;
         Vector3d retainedLinearVelocity = actor.Body.LinearVelocity;
         Vector3d retainedAngularVelocity = actor.Body.AngularVelocity;
         Vector3d oldCenterOfMass = actor.Body.LocalCenterOfMassOffset;
@@ -424,7 +424,7 @@ public sealed class SolidBodyColliderReconfigurationTests
         var support = new SolidBody2D(
             supportAgent,
             new LSCircleCollider2D(Fixed64.Half));
-        support.Initialize(Vector2d.Zero, motionType: BodyMotionType.Static);
+        support.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Static);
         var secondSupportAgent = new TestMatterAgent(
             scenario.Context,
             new FixedTransform(
@@ -436,7 +436,7 @@ public sealed class SolidBodyColliderReconfigurationTests
             new LSCircleCollider2D(Fixed64.Half));
         secondSupport.Initialize(
             new Vector2d(Fixed64.Half, Fixed64.Zero),
-            motionType: BodyMotionType.Static);
+            motionType: PhysicsMobilityType.Static);
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
         scenario.Context.MixedCollisions.ActivePairCount.Should().Be(2);

@@ -918,7 +918,7 @@ public sealed class Physics2DPairLifecycleHardeningTests
         };
         body.Initialize(
             position,
-            motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+            motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 

@@ -287,7 +287,7 @@ public sealed class CollisionPair2DManifoldTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 
@@ -309,7 +309,7 @@ public sealed class CollisionPair2DManifoldTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 
@@ -324,7 +324,7 @@ public sealed class CollisionPair2DManifoldTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 
@@ -339,7 +339,7 @@ public sealed class CollisionPair2DManifoldTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
         return body;
     }
 

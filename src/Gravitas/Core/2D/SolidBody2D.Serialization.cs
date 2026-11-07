@@ -18,7 +18,7 @@ public sealed partial class SolidBody2D
     {
         bool active = Active;
         BodyFreezeAxes2D freezeAxes = FreezeAxes;
-        BodyMotionType motionType = MotionType;
+        PhysicsMobilityType motionType = MotionType;
         Fixed64 mass = Mass;
         Vector2d gravity = Gravity;
         Fixed64 gravityScale = GravityScale;
@@ -41,7 +41,7 @@ public sealed partial class SolidBody2D
 
         RecordValues.Look(chronicler, ref active, "Active", false);
         RecordValues.Look(chronicler, ref freezeAxes, "FreezeAxes", BodyFreezeAxes2D.None);
-        RecordValues.Look(chronicler, ref motionType, "MotionType", BodyMotionType.Dynamic);
+        RecordValues.Look(chronicler, ref motionType, "MotionType", PhysicsMobilityType.Dynamic);
         if (chronicler.Mode == SerializationMode.Loading)
         {
             PreflightLoadedMotionType(motionType);

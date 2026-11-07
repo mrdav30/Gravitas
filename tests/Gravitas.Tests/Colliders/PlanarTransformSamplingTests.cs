@@ -84,7 +84,7 @@ public sealed class PlanarTransformSamplingTests
         var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One, parent);
         var agent = new TestMatterAgent(context, transform);
         var collider = new LSAABBoxCollider2D(new Vector2d(2, 4));
-        if (explicitStatic) new SolidBody2D(agent, collider).Initialize(Vector2d.Zero, motionType: BodyMotionType.Static);
+        if (explicitStatic) new SolidBody2D(agent, collider).Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Static);
         else collider.InitializeWithNoBody(agent);
         Step();
         uint version = collider.RuntimeShapeVersion;

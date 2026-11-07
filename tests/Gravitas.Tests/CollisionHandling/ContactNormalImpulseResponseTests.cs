@@ -190,7 +190,7 @@ public sealed class ContactNormalImpulseResponseTests
         ScenarioBody<LSCuboidCollider> source = scenario.CreateCuboid(Vector3d.Zero);
         ScenarioBody<LSCuboidCollider> target = scenario.CreateCuboid(
             new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
-        source.Body.SetMotionType(BodyMotionType.Kinematic);
+        source.Body.SetMotionType(PhysicsMobilityType.Kinematic);
 
         bool resolved = ContactNormalImpulse3D.TryCalculateVelocityDeltas(
             source.Body,
@@ -220,7 +220,7 @@ public sealed class ContactNormalImpulseResponseTests
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         SolidBody2D source = CreateBox2D(context, Vector2d.Zero);
         SolidBody2D target = CreateBox2D(context, new Vector2d((Fixed64)2, Fixed64.Zero));
-        source.SetMotionType(BodyMotionType.Kinematic);
+        source.SetMotionType(PhysicsMobilityType.Kinematic);
 
         bool resolved = ContactNormalImpulse2D.TryCalculateVelocityDeltas(
             source,
@@ -378,7 +378,7 @@ public sealed class ContactNormalImpulseResponseTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 }

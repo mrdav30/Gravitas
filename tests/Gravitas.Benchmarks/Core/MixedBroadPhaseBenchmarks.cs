@@ -179,7 +179,7 @@ public class MixedBroadPhaseBenchmarks
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: PhysicsMobilityType.Dynamic);
         return body;
     }
 

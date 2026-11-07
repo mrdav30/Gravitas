@@ -142,7 +142,7 @@ public class ContinuousCollisionBenchmarks
             GroundProbeMode = GroundProbeMode.Ray
         };
 
-        body.Initialize(WallPosition, FixedQuaternion.Identity, BodyMotionType.Static);
+        body.Initialize(WallPosition, FixedQuaternion.Identity, PhysicsMobilityType.Static);
     }
 
     private static SolidBody CreateMovingSphere(

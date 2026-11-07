@@ -391,7 +391,7 @@ public sealed class StaticSurfaceContinuityContract2DTests
         if (staticBody)
         {
             var body = new SolidBody2D(agent, member) { Mass = Fixed64.One };
-            body.Initialize(center, motionType: BodyMotionType.Static);
+            body.Initialize(center, motionType: PhysicsMobilityType.Static);
         }
         else member.InitializeWithNoBody(agent);
         return member;

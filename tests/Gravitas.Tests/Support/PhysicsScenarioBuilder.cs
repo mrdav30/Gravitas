@@ -58,11 +58,11 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
             FreezeAxes = freezeAxes
         };
 
-        BodyMotionType motionType = !isDynamic || immovable
-            ? BodyMotionType.Static
+        PhysicsMobilityType motionType = !isDynamic || immovable
+            ? PhysicsMobilityType.Static
             : isKinematic
-                ? BodyMotionType.Kinematic
-                : BodyMotionType.Dynamic;
+                ? PhysicsMobilityType.Kinematic
+                : PhysicsMobilityType.Dynamic;
         body.Initialize(position, rotation, motionType);
         return new ScenarioBody<TCollider>(body, collider);
     }

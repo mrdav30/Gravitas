@@ -886,12 +886,12 @@ public sealed class Physics2DQueryTests
     {
         using GravitasWorldContext context = Create2DContext();
         SolidBody2D dynamicTarget = CreateCircle(context, new Vector2d(Fixed64.One, Fixed64.Zero));
-        dynamicTarget.SetMotionType(BodyMotionType.Dynamic);
+        dynamicTarget.SetMotionType(PhysicsMobilityType.Dynamic);
         dynamicTarget.FreezeAxes = BodyFreezeAxes2D.None;
         SolidBody2D farStatic = CreateCircle(context, new Vector2d((Fixed64)5, Fixed64.Zero));
         SolidBody2D nearStatic = CreateCircle(context, new Vector2d((Fixed64)3, Fixed64.Zero));
-        farStatic.SetMotionType(BodyMotionType.Static);
-        nearStatic.SetMotionType(BodyMotionType.Static);
+        farStatic.SetMotionType(PhysicsMobilityType.Static);
+        nearStatic.SetMotionType(PhysicsMobilityType.Static);
         var hits = new SwiftList<Physics2DHit>();
 
         int count = context.Query2D.SweepCircleAgainstStaticAll(
@@ -2774,7 +2774,7 @@ public sealed class Physics2DQueryTests
             Mass = Fixed64.One
         };
         body.Collider.Layer = layer;
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
         return body;
     }
 
@@ -2805,7 +2805,7 @@ public sealed class Physics2DQueryTests
             Mass = Fixed64.One
         };
         body.Collider.Layer = layer;
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
         return body;
     }
 
@@ -2830,7 +2830,7 @@ public sealed class Physics2DQueryTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
         return body;
     }
 
@@ -2849,7 +2849,7 @@ public sealed class Physics2DQueryTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
         return body;
     }
 
@@ -2874,7 +2874,7 @@ public sealed class Physics2DQueryTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
         return body;
     }
 

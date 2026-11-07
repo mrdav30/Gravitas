@@ -324,7 +324,7 @@ public class Constraint3DBenchmarks
         body.Initialize(
             position,
             FixedQuaternion.Identity,
-            dynamic ? BodyMotionType.Dynamic : BodyMotionType.Static);
+            dynamic ? PhysicsMobilityType.Dynamic : PhysicsMobilityType.Static);
         return body;
     }
 

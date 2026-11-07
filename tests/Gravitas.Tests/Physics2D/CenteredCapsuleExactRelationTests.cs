@@ -224,7 +224,7 @@ public sealed class CenteredCapsuleExactRelationTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, rotation, BodyMotionType.Static);
+        body.Initialize(position, rotation, PhysicsMobilityType.Static);
         return body;
     }
 }

@@ -90,7 +90,7 @@ public sealed class SolidBodyColliderReconfigurationRigidFrameClearanceTests
         var body = new SolidBody(new TestMatterAgent(context,
             new FixedTransform(position, SourceRotation, Vector3d.One)), collider)
         { Mass = Fixed64.One };
-        body.Initialize(position, SourceRotation, BodyMotionType.Kinematic);
+        body.Initialize(position, SourceRotation, PhysicsMobilityType.Kinematic);
         return body;
     }
 

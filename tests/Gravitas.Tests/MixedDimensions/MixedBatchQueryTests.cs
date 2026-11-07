@@ -111,7 +111,7 @@ public sealed class MixedBatchQueryTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Static);
+        body.Initialize(position, FixedQuaternion.Identity, PhysicsMobilityType.Static);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 

@@ -77,7 +77,7 @@ public sealed class Constraint2DServiceTests
         Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
         joint.AccumulatedImpulseMagnitude = Fixed64.One;
 
-        first.SetMotionType(BodyMotionType.Kinematic);
+        first.SetMotionType(PhysicsMobilityType.Kinematic);
 
         joint.AccumulatedImpulseMagnitude.Should().Be(Fixed64.Zero);
         context.Constraints2D.RegisteredJointCount.Should().Be(1);
@@ -1207,8 +1207,8 @@ public sealed class Constraint2DServiceTests
 
         deactivate.Should().Throw<ArgumentException>();
         runtime.IsActive.Should().BeTrue();
-        root.MotionType.Should().Be(BodyMotionType.Dynamic);
-        child.MotionType.Should().Be(BodyMotionType.Dynamic);
+        root.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
+        child.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         runtime.GetJoint(0).IsEnabled.Should().BeTrue();
         context.Constraints2D.EnabledJointCount.Should().Be(1);
     }
@@ -1844,10 +1844,10 @@ public sealed class Constraint2DServiceTests
             position,
             rotation,
             immovable
-                ? BodyMotionType.Static
+                ? PhysicsMobilityType.Static
                 : isKinematic
-                    ? BodyMotionType.Kinematic
-                    : BodyMotionType.Dynamic);
+                    ? PhysicsMobilityType.Kinematic
+                    : PhysicsMobilityType.Dynamic);
         return body;
     }
 

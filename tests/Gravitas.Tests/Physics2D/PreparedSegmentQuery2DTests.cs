@@ -84,7 +84,7 @@ public sealed class PreparedSegmentQuery2DTests
             System.Array.Reverse(vertices);
         var collider = new LSPolygonCollider2D(vertices);
         var body = new SolidBody2D(new TestMatterAgent(context), collider);
-        body.Initialize(Vector2d.Zero, Fixed64.HalfPi, BodyMotionType.Static);
+        body.Initialize(Vector2d.Zero, Fixed64.HalfPi, PhysicsMobilityType.Static);
         Vector2d start = new(-Fixed64.FromFraction(1, 8), Fixed64.Quarter);
 
         context.Query2D.Raycast(start, start + Vector2d.Right, out Physics2DHit hit).Should().BeTrue();
@@ -119,7 +119,7 @@ public sealed class PreparedSegmentQuery2DTests
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         var collider = new LSCapsuleCollider2D(Fixed64.Half, Fixed64.Two);
         var body = new SolidBody2D(new TestMatterAgent(context), collider);
-        body.Initialize(Vector2d.Zero, Fixed64.HalfPi, BodyMotionType.Static);
+        body.Initialize(Vector2d.Zero, Fixed64.HalfPi, PhysicsMobilityType.Static);
 
         context.Query2D.Raycast(Vector2d.Zero, Vector2d.Right, out Physics2DHit hit).Should().BeTrue();
 

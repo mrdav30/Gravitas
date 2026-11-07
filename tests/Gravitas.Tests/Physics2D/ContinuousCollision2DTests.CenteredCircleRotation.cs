@@ -29,7 +29,7 @@ public sealed partial class ContinuousCollision2DTests
             FixedQuaternion.Identity,
             nonuniformScale ? new Vector3d(3, 1, 2) : Vector3d.One));
         var source = new SolidBody2D(agent, collider);
-        source.Initialize(new Vector2d(Fixed64.Zero, supportHeight), motionType: BodyMotionType.Kinematic);
+        source.Initialize(new Vector2d(Fixed64.Zero, supportHeight), motionType: PhysicsMobilityType.Kinematic);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         Vector2d target = source.Position
             + Vector2d.Right * Fixed64.FromFraction(translationUnits, 1024);

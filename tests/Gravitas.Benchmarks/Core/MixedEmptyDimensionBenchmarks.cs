@@ -48,7 +48,7 @@ public class MixedEmptyDimensionBenchmarks
                 Vector3d floorCenter = origin + Vector3d.Backward * Fixed64.Half;
                 var floor = new LSAABBoxCollider2D(new Vector2d(6, 1)) { Material = PhysicsMaterial.Frictionless };
                 new SolidBody2D(new BenchmarkMatterAgent(_context, floorCenter), floor)
-                    .Initialize(floorCenter.ToVector2d(), motionType: BodyMotionType.Static);
+                    .Initialize(floorCenter.ToVector2d(), motionType: PhysicsMobilityType.Static);
                 _floors2D[i] = floor;
                 var collider = new LSCircleCollider2D(Fixed64.Half)
                 { LocalOffset = Vector2d.Forward, Material = PhysicsMaterial.Frictionless };
@@ -62,7 +62,7 @@ public class MixedEmptyDimensionBenchmarks
                 Vector3d floorCenter = origin + Vector3d.Down * Fixed64.Half;
                 var floor = new LSCuboidCollider { Size = new Vector3d(6, 1, 6), Material = PhysicsMaterial.Frictionless };
                 new SolidBody(new BenchmarkMatterAgent(_context, floorCenter), floor)
-                    .Initialize(floorCenter, FixedQuaternion.Identity, BodyMotionType.Static);
+                    .Initialize(floorCenter, FixedQuaternion.Identity, PhysicsMobilityType.Static);
                 _floors3D[i] = floor;
                 var collider = new LSSphereCollider
                 { Radius = Fixed64.Half, LocalOffset = Vector3d.Up, Material = PhysicsMaterial.Frictionless };

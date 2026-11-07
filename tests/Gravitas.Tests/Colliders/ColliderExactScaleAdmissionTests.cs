@@ -500,7 +500,7 @@ public sealed class ColliderExactScaleAdmissionTests
         body.Initialize(
             Vector3d.Zero,
             FixedQuaternion.Identity,
-            BodyMotionType.Dynamic);
+            PhysicsMobilityType.Dynamic);
         transform.LocalScale = new Vector3d(
             Fixed64.Two,
             Fixed64.One,

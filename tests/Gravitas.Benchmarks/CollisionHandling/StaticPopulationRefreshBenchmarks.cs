@@ -55,7 +55,7 @@ public class StaticPopulationRefreshBenchmarks
             {
                 var floor = new LSCuboidCollider { Size = new(width, Fixed64.Two, (Fixed64)4), Material = PhysicsMaterial.Frictionless };
                 var agent = new BenchmarkMatterAgent(_context, new(x, -Fixed64.One, Fixed64.Zero));
-                if (ExplicitStatic) new SolidBody(agent, floor).Initialize(agent.Transform.WorldPosition, FixedQuaternion.Identity, motionType: BodyMotionType.Static);
+                if (ExplicitStatic) new SolidBody(agent, floor).Initialize(agent.Transform.WorldPosition, FixedQuaternion.Identity, motionType: PhysicsMobilityType.Static);
                 else floor.InitializeWithNoBody(agent);
                 _spatialFloors[i] = floor;
                 if (!floor.IsPartitioned) throw new InvalidOperationException("A spatial population member is not loaded.");
@@ -65,7 +65,7 @@ public class StaticPopulationRefreshBenchmarks
                 var floor = new LSAABBoxCollider2D(new Vector2d(width, Fixed64.Two))
                 { Material = PhysicsMaterial.Frictionless, MixedHalfThicknessOverride = Fixed64.Two };
                 var agent = new BenchmarkMatterAgent(_context, new(x, Fixed64.Zero, -Fixed64.One));
-                if (ExplicitStatic) new SolidBody2D(agent, floor).Initialize(agent.Transform.WorldPositionXZ, motionType: BodyMotionType.Static);
+                if (ExplicitStatic) new SolidBody2D(agent, floor).Initialize(agent.Transform.WorldPositionXZ, motionType: PhysicsMobilityType.Static);
                 else floor.InitializeWithNoBody(agent);
                 _planarFloors[i] = floor;
                 if (!floor.IsPartitioned) throw new InvalidOperationException("A planar population member is not loaded.");

@@ -200,7 +200,7 @@ public sealed class MeshSphereSweepContactTests
             : FixedQuaternion.Identity;
         var agent = new TestMatterAgent(scenario.Context, new FixedTransform(position, rotation, Vector3d.One));
         if (bodyBacked)
-            new SolidBody(agent, mesh).Initialize(position, rotation, BodyMotionType.Static);
+            new SolidBody(agent, mesh).Initialize(position, rotation, PhysicsMobilityType.Static);
         else
             mesh.InitializeWithNoBody(agent);
         return mesh;

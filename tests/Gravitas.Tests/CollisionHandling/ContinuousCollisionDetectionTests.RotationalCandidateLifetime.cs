@@ -37,7 +37,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
 
         target.Body.Initialize(Vector3d.Right * (Fixed64)3, FixedQuaternion.Identity,
-            movingTarget ? BodyMotionType.Dynamic : BodyMotionType.Static);
+            movingTarget ? PhysicsMobilityType.Dynamic : PhysicsMobilityType.Static);
         scenario.Context.AdvanceLateSimulateToken();
         source.Body.GatherRotationalContinuousCollisionCandidates(Vector3d.Zero, Vector3d.Zero,
             Vector3d.Zero, (Fixed64)4).Should().BeGreaterThan(0);

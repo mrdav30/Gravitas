@@ -157,14 +157,14 @@ public sealed class SolidBodyMassMutationTests
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Static)]
-    [InlineData(BodyMotionType.Kinematic)]
-    public void ChangedMass_ShouldPreserveExplicitRole(BodyMotionType role)
+    [InlineData(PhysicsMobilityType.Static)]
+    [InlineData(PhysicsMobilityType.Kinematic)]
+    public void ChangedMass_ShouldPreserveExplicitRole(PhysicsMobilityType role)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         SolidBody body = scenario.CreateBody(new LSSphereCollider(), Vector3d.Zero,
-            FixedQuaternion.Identity, isDynamic: role != BodyMotionType.Static,
-            isKinematic: role == BodyMotionType.Kinematic).Body;
+            FixedQuaternion.Identity, isDynamic: role != PhysicsMobilityType.Static,
+            isKinematic: role == PhysicsMobilityType.Kinematic).Body;
         int id = body.DynamicId;
         body.Mass = (Fixed64)2;
         body.MotionType.Should().Be(role);

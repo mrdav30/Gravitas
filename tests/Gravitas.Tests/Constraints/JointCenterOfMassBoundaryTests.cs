@@ -222,7 +222,7 @@ public sealed class JointCenterOfMassBoundaryTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, Fixed64.Zero, BodyMotionType.Dynamic);
+        body.Initialize(position, Fixed64.Zero, PhysicsMobilityType.Dynamic);
         return body;
     }
 }

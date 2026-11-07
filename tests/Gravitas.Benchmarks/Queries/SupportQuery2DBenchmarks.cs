@@ -41,7 +41,7 @@ public class SupportQuery2DBenchmarks
             Vector2d center = origin + new Vector2d(Fixed64.Half, Fixed64.Half);
             var body = new SolidBody2D(new BenchmarkMatterAgent(_context,
                 new Vector3d(center.X, Fixed64.Zero, center.Y)), new LSCircleCollider2D(Fixed64.Half));
-            body.Initialize(center, motionType: BodyMotionType.Kinematic);
+            body.Initialize(center, motionType: PhysicsMobilityType.Kinematic);
             body.UseManualGrounding();
             _probes[i] = new Physics2DSupportQuery(body.Collider, center, Fixed64.Half,
                 Vector2d.Forward, Fixed64.Half, Fixed64.Half, PhysicsLayerMask.All);

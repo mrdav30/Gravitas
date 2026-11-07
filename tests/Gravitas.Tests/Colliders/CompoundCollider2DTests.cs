@@ -444,7 +444,7 @@ public sealed class CompoundCollider2DTests
 
         Action initialize = () => body.Initialize(
             Vector2d.Zero,
-            motionType: BodyMotionType.Static);
+            motionType: PhysicsMobilityType.Static);
 
         initialize.Should()
             .Throw<ArgumentException>()
@@ -623,7 +623,7 @@ public sealed class CompoundCollider2DTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
         return body;
     }
 }

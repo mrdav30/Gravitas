@@ -38,13 +38,13 @@ public partial class SolidBody
             ValidateGroundMinNormalDot(groundMinNormalDot);
         bool active = Active;
         BodyFreezeAxes3D freezeAxes = FreezeAxes;
-        BodyMotionType motionType = MotionType;
+        PhysicsMobilityType motionType = MotionType;
         Fixed64 gravityScale = GravityScale;
         ContinuousCollisionMode continuousCollisionMode = ContinuousCollisionMode;
 
         RecordValues.Look(chronicler, ref active, "Active");
         RecordValues.Look(chronicler, ref freezeAxes, "FreezeAxes", BodyFreezeAxes3D.None);
-        RecordValues.Look(chronicler, ref motionType, "MotionType", BodyMotionType.Dynamic);
+        RecordValues.Look(chronicler, ref motionType, "MotionType", PhysicsMobilityType.Dynamic);
         if (chronicler.Mode == SerializationMode.Loading)
         {
             PreflightLoadedMotionType(motionType);

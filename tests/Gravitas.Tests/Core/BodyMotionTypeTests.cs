@@ -15,10 +15,10 @@ namespace Gravitas.Tests.Core;
 public sealed class BodyMotionTypeTests
 {
     [Theory]
-    [InlineData(BodyMotionType.Dynamic)]
-    [InlineData(BodyMotionType.Static)]
+    [InlineData(PhysicsMobilityType.Dynamic)]
+    [InlineData(PhysicsMobilityType.Static)]
     public void SetMotionType_BeforeInitialization_ShouldRejectSameOrDifferentRoleWithoutChangingEitherBody(
-        BodyMotionType requestedMotionType)
+        PhysicsMobilityType requestedMotionType)
     {
         using GravitasWorldContext context3D = GravitasWorldContext.CreateOwned();
         var body3D = new SolidBody(
@@ -38,22 +38,22 @@ public sealed class BodyMotionTypeTests
 
         transition3D.Should().Throw<InvalidOperationException>();
         transition2D.Should().Throw<InvalidOperationException>();
-        body3D.MotionType.Should().Be(BodyMotionType.Dynamic);
-        body2D.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body3D.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
+        body2D.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         context3D.Physics.BodyCount.Should().Be(0);
         context2D.Physics2D.BodyCount.Should().Be(0);
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Dynamic)]
-    [InlineData(BodyMotionType.Static)]
+    [InlineData(PhysicsMobilityType.Dynamic)]
+    [InlineData(PhysicsMobilityType.Static)]
     public void SetMotionType_AfterContextReset_ShouldRejectSameOrDifferentRoleWithoutMutation(
-        BodyMotionType requestedMotionType)
+        PhysicsMobilityType requestedMotionType)
     {
         using GravitasWorldContext context3D = GravitasWorldContext.CreateOwned();
-        (SolidBody body3D, _) = Create3DBody(context3D, BodyMotionType.Dynamic);
+        (SolidBody body3D, _) = Create3DBody(context3D, PhysicsMobilityType.Dynamic);
         using GravitasWorldContext context2D = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body2D, _) = Create2DBody(context2D, BodyMotionType.Dynamic);
+        (SolidBody2D body2D, _) = Create2DBody(context2D, PhysicsMobilityType.Dynamic);
         int dynamicId3D = body3D.DynamicId;
         int dynamicId2D = body2D.DynamicId;
         context3D.Reset();
@@ -64,8 +64,8 @@ public sealed class BodyMotionTypeTests
 
         transition3D.Should().Throw<InvalidOperationException>();
         transition2D.Should().Throw<InvalidOperationException>();
-        body3D.MotionType.Should().Be(BodyMotionType.Dynamic);
-        body2D.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body3D.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
+        body2D.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body3D.DynamicId.Should().Be(dynamicId3D);
         body2D.DynamicId.Should().Be(dynamicId2D);
         context3D.Physics.BodyCount.Should().Be(0);
@@ -89,9 +89,9 @@ public sealed class BodyMotionTypeTests
         body.Initialize(
             Vector3d.Zero,
             FixedQuaternion.Identity,
-            BodyMotionType.Static);
+            PhysicsMobilityType.Static);
 
-        body.MotionType.Should().Be(BodyMotionType.Static);
+        body.MotionType.Should().Be(PhysicsMobilityType.Static);
         body.IsStatic.Should().BeTrue();
         body.IsKinematic.Should().BeFalse();
         body.IsDynamic.Should().BeFalse();
@@ -117,9 +117,9 @@ public sealed class BodyMotionTypeTests
         body.Initialize(
             Vector2d.Zero,
             Fixed64.Zero,
-            BodyMotionType.Static);
+            PhysicsMobilityType.Static);
 
-        body.MotionType.Should().Be(BodyMotionType.Static);
+        body.MotionType.Should().Be(PhysicsMobilityType.Static);
         body.IsStatic.Should().BeTrue();
         body.IsKinematic.Should().BeFalse();
         body.IsDynamic.Should().BeFalse();
@@ -132,12 +132,12 @@ public sealed class BodyMotionTypeTests
     public void SolidBody_DynamicToStatic_ShouldReleaseOnlySimulatedBodyMembership()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, BodyMotionType.Dynamic);
+        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, PhysicsMobilityType.Dynamic);
         int colliderId = collider.Id;
 
-        body.SetMotionType(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
 
-        body.MotionType.Should().Be(BodyMotionType.Static);
+        body.MotionType.Should().Be(PhysicsMobilityType.Static);
         body.DynamicId.Should().Be(-1);
         context.Physics.BodyCount.Should().Be(0);
         collider.Id.Should().Be(colliderId);
@@ -149,12 +149,12 @@ public sealed class BodyMotionTypeTests
     public void SolidBody_StaticToDynamic_ShouldAcquireSimulatedBodyMembership()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, BodyMotionType.Static);
+        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, PhysicsMobilityType.Static);
         int colliderId = collider.Id;
 
-        body.SetMotionType(BodyMotionType.Dynamic);
+        body.SetMotionType(PhysicsMobilityType.Dynamic);
 
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().BeGreaterThanOrEqualTo(0);
         context.Physics.BodyCount.Should().Be(1);
         collider.Id.Should().Be(colliderId);
@@ -166,12 +166,12 @@ public sealed class BodyMotionTypeTests
     public void SolidBody2D_DynamicToStatic_ShouldReleaseOnlySimulatedBodyMembership()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, BodyMotionType.Dynamic);
+        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, PhysicsMobilityType.Dynamic);
         int colliderId = collider.Id;
 
-        body.SetMotionType(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
 
-        body.MotionType.Should().Be(BodyMotionType.Static);
+        body.MotionType.Should().Be(PhysicsMobilityType.Static);
         body.DynamicId.Should().Be(-1);
         context.Physics2D.BodyCount.Should().Be(0);
         collider.Id.Should().Be(colliderId);
@@ -183,12 +183,12 @@ public sealed class BodyMotionTypeTests
     public void SolidBody2D_StaticToDynamic_ShouldAcquireSimulatedBodyMembership()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, BodyMotionType.Static);
+        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, PhysicsMobilityType.Static);
         int colliderId = collider.Id;
 
-        body.SetMotionType(BodyMotionType.Dynamic);
+        body.SetMotionType(PhysicsMobilityType.Dynamic);
 
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().BeGreaterThanOrEqualTo(0);
         context.Physics2D.BodyCount.Should().Be(1);
         collider.Id.Should().Be(colliderId);
@@ -197,12 +197,12 @@ public sealed class BodyMotionTypeTests
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Kinematic, BodyMotionType.Dynamic)]
-    [InlineData(BodyMotionType.Kinematic, BodyMotionType.Static)]
-    [InlineData(BodyMotionType.Static, BodyMotionType.Kinematic)]
+    [InlineData(PhysicsMobilityType.Kinematic, PhysicsMobilityType.Dynamic)]
+    [InlineData(PhysicsMobilityType.Kinematic, PhysicsMobilityType.Static)]
+    [InlineData(PhysicsMobilityType.Static, PhysicsMobilityType.Kinematic)]
     public void SolidBody_RemainingMotionTypeTransitions_ShouldPreserveIdentityAndReconcileMembership(
-        BodyMotionType initialMotionType,
-        BodyMotionType targetMotionType)
+        PhysicsMobilityType initialMotionType,
+        PhysicsMobilityType targetMotionType)
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         (SolidBody body, LSSphereCollider collider) = Create3DBody(context, initialMotionType);
@@ -213,14 +213,14 @@ public sealed class BodyMotionTypeTests
         body.MotionType.Should().Be(targetMotionType);
         collider.Id.Should().Be(colliderId);
         collider.Body.Should().BeSameAs(body);
-        collider.IsStatic.Should().Be(targetMotionType == BodyMotionType.Static);
-        context.Physics.BodyCount.Should().Be(targetMotionType == BodyMotionType.Static ? 0 : 1);
-        if (targetMotionType == BodyMotionType.Static)
+        collider.IsStatic.Should().Be(targetMotionType == PhysicsMobilityType.Static);
+        context.Physics.BodyCount.Should().Be(targetMotionType == PhysicsMobilityType.Static ? 0 : 1);
+        if (targetMotionType == PhysicsMobilityType.Static)
             body.DynamicId.Should().Be(-1);
         else
             body.DynamicId.Should().BeGreaterThanOrEqualTo(0);
 
-        if (targetMotionType == BodyMotionType.Dynamic)
+        if (targetMotionType == PhysicsMobilityType.Dynamic)
         {
             body.AddAngularImpulse(Vector3d.Up);
             body.AngularVelocity.Should().NotBe(Vector3d.Zero);
@@ -228,12 +228,12 @@ public sealed class BodyMotionTypeTests
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Kinematic, BodyMotionType.Dynamic)]
-    [InlineData(BodyMotionType.Kinematic, BodyMotionType.Static)]
-    [InlineData(BodyMotionType.Static, BodyMotionType.Kinematic)]
+    [InlineData(PhysicsMobilityType.Kinematic, PhysicsMobilityType.Dynamic)]
+    [InlineData(PhysicsMobilityType.Kinematic, PhysicsMobilityType.Static)]
+    [InlineData(PhysicsMobilityType.Static, PhysicsMobilityType.Kinematic)]
     public void SolidBody2D_RemainingMotionTypeTransitions_ShouldPreserveIdentityAndReconcileMembership(
-        BodyMotionType initialMotionType,
-        BodyMotionType targetMotionType)
+        PhysicsMobilityType initialMotionType,
+        PhysicsMobilityType targetMotionType)
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, initialMotionType);
@@ -244,14 +244,14 @@ public sealed class BodyMotionTypeTests
         body.MotionType.Should().Be(targetMotionType);
         collider.Id.Should().Be(colliderId);
         collider.Body.Should().BeSameAs(body);
-        collider.IsStatic.Should().Be(targetMotionType == BodyMotionType.Static);
-        context.Physics2D.BodyCount.Should().Be(targetMotionType == BodyMotionType.Static ? 0 : 1);
-        if (targetMotionType == BodyMotionType.Static)
+        collider.IsStatic.Should().Be(targetMotionType == PhysicsMobilityType.Static);
+        context.Physics2D.BodyCount.Should().Be(targetMotionType == PhysicsMobilityType.Static ? 0 : 1);
+        if (targetMotionType == PhysicsMobilityType.Static)
             body.DynamicId.Should().Be(-1);
         else
             body.DynamicId.Should().BeGreaterThanOrEqualTo(0);
 
-        if (targetMotionType == BodyMotionType.Dynamic)
+        if (targetMotionType == PhysicsMobilityType.Dynamic)
         {
             body.AddAngularImpulse(Fixed64.One);
             body.AngularVelocity.Should().NotBe(Fixed64.Zero);
@@ -262,16 +262,16 @@ public sealed class BodyMotionTypeTests
     public void SolidBody_SameAndUndefinedMotionTypeRequests_ShouldBeNoOpOrRejectWithoutMutation()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, _) = Create3DBody(context, BodyMotionType.Dynamic);
+        (SolidBody body, _) = Create3DBody(context, PhysicsMobilityType.Dynamic);
         int dynamicId = body.DynamicId;
         body.AddAngularImpulse(Vector3d.Up);
         Vector3d angularVelocity = body.AngularVelocity;
 
-        body.SetMotionType(BodyMotionType.Dynamic);
-        Action invalid = () => body.SetMotionType((BodyMotionType)byte.MaxValue);
+        body.SetMotionType(PhysicsMobilityType.Dynamic);
+        Action invalid = () => body.SetMotionType((PhysicsMobilityType)byte.MaxValue);
 
         invalid.Should().Throw<ArgumentOutOfRangeException>();
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().Be(dynamicId);
         body.AngularVelocity.Should().Be(angularVelocity);
     }
@@ -280,16 +280,16 @@ public sealed class BodyMotionTypeTests
     public void SolidBody2D_SameAndUndefinedMotionTypeRequests_ShouldBeNoOpOrRejectWithoutMutation()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body, _) = Create2DBody(context, BodyMotionType.Dynamic);
+        (SolidBody2D body, _) = Create2DBody(context, PhysicsMobilityType.Dynamic);
         int dynamicId = body.DynamicId;
         body.AddAngularImpulse(Fixed64.One);
         Fixed64 angularVelocity = body.AngularVelocity;
 
-        body.SetMotionType(BodyMotionType.Dynamic);
-        Action invalid = () => body.SetMotionType((BodyMotionType)byte.MaxValue);
+        body.SetMotionType(PhysicsMobilityType.Dynamic);
+        Action invalid = () => body.SetMotionType((PhysicsMobilityType)byte.MaxValue);
 
         invalid.Should().Throw<ArgumentOutOfRangeException>();
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().Be(dynamicId);
         body.AngularVelocity.Should().Be(angularVelocity);
     }
@@ -298,19 +298,19 @@ public sealed class BodyMotionTypeTests
     public void SolidBody_MotionTypeChangeDuringOpenFixedStep_ShouldFailWithoutMutation()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, _) = Create3DBody(context, BodyMotionType.Dynamic);
+        (SolidBody body, _) = Create3DBody(context, PhysicsMobilityType.Dynamic);
         int dynamicId = body.DynamicId;
         context.Simulate();
 
-        Action transition = () => body.SetMotionType(BodyMotionType.Static);
+        Action transition = () => body.SetMotionType(PhysicsMobilityType.Static);
 
         transition.Should().Throw<InvalidOperationException>();
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().Be(dynamicId);
         context.Physics.BodyCount.Should().Be(1);
 
         context.LateSimulate();
-        body.SetMotionType(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
         body.IsStatic.Should().BeTrue();
     }
 
@@ -318,19 +318,19 @@ public sealed class BodyMotionTypeTests
     public void SolidBody2D_MotionTypeChangeDuringOpenFixedStep_ShouldFailWithoutMutation()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body, _) = Create2DBody(context, BodyMotionType.Dynamic);
+        (SolidBody2D body, _) = Create2DBody(context, PhysicsMobilityType.Dynamic);
         int dynamicId = body.DynamicId;
         context.Simulate();
 
-        Action transition = () => body.SetMotionType(BodyMotionType.Static);
+        Action transition = () => body.SetMotionType(PhysicsMobilityType.Static);
 
         transition.Should().Throw<InvalidOperationException>();
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().Be(dynamicId);
         context.Physics2D.BodyCount.Should().Be(1);
 
         context.LateSimulate();
-        body.SetMotionType(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
         body.IsStatic.Should().BeTrue();
     }
 
@@ -338,45 +338,45 @@ public sealed class BodyMotionTypeTests
     public void SolidBody_MotionTypeChangeFromSimulateCallback_ShouldFailAndReleasePhaseGuard()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, _) = Create3DBody(context, BodyMotionType.Dynamic);
+        (SolidBody body, _) = Create3DBody(context, PhysicsMobilityType.Dynamic);
         using IDisposable hook = context.RegisterOnSimulate(
             "motion-type-transition",
             0,
-            () => body.SetMotionType(BodyMotionType.Static));
+            () => body.SetMotionType(PhysicsMobilityType.Static));
 
         Action simulate = context.Simulate;
 
         simulate.Should().Throw<InvalidOperationException>();
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         hook.Dispose();
-        body.SetMotionType(BodyMotionType.Static);
-        body.MotionType.Should().Be(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
+        body.MotionType.Should().Be(PhysicsMobilityType.Static);
     }
 
     [Fact]
     public void SolidBody2D_MotionTypeChangeFromLateSimulateCallback_ShouldFailAndReleasePhaseGuard()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body, _) = Create2DBody(context, BodyMotionType.Dynamic);
+        (SolidBody2D body, _) = Create2DBody(context, PhysicsMobilityType.Dynamic);
         using IDisposable hook = context.RegisterOnLateSimulate(
             "motion-type-transition",
             0,
-            () => body.SetMotionType(BodyMotionType.Static));
+            () => body.SetMotionType(PhysicsMobilityType.Static));
 
         Action lateSimulate = context.LateSimulate;
 
         lateSimulate.Should().Throw<InvalidOperationException>();
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         hook.Dispose();
-        body.SetMotionType(BodyMotionType.Static);
-        body.MotionType.Should().Be(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
+        body.MotionType.Should().Be(PhysicsMobilityType.Static);
     }
 
     [Fact]
     public void SolidBody_DynamicToKinematic_ShouldPublishAuthoritativePoseAndClearMotion()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, _) = Create3DBody(context, BodyMotionType.Dynamic);
+        (SolidBody body, _) = Create3DBody(context, PhysicsMobilityType.Dynamic);
         Vector3d position = new((Fixed64)3, (Fixed64)2, Fixed64.One);
         FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.Half);
         body.SetPosition(position);
@@ -384,7 +384,7 @@ public sealed class BodyMotionTypeTests
         body.AddLinearImpulse(Vector3d.Right);
         body.AddAngularImpulse(Vector3d.Up);
 
-        body.SetMotionType(BodyMotionType.Kinematic);
+        body.SetMotionType(PhysicsMobilityType.Kinematic);
 
         body.IsKinematic.Should().BeTrue();
         body.PositionTransform.WorldPosition.Should().Be(position);
@@ -397,7 +397,7 @@ public sealed class BodyMotionTypeTests
     public void SolidBody2D_DynamicToKinematic_ShouldPublishAuthoritativePoseAndClearMotion()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body, _) = Create2DBody(context, BodyMotionType.Dynamic);
+        (SolidBody2D body, _) = Create2DBody(context, PhysicsMobilityType.Dynamic);
         Vector2d position = new((Fixed64)3, Fixed64.One);
         Fixed64 rotation = Fixed64.Half;
         body.SetPosition(position);
@@ -405,7 +405,7 @@ public sealed class BodyMotionTypeTests
         body.AddLinearImpulse(Vector2d.Right);
         body.AddAngularImpulse(Fixed64.One);
 
-        body.SetMotionType(BodyMotionType.Kinematic);
+        body.SetMotionType(PhysicsMobilityType.Kinematic);
 
         body.IsKinematic.Should().BeTrue();
         body.Agent.Transform.WorldPositionXZ.Should().Be(position);
@@ -422,14 +422,14 @@ public sealed class BodyMotionTypeTests
         bool transitionPairOwner)
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody first, LSSphereCollider firstCollider) = Create3DBody(context, BodyMotionType.Dynamic);
-        (SolidBody second, LSSphereCollider secondCollider) = Create3DBody(context, BodyMotionType.Dynamic);
+        (SolidBody first, LSSphereCollider firstCollider) = Create3DBody(context, PhysicsMobilityType.Dynamic);
+        (SolidBody second, LSSphereCollider secondCollider) = Create3DBody(context, PhysicsMobilityType.Dynamic);
         var pair = new CollisionPair(firstCollider, secondCollider);
         firstCollider.TryAddCollisionPair(secondCollider.Id, pair).Should().BeTrue();
         secondCollider.TryAddCollisionPairHolder(firstCollider.Id).Should().BeTrue();
         pair.StoreWarmStartImpulse(7, Vector3d.Right, Fixed64.One, Fixed64.Half);
 
-        (transitionPairOwner ? first : second).SetMotionType(BodyMotionType.Kinematic);
+        (transitionPairOwner ? first : second).SetMotionType(PhysicsMobilityType.Kinematic);
 
         pair.TryGetWarmStartImpulse(7, out _).Should().BeFalse();
         firstCollider.TryGetCollisionPair(secondCollider.Id, out CollisionPair? retained).Should().BeTrue();
@@ -443,14 +443,14 @@ public sealed class BodyMotionTypeTests
         bool transitionPairOwner)
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D first, LSCircleCollider2D firstCollider) = Create2DBody(context, BodyMotionType.Dynamic);
-        (SolidBody2D second, LSCircleCollider2D secondCollider) = Create2DBody(context, BodyMotionType.Dynamic);
+        (SolidBody2D first, LSCircleCollider2D firstCollider) = Create2DBody(context, PhysicsMobilityType.Dynamic);
+        (SolidBody2D second, LSCircleCollider2D secondCollider) = Create2DBody(context, PhysicsMobilityType.Dynamic);
         var pair = new CollisionPair2D(firstCollider, secondCollider);
         firstCollider.TryAddCollisionPair(secondCollider.Id, pair).Should().BeTrue();
         secondCollider.TryAddCollisionPairHolder(firstCollider.Id).Should().BeTrue();
         pair.StoreWarmStartImpulse(default, 7, Fixed64.One, Fixed64.Half);
 
-        (transitionPairOwner ? first : second).SetMotionType(BodyMotionType.Kinematic);
+        (transitionPairOwner ? first : second).SetMotionType(PhysicsMobilityType.Kinematic);
 
         pair.TryGetWarmStartImpulse(default, 7, out _).Should().BeFalse();
         firstCollider.TryGetCollisionPair(secondCollider.Id, out CollisionPair2D? retained).Should().BeTrue();
@@ -478,7 +478,7 @@ public sealed class BodyMotionTypeTests
     public void SolidBody2D_StaticReposition_ShouldRefreshPartitionImmediately()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, BodyMotionType.Static);
+        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, PhysicsMobilityType.Static);
         var originalCoordinate = collider.PartitionCoordinates![0];
         Vector2d position = Vector2d.Right * (Fixed64)20;
 
@@ -499,7 +499,7 @@ public sealed class BodyMotionTypeTests
             FixedQuaternion.Identity,
             isDynamic: false);
         (SolidBody2D body2D, LSCircleCollider2D collider2D) =
-            Create2DBody(scenario.Context, BodyMotionType.Static);
+            Create2DBody(scenario.Context, PhysicsMobilityType.Static);
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
         var original3DCoordinate = body3D.Collider.MixedPartitionCoordinates![0];
@@ -516,15 +516,15 @@ public sealed class BodyMotionTypeTests
     public void SolidBody_MotionTypeTransitionWithInvalidRuntimeScale_ShouldRejectBeforeMutation()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, BodyMotionType.Dynamic);
+        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, PhysicsMobilityType.Dynamic);
         int dynamicId = body.DynamicId;
         int bodyCount = context.Physics.BodyCount;
         body.Agent.Transform.LocalScale = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.One);
 
-        Action transition = () => body.SetMotionType(BodyMotionType.Static);
+        Action transition = () => body.SetMotionType(PhysicsMobilityType.Static);
 
         transition.Should().Throw<ArgumentException>();
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().Be(dynamicId);
         context.Physics.BodyCount.Should().Be(bodyCount);
         collider.IsStatic.Should().BeFalse();
@@ -535,15 +535,15 @@ public sealed class BodyMotionTypeTests
     public void SolidBody2D_MotionTypeTransitionWithInvalidRuntimeScale_ShouldRejectBeforeMutation()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, BodyMotionType.Dynamic);
+        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, PhysicsMobilityType.Dynamic);
         int dynamicId = body.DynamicId;
         int bodyCount = context.Physics2D.BodyCount;
         body.Agent.Transform.LocalScale = new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One);
 
-        Action transition = () => body.SetMotionType(BodyMotionType.Static);
+        Action transition = () => body.SetMotionType(PhysicsMobilityType.Static);
 
         transition.Should().Throw<ArgumentException>();
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().Be(dynamicId);
         context.Physics2D.BodyCount.Should().Be(bodyCount);
         collider.IsStatic.Should().BeFalse();
@@ -554,7 +554,7 @@ public sealed class BodyMotionTypeTests
     public void SolidBody_StaticPoseChangesDuringOpenFixedStep_ShouldRejectBeforeMutation()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, BodyMotionType.Static);
+        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, PhysicsMobilityType.Static);
         Vector3d originalPosition = body.Position3d;
         FixedQuaternion originalRotation = body.Rotation;
         FixedBoundBox originalBounds = collider.Bounds;
@@ -583,7 +583,7 @@ public sealed class BodyMotionTypeTests
     public void SolidBody2D_StaticPoseChangesDuringOpenFixedStep_ShouldRejectBeforeMutation()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, BodyMotionType.Static);
+        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, PhysicsMobilityType.Static);
         Vector2d originalPosition = body.Position;
         Fixed64 originalRotation = body.Rotation;
         FixedBoundArea originalBounds = collider.Bounds;
@@ -607,7 +607,7 @@ public sealed class BodyMotionTypeTests
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, BodyMotionType.Static);
+        (SolidBody2D body, LSCircleCollider2D collider) = Create2DBody(context, PhysicsMobilityType.Static);
         context.Simulate();
         context.LateSimulate();
         var originalCoordinate = collider.MixedPartitionCoordinates![0];
@@ -654,10 +654,10 @@ public sealed class BodyMotionTypeTests
     {
         using GravitasWorldContext context3D = GravitasWorldContext.CreateOwned();
         context3D.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-        (SolidBody body3D, LSSphereCollider collider3D) = Create3DBody(context3D, BodyMotionType.Static);
+        (SolidBody body3D, LSSphereCollider collider3D) = Create3DBody(context3D, PhysicsMobilityType.Static);
         using GravitasWorldContext context2D = Physics2DTestWorld.CreateContext();
         context2D.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-        (SolidBody2D body2D, LSCircleCollider2D collider2D) = Create2DBody(context2D, BodyMotionType.Static);
+        (SolidBody2D body2D, LSCircleCollider2D collider2D) = Create2DBody(context2D, PhysicsMobilityType.Static);
         Vector3d originalPosition3D = body3D.Position3d;
         Vector2d originalPosition2D = body2D.Position;
         context3D.Reset();
@@ -682,7 +682,7 @@ public sealed class BodyMotionTypeTests
     public void SolidBody_ResetPositionAfterContextReset_ShouldRejectBeforeMutation()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, BodyMotionType.Dynamic);
+        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, PhysicsMobilityType.Dynamic);
         Vector3d originalPosition = body.Position3d;
         FixedQuaternion originalRotation = body.Rotation;
         Vector3d originalHostPosition = body.PositionTransform.WorldPosition;
@@ -705,9 +705,9 @@ public sealed class BodyMotionTypeTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         (SolidBody body3D, LSSphereCollider collider3D) =
-            Create3DBody(scenario.Context, BodyMotionType.Static);
+            Create3DBody(scenario.Context, PhysicsMobilityType.Static);
         (SolidBody2D body2D, LSCircleCollider2D collider2D) =
-            Create2DBody(scenario.Context, BodyMotionType.Static);
+            Create2DBody(scenario.Context, PhysicsMobilityType.Static);
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
         Vector3d originalPosition3D = body3D.Position3d;
@@ -740,7 +740,7 @@ public sealed class BodyMotionTypeTests
     public void SolidBody_ResetPositionWithUnrepresentableParentRelativePose_ShouldRejectBeforeMutation()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, BodyMotionType.Static);
+        (SolidBody body, LSSphereCollider collider) = Create3DBody(context, PhysicsMobilityType.Static);
         var parent = new FixedTransform(
             Vector3d.Zero,
             FixedQuaternion.Identity,
@@ -933,11 +933,11 @@ public sealed class BodyMotionTypeTests
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Dynamic)]
-    [InlineData(BodyMotionType.Kinematic)]
-    [InlineData(BodyMotionType.Static)]
+    [InlineData(PhysicsMobilityType.Dynamic)]
+    [InlineData(PhysicsMobilityType.Kinematic)]
+    [InlineData(PhysicsMobilityType.Static)]
     public void SolidBody_ResetPositionWithShearedHostPose_ShouldRejectBeforeMutation(
-        BodyMotionType motionType)
+        PhysicsMobilityType motionType)
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var parent = new FixedTransform(
@@ -982,7 +982,7 @@ public sealed class BodyMotionTypeTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         (SolidBody body, LSSphereCollider collider) =
-            Create3DBody(scenario.Context, BodyMotionType.Static);
+            Create3DBody(scenario.Context, PhysicsMobilityType.Static);
         var hits = new SwiftList<Physics3DHit>();
 
         body.SetPosition(Vector3d.Right * (Fixed64)1000);
@@ -1005,9 +1005,9 @@ public sealed class BodyMotionTypeTests
     public void DeactivatedStaticBodies_ShouldAcceptOfflinePosePreparationWithoutReregistration()
     {
         using GravitasWorldContext context3D = GravitasWorldContext.CreateOwned();
-        (SolidBody body3D, LSSphereCollider collider3D) = Create3DBody(context3D, BodyMotionType.Static);
+        (SolidBody body3D, LSSphereCollider collider3D) = Create3DBody(context3D, PhysicsMobilityType.Static);
         using GravitasWorldContext context2D = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body2D, LSCircleCollider2D collider2D) = Create2DBody(context2D, BodyMotionType.Static);
+        (SolidBody2D body2D, LSCircleCollider2D collider2D) = Create2DBody(context2D, PhysicsMobilityType.Static);
         body3D.Deactivate();
         body2D.Deactivate();
         Vector3d position3D = new((Fixed64)2, (Fixed64)3, (Fixed64)4);
@@ -1019,8 +1019,8 @@ public sealed class BodyMotionTypeTests
 
         body3D.Position3d.Should().Be(position3D);
         body2D.Position.Should().Be(position2D);
-        body3D.MotionType.Should().Be(BodyMotionType.Static);
-        body2D.MotionType.Should().Be(BodyMotionType.Static);
+        body3D.MotionType.Should().Be(PhysicsMobilityType.Static);
+        body2D.MotionType.Should().Be(PhysicsMobilityType.Static);
         body3D.DynamicId.Should().Be(-1);
         body2D.DynamicId.Should().Be(-1);
         collider3D.Id.Should().Be(-1);
@@ -1035,16 +1035,16 @@ public sealed class BodyMotionTypeTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero);
         using GravitasWorldContext context2D = Physics2DTestWorld.CreateContext();
-        (SolidBody2D body2D, _) = Create2DBody(context2D, BodyMotionType.Dynamic);
+        (SolidBody2D body2D, _) = Create2DBody(context2D, PhysicsMobilityType.Dynamic);
 
         void TransitionCycle()
         {
-            body3D.Body.SetMotionType(BodyMotionType.Static);
-            body3D.Body.SetMotionType(BodyMotionType.Kinematic);
-            body3D.Body.SetMotionType(BodyMotionType.Dynamic);
-            body2D.SetMotionType(BodyMotionType.Static);
-            body2D.SetMotionType(BodyMotionType.Kinematic);
-            body2D.SetMotionType(BodyMotionType.Dynamic);
+            body3D.Body.SetMotionType(PhysicsMobilityType.Static);
+            body3D.Body.SetMotionType(PhysicsMobilityType.Kinematic);
+            body3D.Body.SetMotionType(PhysicsMobilityType.Dynamic);
+            body2D.SetMotionType(PhysicsMobilityType.Static);
+            body2D.SetMotionType(PhysicsMobilityType.Kinematic);
+            body2D.SetMotionType(PhysicsMobilityType.Dynamic);
         }
 
         TransitionCycle();
@@ -1054,7 +1054,7 @@ public sealed class BodyMotionTypeTests
 
     private static (SolidBody Body, LSSphereCollider Collider) Create3DBody(
         GravitasWorldContext context,
-        BodyMotionType motionType)
+        PhysicsMobilityType motionType)
     {
         var collider = new LSSphereCollider();
         var body = new SolidBody(
@@ -1071,7 +1071,7 @@ public sealed class BodyMotionTypeTests
 
     private static (SolidBody2D Body, LSCircleCollider2D Collider) Create2DBody(
         GravitasWorldContext context,
-        BodyMotionType motionType)
+        PhysicsMobilityType motionType)
     {
         var collider = new LSCircleCollider2D(Fixed64.One);
         var body = new SolidBody2D(
@@ -1103,7 +1103,7 @@ public sealed class BodyMotionTypeTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, rotation, BodyMotionType.Dynamic);
+        body.Initialize(position, rotation, PhysicsMobilityType.Dynamic);
         return body;
     }
 }

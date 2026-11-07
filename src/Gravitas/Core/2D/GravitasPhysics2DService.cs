@@ -88,7 +88,7 @@ public sealed partial class GravitasPhysics2DService
     /// </summary>
     public bool LastContinuousCollisionIslandLimitReached { get; private set; }
 
-    internal void AssimilateBody(SolidBody2D body, BodyMotionType motionType)
+    internal void AssimilateBody(SolidBody2D body, PhysicsMobilityType motionType)
     {
         ChronicleGuard.ThrowIfNull(body, nameof(body));
         ChronicleGuard.ThrowIfArgument(
@@ -96,7 +96,7 @@ public sealed partial class GravitasPhysics2DService
             nameof(body),
             "2D body must belong to this physics service context.");
 
-        if (motionType != BodyMotionType.Static)
+        if (motionType != PhysicsMobilityType.Static)
         {
             body.DynamicId = _dynamicBodies.Add(body);
             while (_continuousCollisionCandidateLifetimes.Count <= body.DynamicId)
@@ -109,10 +109,10 @@ public sealed partial class GravitasPhysics2DService
 
     internal void RefreshBodyMotionTypeRegistration(
         SolidBody2D body,
-        BodyMotionType previousMotionType)
+        PhysicsMobilityType previousMotionType)
     {
         if (!body.IsStatic) body.Collider.StaticSurface?.Remove(body.Collider);
-        if (previousMotionType == BodyMotionType.Static)
+        if (previousMotionType == PhysicsMobilityType.Static)
         {
             body.DynamicId = _dynamicBodies.Add(body);
             while (_continuousCollisionCandidateLifetimes.Count <= body.DynamicId)
@@ -121,7 +121,7 @@ public sealed partial class GravitasPhysics2DService
             return;
         }
 
-        if (body.MotionType == BodyMotionType.Static)
+        if (body.MotionType == PhysicsMobilityType.Static)
         {
             int previousDynamicId = body.DynamicId;
             _dynamicBodies.RemoveAt(previousDynamicId);

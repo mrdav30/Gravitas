@@ -63,8 +63,8 @@ public class CircleContactBenchmarks
         _second = new LSCircleCollider2D(radius);
         var firstBody = new SolidBody2D(new BenchmarkMatterAgent(_context, Vector3d.Zero), _first);
         var secondBody = new SolidBody2D(new BenchmarkMatterAgent(_context, Vector3d.Zero), _second);
-        firstBody.Initialize(Vector2d.Zero, rotation, BodyMotionType.Static);
-        secondBody.Initialize(center, -rotation, BodyMotionType.Static);
+        firstBody.Initialize(Vector2d.Zero, rotation, PhysicsMobilityType.Static);
+        secondBody.Initialize(center, -rotation, PhysicsMobilityType.Static);
         bool hit = CollisionDetection2D.TryCollide(_first, _second, out Contact2D contact);
         if (hit != expectedHit || contact.Depth != expectedDepth ||
             contact.Normal != expectedNormal || contact.DepthIsClamped)

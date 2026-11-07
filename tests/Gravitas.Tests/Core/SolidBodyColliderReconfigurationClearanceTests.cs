@@ -22,7 +22,7 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
         var body = new SolidBody(new TestMatterAgent(context,
             new FixedTransform(position, rotation, Vector3d.One)), source)
         { Mass = Fixed64.One };
-        body.Initialize(position, rotation, BodyMotionType.Kinematic);
+        body.Initialize(position, rotation, PhysicsMobilityType.Kinematic);
         LSCollider obstacle = ColliderShapeDefinition.Cylinder((Fixed64)10, Fixed64.Two).CreateCollider();
         obstacle.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
@@ -55,7 +55,7 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
         var body = new SolidBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), source)
         { Mass = Fixed64.One };
-        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         FixedQuaternion rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized;
         LSCollider obstacle = ColliderShapeDefinition.Cylinder(Fixed64.FromFraction(5, 4), Fixed64.Two).CreateCollider();
         obstacle.InitializeWithNoBody(new TestMatterAgent(context,
@@ -87,7 +87,7 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
         var body = new SolidBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), source)
         { Mass = Fixed64.One };
-        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         var obstacle = new LSMeshCollider(new[] { new Vector3d(0, 7, -5), new Vector3d(10, 1, -5), new Vector3d(5, 4, 5) },
             new[] { 0, 1, 2 }, MeshColliderMode.Concave);
         obstacle.InitializeWithNoBody(new TestMatterAgent(context,
@@ -118,7 +118,7 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
         var body = new SolidBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), source)
         { Mass = Fixed64.One };
-        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         LSCollider shell = CreateTarget(concave ? 8 : 5, compound: false);
         shell.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, new Vector3d(10, 10, 10))));
@@ -168,7 +168,7 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
                 var body = new SolidBody(new TestMatterAgent(context,
                     new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One)), source)
                 { Mass = Fixed64.One };
-                body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+                body.Initialize(position, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
                 LSCollider obstacle = CreateTarget(targetFamily, compound);
                 obstacle.InitializeWithNoBody(new TestMatterAgent(context,
                     new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
@@ -248,7 +248,7 @@ public sealed class SolidBodyColliderReconfigurationClearanceTests
             ? new LSCapsuleCollider(ColliderShapeDefinition.Capsule((Fixed64)4, (Fixed64)8))
             : new LSSphereCollider(ColliderShapeDefinition.Sphere((Fixed64)4));
         var body = new SolidBody(new TestMatterAgent(context, transform), source) { Mass = Fixed64.One };
-        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        body.Initialize(position, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         var obstacle = new LSCuboidCollider(ColliderShapeDefinition.Cuboid(new Vector3d(2, 2, 2)));
         obstacle.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(new Vector3d(-1, 0, -1), FixedQuaternion.Identity, Vector3d.One)));

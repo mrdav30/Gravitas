@@ -11,7 +11,7 @@ namespace Gravitas.Materials;
 /// Defines how two deterministic scalar material coefficients are combined for
 /// one contact pair.
 /// </summary>
-public enum PhysicsMaterialCombine
+public enum PhysicsMaterialCombine : byte
 {
     /// <summary>
     /// Uses the lower coefficient from the two contacting surfaces.

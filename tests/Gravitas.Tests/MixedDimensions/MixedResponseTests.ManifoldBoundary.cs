@@ -34,7 +34,7 @@ public sealed partial class MixedResponseTests
         var belt = new SolidBody2D(new TestMatterAgent(context,
             new FixedTransform(position.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One)), circle)
         { Mass = Fixed64.One };
-        belt.Initialize(position, motionType: BodyMotionType.Kinematic);
+        belt.Initialize(position, motionType: PhysicsMobilityType.Kinematic);
         CollisionPairMixed pair = BuildMixedManifoldPair(mesh, circle);
         pair.Manifold.Count.Should().Be(2);
         foreach (ManifoldContact row in pair.Manifold)
@@ -79,7 +79,7 @@ public sealed partial class MixedResponseTests
         var mover = new SolidBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), mesh)
         { Mass = Fixed64.One };
-        mover.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        mover.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         SolidBody2D circle = CreateCircularNormalBody(context, zeroCore: false, Vector2d.Zero);
         circle.Collider.Material = rough;
         if (heavy) circle.Mass = Fixed64.MaxValue;
@@ -226,11 +226,11 @@ public sealed partial class MixedResponseTests
             new FixedTransform(positionA, FixedQuaternion.Identity, Vector3d.One)), shapeA)
         { Mass = Fixed64.One };
         bodyA.Initialize(positionA, FixedQuaternion.Identity,
-            planarRecipient ? BodyMotionType.Kinematic : BodyMotionType.Dynamic);
+            planarRecipient ? PhysicsMobilityType.Kinematic : PhysicsMobilityType.Dynamic);
         var bodyB = new SolidBody2D(new TestMatterAgent(context,
             new FixedTransform(positionB.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One)), shapeB)
         { Mass = Fixed64.One };
-        bodyB.Initialize(positionB, motionType: planarRecipient ? BodyMotionType.Dynamic : BodyMotionType.Kinematic);
+        bodyB.Initialize(positionB, motionType: planarRecipient ? PhysicsMobilityType.Dynamic : PhysicsMobilityType.Kinematic);
         shapeA.Material = shapeB.Material = PhysicsMaterial.Frictionless;
         bodyA.FreezeAxes = planarRecipient ? BodyFreezeAxes3D.None : BodyFreezeAxes3D.Rotation;
         bodyB.FreezeAxes = planarRecipient ? BodyFreezeAxes2D.Rotation : BodyFreezeAxes2D.None;
@@ -263,7 +263,7 @@ public sealed partial class MixedResponseTests
         var bodyA = new SolidBody(new TestMatterAgent(context,
             new FixedTransform(wallPosition, FixedQuaternion.Identity, Vector3d.One)), wall)
         { Mass = Fixed64.One };
-        bodyA.Initialize(wallPosition, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        bodyA.Initialize(wallPosition, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         var box = new LSAABBoxCollider2D(Vector2d.One);
         var bodyB = new SolidBody2D(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), box)
@@ -547,7 +547,7 @@ public sealed partial class MixedResponseTests
         var target = new SolidBody2D(new TestMatterAgent(context,
             new FixedTransform(wallPosition.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One)), wall)
         { Mass = Fixed64.One };
-        target.Initialize(wallPosition, motionType: BodyMotionType.Kinematic);
+        target.Initialize(wallPosition, motionType: PhysicsMobilityType.Kinematic);
         var manifold = new ContactManifold();
         CollisionDetectionMixed.TryBuildManifold(box, wall, manifold).Should().BeTrue();
         var impact = new ContactResponseSnapshot(Vector3d.Zero, wallPosition.ToVector3d(Fixed64.Zero),

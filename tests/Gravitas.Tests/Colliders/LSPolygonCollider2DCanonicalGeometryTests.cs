@@ -75,7 +75,7 @@ public sealed class LSPolygonCollider2DCanonicalGeometryTests
         Action initialize = () => body.Initialize(
             new Vector2d(Fixed64.Zero, Fixed64.MinValue),
             rotation: Fixed64.PiOver4,
-            motionType: BodyMotionType.Static);
+            motionType: PhysicsMobilityType.Static);
 
         initialize.Should().Throw<ArgumentException>();
         collider.Id.Should().Be(-1);

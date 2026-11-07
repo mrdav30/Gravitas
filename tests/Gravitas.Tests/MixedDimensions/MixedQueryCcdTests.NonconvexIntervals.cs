@@ -45,7 +45,7 @@ public sealed partial class MixedQueryCcdTests
             new FixedTransform(planarPosition.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One)),
             planarCollider)
         { Mass = Fixed64.One };
-        planar.Initialize(planarPosition, motionType: meshSource ? BodyMotionType.Static : BodyMotionType.Kinematic);
+        planar.Initialize(planarPosition, motionType: meshSource ? PhysicsMobilityType.Static : PhysicsMobilityType.Kinematic);
         planar.UseManualGrounding();
         mesh.Bounds.Intersects(planarCollider.MixedBounds3D).Should().BeTrue();
         CollisionDetectionMixed.TryCollide(mesh, planarCollider, out _).Should().BeFalse();
@@ -243,7 +243,7 @@ public sealed partial class MixedQueryCcdTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+        body.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
         return body;
     }
 }

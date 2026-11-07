@@ -309,7 +309,7 @@ public sealed partial class MixedResponseTests
             LinearDragCoefficient = Fixed64.Zero
         };
         spatial.Initialize(Vector3d.Zero, FixedQuaternion.Identity,
-            moving3D ? BodyMotionType.Dynamic : BodyMotionType.Static);
+            moving3D ? PhysicsMobilityType.Dynamic : PhysicsMobilityType.Static);
         var slab = new LSAABBoxCollider2D(new Vector2d(Fixed64.One, Fixed64.Two))
         {
             MixedHalfThicknessOverride = Fixed64.One,
@@ -323,7 +323,7 @@ public sealed partial class MixedResponseTests
             FreezeAxes = BodyFreezeAxes2D.Rotation
         };
         Vector2d initial2D = slabOrigin.ToVector2d();
-        planar.Initialize(initial2D, motionType: moving3D ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        planar.Initialize(initial2D, motionType: moving3D ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         int entered = 0, stayed = 0, exited = 0;
         cone.OnMixedContactEnter += _ => entered++;
         slab.OnMixedContactEnter += _ => entered++;

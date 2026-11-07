@@ -331,7 +331,7 @@ public class Constraint2DBenchmarks
 
         body.Initialize(
             position,
-            motionType: dynamic ? BodyMotionType.Dynamic : BodyMotionType.Static);
+            motionType: dynamic ? PhysicsMobilityType.Dynamic : PhysicsMobilityType.Static);
         return body;
     }
 
@@ -347,7 +347,7 @@ public class Constraint2DBenchmarks
         };
         body.Initialize(
             offset + new Vector2d(Fixed64.Zero, -Fixed64.One),
-            motionType: BodyMotionType.Static);
+            motionType: PhysicsMobilityType.Static);
     }
 
     private static RagdollLinkDefinition2D Link(int id, SolidBody2D body) =>

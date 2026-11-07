@@ -32,7 +32,7 @@ public sealed class ColliderCcdProxyPublicationTests
                 new FixedTransform(farPosition, FixedQuaternion.Identity, Vector3d.One)));
             var collider = new LSCircleCollider2D(Fixed64.Half);
             var body = new SolidBody2D(agent, collider);
-            body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+            body.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
             body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
             transform.LocalScale = Vector3d.One * Fixed64.MinIncrement;
             collider.Radius = (Fixed64)(1 << 30);
@@ -62,7 +62,7 @@ public sealed class ColliderCcdProxyPublicationTests
                 new FixedTransform(farPosition, FixedQuaternion.Identity, Vector3d.One)));
             var collider = new LSSphereCollider { Radius = Fixed64.Half };
             var body = new SolidBody(agent, collider);
-            body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+            body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
             body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
             transform.LocalScale = Vector3d.One * Fixed64.MinIncrement;
             collider.Radius = (Fixed64)(1 << 30);
@@ -102,7 +102,7 @@ public sealed class ColliderCcdProxyPublicationTests
         {
             var collider = new LSCircleCollider2D(Fixed64.Half);
             var body = new SolidBody2D(agent, collider);
-            body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+            body.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
             transform.LocalScale = Vector3d.One * (Fixed64)4;
             collider.Radius = Fixed64.Two;
             body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.Half);
@@ -121,7 +121,7 @@ public sealed class ColliderCcdProxyPublicationTests
         {
             var collider = new LSSphereCollider { Radius = Fixed64.Half };
             var body = new SolidBody(agent, collider);
-            body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+            body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
             transform.LocalScale = Vector3d.One * (Fixed64)4;
             collider.Radius = Fixed64.Two;
             body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.Half);
@@ -145,7 +145,7 @@ public sealed class ColliderCcdProxyPublicationTests
         context.Settings.Mixed2DHalfThickness = Fixed64.Half;
         var collider = new LSCircleCollider2D(Fixed64.One);
         var body = new SolidBody2D(new TestMatterAgent(context), collider);
-        body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+        body.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
         new Vector2d(Fixed64.One, Fixed64.Half).TryGetMagnitudeCeiling(
             out Fixed64 committedRadius).Should().BeTrue();
         if (mutation == 0)
@@ -187,7 +187,7 @@ public sealed class ColliderCcdProxyPublicationTests
         {
             var collider = new LSCircleCollider2D(Fixed64.Half);
             var body = new SolidBody2D(agent, collider);
-            body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+            body.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
             agent.Transform.LocalScale = Vector3d.One * (Fixed64)4;
             context.AdvanceLateSimulateToken();
             context.Physics2D.PrepareContinuousCollisionFrame();
@@ -198,7 +198,7 @@ public sealed class ColliderCcdProxyPublicationTests
         {
             var collider = new LSSphereCollider { Radius = Fixed64.Half };
             var body = new SolidBody(agent, collider);
-            body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+            body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
             agent.Transform.LocalScale = Vector3d.One * (Fixed64)4;
             context.AdvanceLateSimulateToken();
             context.Physics.PrepareContinuousCollisionFrame();

@@ -43,7 +43,7 @@ public class MixedSparseGridSpanBenchmarks
         {
             Mass = Fixed64.One
         };
-        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Static);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Static);
         _context.Simulate();
         _hits = new SwiftList<PhysicsMixedHit>(1);
     }

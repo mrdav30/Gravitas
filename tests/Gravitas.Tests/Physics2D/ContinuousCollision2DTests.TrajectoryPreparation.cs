@@ -55,7 +55,7 @@ public sealed partial class ContinuousCollision2DTests
         var dynamicTarget = new SolidBody(new TestMatterAgent(context), new LSSphereCollider { Radius = (Fixed64)10 });
         dynamicTarget.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
         var staticTarget = new SolidBody(new TestMatterAgent(context), new LSSphereCollider { Radius = (Fixed64)10 });
-        staticTarget.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Static);
+        staticTarget.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Static);
         SolidBody2D source = CreatePendingCompensatedCircle(context, pending);
         source.Agent.Transform.LocalRotationXZRadians = Fixed64.HalfPi;
         context.AdvanceLateSimulateToken();
@@ -662,7 +662,7 @@ public sealed partial class ContinuousCollision2DTests
             MixedHalfThicknessOverride = Fixed64.One
         };
         var source = new SolidBody2D(new TestMatterAgent(context, transform), collider);
-        source.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+        source.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         // Old radius 2048 and pending offset/radius (1/2, 1/4) are both supported.
         if (!pending) return source;

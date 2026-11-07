@@ -73,28 +73,28 @@ public partial class SolidBody : IRecordable
         get => (_freezeAxes & BodyFreezeAxes3D.Position) == BodyFreezeAxes3D.Position;
     }
 
-    private BodyMotionType _motionType;
+    private PhysicsMobilityType _motionType;
 
     /// <summary>
     /// Gets this body's explicit solver-controlled, host-controlled, or static
     /// runtime role.
     /// </summary>
-    public BodyMotionType MotionType => _motionType;
+    public PhysicsMobilityType MotionType => _motionType;
 
     /// <summary>
     /// Gets whether the solver controls this body.
     /// </summary>
-    public bool IsDynamic => _motionType == BodyMotionType.Dynamic;
+    public bool IsDynamic => _motionType == PhysicsMobilityType.Dynamic;
 
     /// <summary>
     /// Gets whether this body is excluded from per-frame motion.
     /// </summary>
-    public bool IsStatic => _motionType == BodyMotionType.Static;
+    public bool IsStatic => _motionType == PhysicsMobilityType.Static;
 
     /// <summary>
     /// Gets whether the host controls this body's pose.
     /// </summary>
-    public bool IsKinematic => _motionType == BodyMotionType.Kinematic;
+    public bool IsKinematic => _motionType == PhysicsMobilityType.Kinematic;
 
     /// <summary>
     /// Changes this registered body's runtime role between fixed-step
@@ -112,7 +112,7 @@ public partial class SolidBody : IRecordable
     /// The body is not currently registered, its context registration has been
     /// reset, or a simulation transaction or callback is active.
     /// </exception>
-    public void SetMotionType(BodyMotionType motionType)
+    public void SetMotionType(PhysicsMobilityType motionType)
     {
         if (!PrepareMotionTypeTransition(motionType))
             return;
@@ -120,7 +120,7 @@ public partial class SolidBody : IRecordable
         CommitMotionTypeTransition(motionType);
     }
 
-    internal bool PrepareMotionTypeTransition(BodyMotionType motionType)
+    internal bool PrepareMotionTypeTransition(PhysicsMobilityType motionType)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
         ThrowIfRuntimeRegistrationMissing();
@@ -129,13 +129,13 @@ public partial class SolidBody : IRecordable
 
         Context.ThrowIfFixedStepMutationNotAllowed();
         Collider.ValidateCurrentRuntimeTransform();
-        if (motionType != BodyMotionType.Dynamic)
+        if (motionType != PhysicsMobilityType.Dynamic)
             PublishAuthoritativePose();
 
         return true;
     }
 
-    internal void CommitMotionTypeTransition(BodyMotionType motionType)
+    internal void CommitMotionTypeTransition(PhysicsMobilityType motionType)
     {
         ReconcileMotionTypeRegistration(motionType);
 
@@ -148,7 +148,7 @@ public partial class SolidBody : IRecordable
         RefreshPartitionMobility();
     }
 
-    internal void ApplyLoadedMotionType(BodyMotionType motionType)
+    internal void ApplyLoadedMotionType(PhysicsMobilityType motionType)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
         if (_motionType == motionType)
@@ -164,7 +164,7 @@ public partial class SolidBody : IRecordable
         InvalidateContinuousCollisionTrajectory();
     }
 
-    internal void PreflightLoadedMotionType(BodyMotionType motionType)
+    internal void PreflightLoadedMotionType(PhysicsMobilityType motionType)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
         if (!Active)
@@ -188,9 +188,9 @@ public partial class SolidBody : IRecordable
             "Body runtime state cannot change after its registration has been reset or replaced.");
     }
 
-    private void ReconcileMotionTypeRegistration(BodyMotionType motionType)
+    private void ReconcileMotionTypeRegistration(PhysicsMobilityType motionType)
     {
-        BodyMotionType previousMotionType = _motionType;
+        PhysicsMobilityType previousMotionType = _motionType;
         InvalidateMassDependentSolverState();
 
         _motionType = motionType;
@@ -631,7 +631,7 @@ public partial class SolidBody : IRecordable
     public void Initialize(
         Vector3d startPosition,
         FixedQuaternion startRotation,
-        BodyMotionType motionType = BodyMotionType.Dynamic)
+        PhysicsMobilityType motionType = PhysicsMobilityType.Dynamic)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
         ChronicleGuard.ThrowIfArgument(

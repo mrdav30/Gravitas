@@ -367,7 +367,7 @@ public sealed partial class MixedQueryCcdTests
             FreezeAxes = BodyFreezeAxes2D.Rotation,
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous
         };
-        source.Initialize(Vector2d.Zero, motionType: kinematic ? BodyMotionType.Kinematic : BodyMotionType.Dynamic);
+        source.Initialize(Vector2d.Zero, motionType: kinematic ? PhysicsMobilityType.Kinematic : PhysicsMobilityType.Dynamic);
         source.UseManualGrounding();
         if (kinematic) source.Agent.Transform.LocalPosition = new Vector3d(Fixed64.One, -Fixed64.Quarter, Fixed64.Zero);
         else source.ApplyCollisionLinearVelocityDelta(Vector2d.Right);
@@ -571,7 +571,7 @@ public sealed partial class MixedQueryCcdTests
             FreezeAxes = BodyFreezeAxes2D.Rotation,
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous
         };
-        source.Initialize(start, motionType: kinematic ? BodyMotionType.Kinematic : BodyMotionType.Dynamic);
+        source.Initialize(start, motionType: kinematic ? PhysicsMobilityType.Kinematic : PhysicsMobilityType.Dynamic);
         source.UseManualGrounding();
         var manifold = new ContactManifold();
         CollisionDetectionMixed.TryBuildManifold(mesh, circle, manifold).Should().BeTrue();

@@ -155,8 +155,8 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         Vector2d[] secondVertices = { Rotate(new(1, 0), firstAngle), Rotate(new(3, 0), firstAngle), Rotate(new(3, -2), firstAngle), Rotate(new(1, -2), firstAngle) };
         var source = new LSPolygonCollider2D(firstVertices);
         var other = new LSPolygonCollider2D(secondVertices);
-        new SolidBody2D(new TestMatterAgent(scene.Context), source).Initialize(new(7, -3), firstAngle, BodyMotionType.Static);
-        new SolidBody2D(new TestMatterAgent(scene.Context), other).Initialize(new(7, -3), secondAngle, BodyMotionType.Static);
+        new SolidBody2D(new TestMatterAgent(scene.Context), source).Initialize(new(7, -3), firstAngle, PhysicsMobilityType.Static);
+        new SolidBody2D(new TestMatterAgent(scene.Context), other).Initialize(new(7, -3), secondAngle, PhysicsMobilityType.Static);
         Assert.Equal(new Vector2d(7, -3), source.Center);
         Assert.Equal(source.Center, other.Center);
         Assert.Equal(firstAngle, source.ConvexRotation);
@@ -289,8 +289,8 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
             Rotate(new(4, 2), otherAngle), Rotate(new(0, 2), otherAngle));
         var other = new LSPolygonCollider2D(Rotate(new(1, 0), sourceAngle), Rotate(new(3, 0), sourceAngle),
             Rotate(new(3, -2), sourceAngle), Rotate(new(1, -2), sourceAngle));
-        new SolidBody2D(new TestMatterAgent(scene.Context), source).Initialize(new(7, -3), sourceAngle, BodyMotionType.Static);
-        new SolidBody2D(new TestMatterAgent(scene.Context), other).Initialize(new(7, -3), otherAngle, BodyMotionType.Static);
+        new SolidBody2D(new TestMatterAgent(scene.Context), source).Initialize(new(7, -3), sourceAngle, PhysicsMobilityType.Static);
+        new SolidBody2D(new TestMatterAgent(scene.Context), other).Initialize(new(7, -3), otherAngle, PhysicsMobilityType.Static);
         var domain = new MeshSurfaceBoundaryDomain2D();
         domain.Build(new LSCollider2D[] { other, source }, 1);
         Assert.Equal(source.Center, domain.Origin);

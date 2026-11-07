@@ -47,11 +47,11 @@ public sealed partial class ContinuousCollisionDetectionTests
         source.Initialize(
             new Vector3d(sourceX, Fixed64.Zero, Fixed64.Zero),
             FixedQuaternion.Identity,
-            BodyMotionType.Dynamic);
+            PhysicsMobilityType.Dynamic);
         target.Initialize(
             new Vector3d(targetX, Fixed64.Zero, Fixed64.Zero),
             FixedQuaternion.Identity,
-            BodyMotionType.Dynamic);
+            PhysicsMobilityType.Dynamic);
         target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         target.ApplyCollisionVelocityState(
             Vector3d.Left * (Fixed64)3,

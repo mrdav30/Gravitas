@@ -148,9 +148,9 @@ public sealed class Physics2DSupportQueryTests
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Static)]
-    [InlineData(BodyMotionType.Kinematic)]
-    public void BodyBackedSupport_PreservesRegistrationIdentity(BodyMotionType motionType)
+    [InlineData(PhysicsMobilityType.Static)]
+    [InlineData(PhysicsMobilityType.Kinematic)]
+    public void BodyBackedSupport_PreservesRegistrationIdentity(PhysicsMobilityType motionType)
     {
         using var context = Physics2DTestWorld.CreateContext();
         SolidBody2D source = Source(context);
@@ -255,9 +255,9 @@ public sealed class Physics2DSupportQueryTests
     {
         using var context = Physics2DTestWorld.CreateContext();
         SolidBody2D source = Source(context);
-        source.SetMotionType(BodyMotionType.Dynamic);
+        source.SetMotionType(PhysicsMobilityType.Dynamic);
         var floor = new SolidBody2D(new TestMatterAgent(context: context), new LSAABBoxCollider2D(new Vector2d(12, 1)));
-        floor.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+        floor.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
         var request = Request(source, Vector2d.Forward, Fixed64.One);
         context.Query2D.QuerySupport(request, out _).Should().Be(Physics2DSupportQueryStatus.Found);
         Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(source, floor,
@@ -327,7 +327,7 @@ public sealed class Physics2DSupportQueryTests
     {
         var agent = new TestMatterAgent(context: context);
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half));
-        body.Initialize(new Vector2d(10, 10), motionType: BodyMotionType.Kinematic);
+        body.Initialize(new Vector2d(10, 10), motionType: PhysicsMobilityType.Kinematic);
         return body;
     }
 

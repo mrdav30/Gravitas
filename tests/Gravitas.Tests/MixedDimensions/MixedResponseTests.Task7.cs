@@ -546,7 +546,7 @@ public sealed partial class MixedResponseTests
         body3D.Initialize(
             Vector3d.Zero,
             FixedQuaternion.Identity,
-            BodyMotionType.Dynamic);
+            PhysicsMobilityType.Dynamic);
         SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
         body2D.Mass = Fixed64.MinIncrement;
         body2D.FreezeAxes =
@@ -1039,7 +1039,7 @@ public sealed partial class MixedResponseTests
         body3D.Initialize(
             Vector3d.Zero,
             FixedQuaternion.Identity,
-            BodyMotionType.Dynamic);
+            PhysicsMobilityType.Dynamic);
         SolidBody2D body2D = CreatePreparedKinematicCircle2D(
             context,
             new Vector2d(
@@ -1127,7 +1127,7 @@ public sealed partial class MixedResponseTests
         body3D.Initialize(
             Vector3d.Left,
             FixedQuaternion.Identity,
-            BodyMotionType.Dynamic);
+            PhysicsMobilityType.Dynamic);
         SolidBody2D body2D = CreatePreparedKinematicCircle2D(
             context,
             new Vector2d(
@@ -1562,7 +1562,7 @@ public sealed partial class MixedResponseTests
                 Vector3d.One));
         var body = new SolidBody2D(agent, collider) { Mass = Fixed64.One };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
-        body.Initialize(position, motionType: BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: PhysicsMobilityType.Dynamic);
         return body;
     }
 
@@ -1583,7 +1583,7 @@ public sealed partial class MixedResponseTests
         };
         body.Initialize(
             Vector2d.Zero,
-            motionType: BodyMotionType.Kinematic);
+            motionType: PhysicsMobilityType.Kinematic);
         transform.LocalPosition =
             (frameVelocity * context.DeltaTime)
             .ToVector3d(Fixed64.Zero);

@@ -313,7 +313,7 @@ public sealed partial class SolidBody2DGroundingTests
             outerCandidate.IsGrounded.Should().BeFalse();
             outerSupport.IsTrigger = false;
         };
-        first.SetMotionType(BodyMotionType.Kinematic);
+        first.SetMotionType(PhysicsMobilityType.Kinematic);
 
         Step(context);
 

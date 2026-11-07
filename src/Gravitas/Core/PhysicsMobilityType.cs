@@ -10,7 +10,7 @@ namespace Gravitas;
 /// <summary>
 /// Selects whether a body is solver controlled, host controlled, or immobile.
 /// </summary>
-public enum BodyMotionType : byte
+public enum PhysicsMobilityType : byte
 {
     /// <summary>
     /// The solver controls the body subject to its frozen degrees of freedom.

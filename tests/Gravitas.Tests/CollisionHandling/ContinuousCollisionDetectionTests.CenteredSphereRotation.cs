@@ -30,7 +30,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             FixedQuaternion.Identity,
             nonuniformScale ? new Vector3d(3, 2, 1) : Vector3d.One));
         var source = new SolidBody(agent, collider);
-        source.Initialize(Vector3d.Up * supportHeight, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        source.Initialize(Vector3d.Up * supportHeight, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         DisableGroundQueries(source);
         Vector3d target = source.Position3d
@@ -226,11 +226,11 @@ public sealed partial class ContinuousCollisionDetectionTests
         if (sourceFirst)
         {
             source = scenario.CreateBody(sourceCollider, sourceStart, FixedQuaternion.Identity);
-            blade.Initialize(Vector2d.Zero, startRotation, BodyMotionType.Kinematic);
+            blade.Initialize(Vector2d.Zero, startRotation, PhysicsMobilityType.Kinematic);
         }
         else
         {
-            blade.Initialize(Vector2d.Zero, startRotation, BodyMotionType.Kinematic);
+            blade.Initialize(Vector2d.Zero, startRotation, PhysicsMobilityType.Kinematic);
             source = scenario.CreateBody(sourceCollider, sourceStart, FixedQuaternion.Identity);
         }
 

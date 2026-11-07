@@ -421,7 +421,7 @@ public sealed class Physics2DSimulationTests
         };
         body.Initialize(
             position,
-            motionType: isDynamic && !immovable ? BodyMotionType.Dynamic : BodyMotionType.Static);
+            motionType: isDynamic && !immovable ? PhysicsMobilityType.Dynamic : PhysicsMobilityType.Static);
         return body;
     }
 

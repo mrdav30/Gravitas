@@ -104,7 +104,7 @@ public sealed partial class MixedQueryCcdTests
             body2D = new SolidBody2D(new TestMatterAgent(context,
                 new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)), compound)
             { Mass = Fixed64.One };
-            body2D.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+            body2D.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
             body2D.Agent.Transform.LocalPosition = Vector3d.Right;
         }
         body3D.FreezeAxes = BodyFreezeAxes3D.Rotation;

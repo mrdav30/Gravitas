@@ -8,7 +8,7 @@
 namespace Gravitas;
 
 /// <summary>Describes the result of an exact registered-collider reconfiguration attempt.</summary>
-public enum ColliderReconfigurationStatus
+public enum ColliderReconfigurationStatus : byte
 {
     /// <summary>The requested geometry and root pose were published.</summary>
     Applied,

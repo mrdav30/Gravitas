@@ -327,7 +327,7 @@ public sealed partial class MixedQueryCcdTests
         SolidBody2D source = CreateRefinementSource2D(
             context,
             start,
-            BodyMotionType.Kinematic);
+            PhysicsMobilityType.Kinematic);
         target.Body.ResetPosition(
             Vector3d.Zero,
             FixedQuaternion.FromAxisAngle(
@@ -418,9 +418,9 @@ public sealed partial class MixedQueryCcdTests
                 ? Fixed64.FromFraction(13, 4) + Fixed64.FromFraction(1, 8192)
                 : Fixed64.FromFraction(31, 10),
             Fixed64.FromFraction(-1, 10));
-        BodyMotionType sourceMotion = sourceKinematic
-            ? BodyMotionType.Kinematic
-            : BodyMotionType.Dynamic;
+        PhysicsMobilityType sourceMotion = sourceKinematic
+            ? PhysicsMobilityType.Kinematic
+            : PhysicsMobilityType.Dynamic;
 
         ScenarioBody<LSCuboidCollider> target;
         SolidBody2D source;
@@ -625,7 +625,7 @@ public sealed partial class MixedQueryCcdTests
     private static SolidBody2D CreateRefinementSource2D(
         GravitasWorldContext context,
         Vector2d position,
-        BodyMotionType motionType = BodyMotionType.Dynamic)
+        PhysicsMobilityType motionType = PhysicsMobilityType.Dynamic)
     {
         Fixed64 halfSize = Fixed64.FromFraction(1, 4);
         var collider = new LSPolygonCollider2D(

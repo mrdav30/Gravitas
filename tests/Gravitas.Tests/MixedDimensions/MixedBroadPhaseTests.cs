@@ -537,7 +537,7 @@ public sealed partial class MixedBroadPhaseTests
         using GravitasWorldContext context = CreateMixedContext(extent: 64);
         ScenarioBody<LSSphereCollider> dynamic3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
         ScenarioBody<LSSphereCollider> kinematic3D = CreateSphere3D(context, Vector3d.Right * (Fixed64)2, immovable: false);
-        kinematic3D.Body.SetMotionType(BodyMotionType.Kinematic);
+        kinematic3D.Body.SetMotionType(PhysicsMobilityType.Kinematic);
         ScenarioBody<LSSphereCollider> staticBody3D = CreateSphere3D(context, Vector3d.Right * (Fixed64)4, immovable: true);
         _ = CreateSphere3D(context, Vector3d.Right * (Fixed64)6, immovable: true, layer: new PhysicsLayer(1));
         LSSphereCollider inactive3D = CreateBodylessSphere3D(context, Vector3d.Right * (Fixed64)7);
@@ -672,21 +672,21 @@ public sealed partial class MixedBroadPhaseTests
         PhysicsMixedPartition partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
         ContainsId(partition.ContainedDynamic3DObjects, body3D.Collider.Id).Should().BeTrue();
 
-        body3D.Body.SetMotionType(BodyMotionType.Kinematic);
+        body3D.Body.SetMotionType(PhysicsMobilityType.Kinematic);
         Step(context);
         partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedDynamic3DObjects, body3D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedKinematic3DObjects, body3D.Collider.Id).Should().BeTrue();
 
-        body3D.Body.SetMotionType(BodyMotionType.Static);
+        body3D.Body.SetMotionType(PhysicsMobilityType.Static);
         Step(context);
         partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedKinematic3DObjects, body3D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedStatic3DObjects, body3D.Collider.Id).Should().BeTrue();
 
-        body3D.Body.SetMotionType(BodyMotionType.Dynamic);
+        body3D.Body.SetMotionType(PhysicsMobilityType.Dynamic);
         Step(context);
         partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
 
@@ -705,21 +705,21 @@ public sealed partial class MixedBroadPhaseTests
         PhysicsMixedPartition partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
         ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeTrue();
 
-        body2D.SetMotionType(BodyMotionType.Kinematic);
+        body2D.SetMotionType(PhysicsMobilityType.Kinematic);
         Step(context);
         partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedKinematic2DObjects, body2D.Collider.Id).Should().BeTrue();
 
-        body2D.SetMotionType(BodyMotionType.Static);
+        body2D.SetMotionType(PhysicsMobilityType.Static);
         Step(context);
         partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedKinematic2DObjects, body2D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedStatic2DObjects, body2D.Collider.Id).Should().BeTrue();
 
-        body2D.SetMotionType(BodyMotionType.Dynamic);
+        body2D.SetMotionType(PhysicsMobilityType.Dynamic);
         Step(context);
         partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
 
@@ -934,7 +934,7 @@ public sealed partial class MixedBroadPhaseTests
         body.Initialize(
             agent.Transform.LocalPosition,
             agent.Transform.LocalRotation,
-            immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+            immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 
@@ -985,10 +985,10 @@ public sealed partial class MixedBroadPhaseTests
         body.Initialize(
             agent.Transform.LocalPosition.ToVector2d(),
             motionType: immovable
-                ? BodyMotionType.Static
+                ? PhysicsMobilityType.Static
                 : isKinematic
-                    ? BodyMotionType.Kinematic
-                    : BodyMotionType.Dynamic);
+                    ? PhysicsMobilityType.Kinematic
+                    : PhysicsMobilityType.Dynamic);
         return body;
     }
 

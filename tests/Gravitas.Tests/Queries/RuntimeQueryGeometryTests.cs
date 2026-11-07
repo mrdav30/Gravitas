@@ -100,7 +100,7 @@ public sealed class RuntimeQueryGeometryTests
                 MixedHalfThicknessOverride = Fixed64.MinIncrement
             };
             var body = new SolidBody2D(new TestMatterAgent(context), collider);
-            body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+            body.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
             Fixed64 proxy = body.ResolveContinuousCollisionProxyRadius();
             proxy.Should().BeGreaterThan((Fixed64)4096);
             var hits = new SwiftList<Physics2DHit>();
@@ -121,7 +121,7 @@ public sealed class RuntimeQueryGeometryTests
                 LocalOffset = new Vector3d(4095, 0, 0)
             };
             var body = new SolidBody(new TestMatterAgent(context), collider);
-            body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+            body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
             Fixed64 proxy = body.ResolveContinuousCollisionProxyRadius();
             proxy.Should().BeGreaterThan((Fixed64)4096);
             context.Query3D.SweepSphereAgainstStaticAll(Vector3d.Zero, Vector3d.Right, proxy,

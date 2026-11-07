@@ -42,7 +42,7 @@ public sealed partial class MixedQueryCcdTests
         };
         circle.Initialize(
             new Vector2d((Fixed64)(-3), Fixed64.Zero),
-            motionType: BodyMotionType.Dynamic);
+            motionType: PhysicsMobilityType.Dynamic);
         ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
             context,
             new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
@@ -97,7 +97,7 @@ public sealed partial class MixedQueryCcdTests
             PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
         source.Initialize(
             new Vector2d((Fixed64)(-5), Fixed64.Zero),
-            motionType: BodyMotionType.Dynamic);
+            motionType: PhysicsMobilityType.Dynamic);
         ScenarioBody<LSSphereCollider> target = CreateSphere3D(
             context,
             new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Two));

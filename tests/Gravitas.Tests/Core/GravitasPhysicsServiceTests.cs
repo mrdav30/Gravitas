@@ -137,9 +137,9 @@ public sealed class GravitasPhysicsServiceTests
         body.Collider.IsStatic.Should().BeFalse();
         body.CanRotate.Should().BeTrue();
 
-        body.SetMotionType(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
         body.Collider.IsStatic.Should().BeTrue();
-        body.SetMotionType(BodyMotionType.Kinematic);
+        body.SetMotionType(PhysicsMobilityType.Kinematic);
         body.Collider.IsStatic.Should().BeFalse();
     }
 
@@ -390,7 +390,7 @@ public sealed class GravitasPhysicsServiceTests
         body.Initialize(
             Vector3d.Zero,
             FixedQuaternion.Identity,
-            isDynamic ? BodyMotionType.Dynamic : BodyMotionType.Static);
+            isDynamic ? PhysicsMobilityType.Dynamic : PhysicsMobilityType.Static);
         return body;
     }
 }

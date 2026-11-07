@@ -11,7 +11,7 @@ namespace Gravitas.Colliders;
 /// Identifies a data-only collider shape definition that can be materialized
 /// into a runtime collider.
 /// </summary>
-public enum ColliderShapeDefinitionKind
+public enum ColliderShapeDefinitionKind : byte
 {
     /// <summary>No authored shape.</summary>
     Undefined = 0,

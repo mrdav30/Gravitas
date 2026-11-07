@@ -84,7 +84,7 @@ public class CircleContactSimulationBenchmarks
             body.Initialize(position, _rotation);
             var target = new SolidBody2D(new BenchmarkMatterAgent(_context,
                 new Vector3d(position.X + offset.X, Fixed64.Zero, position.Y + offset.Y)), second);
-            target.Initialize(position + offset, -_rotation, BodyMotionType.Static);
+            target.Initialize(position + offset, -_rotation, PhysicsMobilityType.Static);
             _bodies[i] = body;
             _targets[i] = second;
 

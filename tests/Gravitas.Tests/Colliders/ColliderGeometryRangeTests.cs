@@ -256,7 +256,7 @@ public sealed class ColliderGeometryRangeTests
         dynamicTarget.Initialize(Vector2d.Zero);
         var staticTarget = new SolidBody2D(new TestMatterAgent(context),
             new LSCircleCollider2D((Fixed64)10) { MixedHalfThicknessOverride = (Fixed64)10 });
-        staticTarget.Initialize(Vector2d.Zero, motionType: BodyMotionType.Static);
+        staticTarget.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Static);
         SolidBody source = CreatePendingCompensatedSphere(context, pending);
         source.Agent.Transform.LocalRotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.HalfPi);
         context.AdvanceLateSimulateToken();
@@ -743,7 +743,7 @@ public sealed class ColliderGeometryRangeTests
             LocalOffset = pending ? Vector3d.Zero : Vector3d.Right * Fixed64.Half
         };
         var source = new SolidBody(new TestMatterAgent(context, transform), collider);
-        source.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        source.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         if (!pending) return source;
         transform.LocalScale = Vector3d.One * RawUnit;

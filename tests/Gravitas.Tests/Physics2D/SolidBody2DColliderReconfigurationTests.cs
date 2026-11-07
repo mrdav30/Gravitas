@@ -257,10 +257,10 @@ public sealed partial class SolidBody2DColliderReconfigurationTests
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Dynamic)]
-    [InlineData(BodyMotionType.Kinematic)]
-    [InlineData(BodyMotionType.Static)]
-    public void BlockerSelection_ShouldIncludeEveryBodyRoleAndUseStableRegistrationOrder(BodyMotionType role)
+    [InlineData(PhysicsMobilityType.Dynamic)]
+    [InlineData(PhysicsMobilityType.Kinematic)]
+    [InlineData(PhysicsMobilityType.Static)]
+    public void BlockerSelection_ShouldIncludeEveryBodyRoleAndUseStableRegistrationOrder(PhysicsMobilityType role)
     {
         using GravitasWorldContext context = CreateContext();
         SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half));
@@ -458,11 +458,11 @@ public sealed partial class SolidBody2DColliderReconfigurationTests
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Static, 0)]
-    [InlineData(BodyMotionType.Static, 1)]
-    [InlineData(BodyMotionType.Kinematic, 1)]
-    [InlineData(BodyMotionType.Dynamic, 1)]
-    public void AcceptedReplacement_ShouldPreserveRoleAndExplicitMassReference(BodyMotionType role, int mass)
+    [InlineData(PhysicsMobilityType.Static, 0)]
+    [InlineData(PhysicsMobilityType.Static, 1)]
+    [InlineData(PhysicsMobilityType.Kinematic, 1)]
+    [InlineData(PhysicsMobilityType.Dynamic, 1)]
+    public void AcceptedReplacement_ShouldPreserveRoleAndExplicitMassReference(PhysicsMobilityType role, int mass)
     {
         using GravitasWorldContext context = CreateContext();
         SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), role: role);
@@ -494,7 +494,7 @@ public sealed partial class SolidBody2DColliderReconfigurationTests
     }
 
     private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider,
-        Vector2d position = default, BodyMotionType role = BodyMotionType.Dynamic)
+        Vector2d position = default, PhysicsMobilityType role = PhysicsMobilityType.Dynamic)
     {
         var transform = new FixedTransform(new Vector3d(position.X, (Fixed64)7, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var body = new SolidBody2D(new TestMatterAgent(context, transform), collider) { Mass = Fixed64.One, GravityScale = Fixed64.Zero };

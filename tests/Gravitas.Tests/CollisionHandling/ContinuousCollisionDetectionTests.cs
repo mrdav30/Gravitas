@@ -47,15 +47,15 @@ public sealed partial class ContinuousCollisionDetectionTests
         scenario.Context.Physics.QueryContinuousCollisionCandidates(originBounds)
             .Should().Contain(body.Body.DynamicId);
 
-        body.Body.SetMotionType(BodyMotionType.Static);
+        body.Body.SetMotionType(PhysicsMobilityType.Static);
         scenario.Context.Physics.QueryContinuousCollisionCandidates(originBounds)
             .Should().BeEmpty();
 
-        body.Body.SetMotionType(BodyMotionType.Dynamic);
+        body.Body.SetMotionType(PhysicsMobilityType.Dynamic);
         scenario.Context.Physics.QueryContinuousCollisionCandidates(originBounds)
             .Should().Contain(body.Body.DynamicId);
 
-        body.Body.SetMotionType(BodyMotionType.Kinematic);
+        body.Body.SetMotionType(PhysicsMobilityType.Kinematic);
         body.Body.Agent.Transform.LocalPosition = Vector3d.Right * (Fixed64)4;
         scenario.Context.Physics.QueryContinuousCollisionCandidates(
                 DynamicCcdCandidateIndex.CreateSweptSphereBounds(
@@ -64,7 +64,7 @@ public sealed partial class ContinuousCollisionDetectionTests
                     Fixed64.One))
             .Should().Contain(body.Body.DynamicId);
 
-        body.Body.SetMotionType(BodyMotionType.Dynamic);
+        body.Body.SetMotionType(PhysicsMobilityType.Dynamic);
         scenario.Context.Physics.QueryContinuousCollisionCandidates(originBounds)
             .Should().Contain(body.Body.DynamicId);
     }
@@ -2923,7 +2923,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        body.Initialize(position, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         return body;
     }
 
@@ -2937,7 +2937,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Static);
+        body.Initialize(position, FixedQuaternion.Identity, PhysicsMobilityType.Static);
         return body;
     }
 

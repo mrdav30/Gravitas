@@ -27,18 +27,18 @@ public sealed class Physics2DQueryCandidateOrderingTests
             new Vector3d(-8, 0, -8), new Vector3d(8, 0, 8)), out _).Should().BeTrue();
         LSCollider2D[] owners =
         {
-            CreateBox(context, BodyMotionType.Static),
-            CreateBox(context, BodyMotionType.Kinematic),
-            CreateBox(context, BodyMotionType.Dynamic),
+            CreateBox(context, PhysicsMobilityType.Static),
+            CreateBox(context, PhysicsMobilityType.Kinematic),
+            CreateBox(context, PhysicsMobilityType.Dynamic),
             CreateBodylessBox(context),
-            CreateBox(context, BodyMotionType.Kinematic),
-            CreateBox(context, BodyMotionType.Dynamic)
+            CreateBox(context, PhysicsMobilityType.Kinematic),
+            CreateBox(context, PhysicsMobilityType.Dynamic)
         };
-        LSCollider2D inactive = CreateBox(context, BodyMotionType.Dynamic);
+        LSCollider2D inactive = CreateBox(context, PhysicsMobilityType.Dynamic);
         inactive.IsActive = false;
-        LSCollider2D masked = CreateBox(context, BodyMotionType.Kinematic);
+        LSCollider2D masked = CreateBox(context, PhysicsMobilityType.Kinematic);
         masked.Layer = new PhysicsLayer(1);
-        LSCollider2D outside = CreateBox(context, BodyMotionType.Static, new Vector2d(10, 0));
+        LSCollider2D outside = CreateBox(context, PhysicsMobilityType.Static, new Vector2d(10, 0));
         context.RefreshQueryPartitions();
         owners[0].PartitionCoordinates!.Count.Should().BeGreaterThan(1);
         owners[0].PartitionCoordinates!.Select(coordinate => coordinate.GridIndex)
@@ -115,7 +115,7 @@ public sealed class Physics2DQueryCandidateOrderingTests
             : context.Query2D.OverlapCircleAll(new Vector2d(-4, 0), (Fixed64)4,
                 PhysicsLayerMask.FromLayer(0), hits);
 
-    private static LSCollider2D CreateBox(GravitasWorldContext context, BodyMotionType motionType, Vector2d? position = null)
+    private static LSCollider2D CreateBox(GravitasWorldContext context, PhysicsMobilityType motionType, Vector2d? position = null)
     {
         Vector2d center = position ?? Vector2d.Zero;
         var transform = new FixedTransform(new Vector3d(center.X, Fixed64.Zero, center.Y),

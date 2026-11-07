@@ -107,7 +107,7 @@ public class RotationalCcdIntervalBenchmarks
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             Mass = Fixed64.One
         };
-        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         return body;
     }
 
@@ -124,7 +124,7 @@ public class RotationalCcdIntervalBenchmarks
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
             Mass = Fixed64.One
         };
-        body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+        body.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
         return body;
     }
 }

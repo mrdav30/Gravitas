@@ -9,14 +9,14 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
-internal static class BodyMotionTypeSupport
+internal static class PhysicsMobilityTypeSupport
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool IsValid(this BodyMotionType motionType) =>
-        (byte)motionType <= (byte)BodyMotionType.Static;
+    internal static bool IsValid(this PhysicsMobilityType motionType) =>
+        (byte)motionType <= (byte)PhysicsMobilityType.Static;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void ThrowIfInvalid(this BodyMotionType motionType, string parameterName)
+    internal static void ThrowIfInvalid(this PhysicsMobilityType motionType, string parameterName)
     {
         ChronicleGuard.ThrowIfArgumentOutOfRange(
             !motionType.IsValid(),

@@ -140,10 +140,10 @@ public sealed class CollisionResponse2DAngularTests
         body.Initialize(
             position,
             motionType: immovable
-                ? BodyMotionType.Static
+                ? PhysicsMobilityType.Static
                 : isKinematic
-                    ? BodyMotionType.Kinematic
-                    : BodyMotionType.Dynamic);
+                    ? PhysicsMobilityType.Kinematic
+                    : PhysicsMobilityType.Dynamic);
         return body;
     }
 

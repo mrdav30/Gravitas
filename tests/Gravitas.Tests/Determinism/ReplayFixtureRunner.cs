@@ -168,8 +168,8 @@ internal sealed class ReplayFixtureRunner : IDisposable
             };
             if (actor.Frictionless) collider.Material = PhysicsMaterial.Frictionless;
             SolidBody body = _scenario.CreateBody(collider, position, FixedQuaternion.Identity,
-                mass: mass, immovable: actor.MotionType == BodyMotionType.Static,
-                isKinematic: actor.MotionType == BodyMotionType.Kinematic,
+                mass: mass, immovable: actor.MotionType == PhysicsMobilityType.Static,
+                isKinematic: actor.MotionType == PhysicsMobilityType.Kinematic,
                 preventAngularForces: actor.PreventAngularForces).Body;
             // These zero-gravity fixtures exercise rigid-body contacts and CCD;
             // host-owned grounding keeps automatic support snaps out of the trace.

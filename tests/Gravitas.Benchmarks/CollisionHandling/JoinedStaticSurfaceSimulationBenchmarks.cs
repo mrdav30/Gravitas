@@ -55,7 +55,7 @@ public class JoinedStaticSurfaceSimulationBenchmarks
         var start = new Vector3d((Fixed64)(-2), Shape == "Capsule" ? Fixed64.One : Fixed64.Half, Fixed64.Zero);
         _body = new SolidBody(new BenchmarkMatterAgent(_context, start), collider)
         { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes3D.Rotation, SleepEnabled = false };
-        _body.Initialize(start, FixedQuaternion.Identity, BodyMotionType.Dynamic);
+        _body.Initialize(start, FixedQuaternion.Identity, PhysicsMobilityType.Dynamic);
         _body.UseManualGrounding();
         for (int step = 0; step < 32; step++) { _context.Simulate(); _context.LateSimulate(); }
         _body.AddLinearImpulse(Vector3d.Right);

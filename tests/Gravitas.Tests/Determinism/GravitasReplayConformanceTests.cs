@@ -182,7 +182,7 @@ public sealed class GravitasReplayConformanceTests
         using GravitasWorldContext restoredContext = CreatePure2DReplayScenario();
         SolidBody2D restored = GetBody2D(restoredContext, colliderId: 0);
 
-        Assert.Equal(BodyMotionType.Dynamic, source.MotionType);
+        Assert.Equal(PhysicsMobilityType.Dynamic, source.MotionType);
         AdvanceBoth(sourceContext, restoredContext, frameCount: 4);
 
         source.AddTorque((Fixed64)2);
@@ -336,7 +336,7 @@ public sealed class GravitasReplayConformanceTests
         body3D.Initialize(
             agent3D.Transform.LocalPosition,
             FixedQuaternion.Identity,
-            BodyMotionType.Static);
+            PhysicsMobilityType.Static);
 
         SolidBody2D body2D = CreateCircle2D(context, new Vector2d((Fixed64)(-1), Fixed64.Zero));
         body2D.AddForce(new Vector2d((Fixed64)6, Fixed64.Zero));
@@ -358,7 +358,7 @@ public sealed class GravitasReplayConformanceTests
         {
             Mass = (Fixed64)2
         };
-        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 
@@ -377,7 +377,7 @@ public sealed class GravitasReplayConformanceTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 

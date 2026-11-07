@@ -56,7 +56,7 @@ public sealed class SolidBody2DMassPropertiesTests
             new LSCircleCollider2D(Fixed64.One),
             mass: (Fixed64)2,
             positionFrozen: positionFrozen,
-            motionType: isKinematic ? BodyMotionType.Kinematic : BodyMotionType.Dynamic);
+            motionType: isKinematic ? PhysicsMobilityType.Kinematic : PhysicsMobilityType.Dynamic);
 
         body.InverseMass.Should().Be(Fixed64.Half);
         body.InverseMomentOfInertia.Should().Be(Fixed64.One);
@@ -96,7 +96,7 @@ public sealed class SolidBody2DMassPropertiesTests
         body.CanTranslate.Should().BeTrue();
         body.CanRotate.Should().BeTrue();
         body.IsAwakeForCollision.Should().BeTrue();
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
     }
 
     [Theory]
@@ -118,7 +118,7 @@ public sealed class SolidBody2DMassPropertiesTests
 
         body.Mass = initiallyNonpositive ? (Fixed64)2 : (Fixed64)nonpositiveMass;
 
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().Be(dynamicId);
         body.Collider.PartitionCoordinates.Should().BeSameAs(coordinates);
         coordinates.Count.Should().Be(coordinateCount);
@@ -269,9 +269,9 @@ public sealed class SolidBody2DMassPropertiesTests
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Static)]
-    [InlineData(BodyMotionType.Kinematic)]
-    public void MassSetter_ForNonDynamicBody_ShouldRefreshInertiaWithoutChangingPartitionRole(BodyMotionType motionType)
+    [InlineData(PhysicsMobilityType.Static)]
+    [InlineData(PhysicsMobilityType.Kinematic)]
+    public void MassSetter_ForNonDynamicBody_ShouldRefreshInertiaWithoutChangingPartitionRole(PhysicsMobilityType motionType)
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), (Fixed64)2,
@@ -295,8 +295,8 @@ public sealed class SolidBody2DMassPropertiesTests
             voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
             partition!.DynamicObjectCount.Should().Be(0);
             partition.AwakeDynamicObjectCount.Should().Be(0);
-            partition.StaticObjectCount.Should().Be(motionType == BodyMotionType.Static ? 1 : 0);
-            partition.KinematicObjectCount.Should().Be(motionType == BodyMotionType.Kinematic ? 1 : 0);
+            partition.StaticObjectCount.Should().Be(motionType == PhysicsMobilityType.Static ? 1 : 0);
+            partition.KinematicObjectCount.Should().Be(motionType == PhysicsMobilityType.Kinematic ? 1 : 0);
         }
     }
 
@@ -489,7 +489,7 @@ public sealed class SolidBody2DMassPropertiesTests
         LSCollider2D collider,
         Fixed64 mass,
         bool positionFrozen = false,
-        BodyMotionType motionType = BodyMotionType.Dynamic)
+        PhysicsMobilityType motionType = PhysicsMobilityType.Dynamic)
     {
         var body = new SolidBody2D(new TestMatterAgent(context), collider)
         {

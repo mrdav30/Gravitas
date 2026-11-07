@@ -67,17 +67,17 @@ public sealed partial class ContinuousCollision2DTests
         context.Physics2D.QueryMixedContinuousCollisionCandidates(originMixedBounds)
             .Should().Contain(body.DynamicId);
 
-        body.SetMotionType(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
         context.Physics2D.QueryPlanarContinuousCollisionCandidates(originBounds)
             .Should().BeEmpty();
         context.Physics2D.QueryMixedContinuousCollisionCandidates(originMixedBounds)
             .Should().BeEmpty();
 
-        body.SetMotionType(BodyMotionType.Dynamic);
+        body.SetMotionType(PhysicsMobilityType.Dynamic);
         context.Physics2D.QueryPlanarContinuousCollisionCandidates(originBounds)
             .Should().Contain(body.DynamicId);
 
-        body.SetMotionType(BodyMotionType.Kinematic);
+        body.SetMotionType(PhysicsMobilityType.Kinematic);
         body.Agent.Transform.LocalPosition = Vector3d.Right * (Fixed64)4;
         DynamicCcdPlanarBounds movedBounds = DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
             Vector2d.Right * (Fixed64)4,
@@ -86,7 +86,7 @@ public sealed partial class ContinuousCollision2DTests
         context.Physics2D.QueryPlanarContinuousCollisionCandidates(movedBounds)
             .Should().Contain(body.DynamicId);
 
-        body.SetMotionType(BodyMotionType.Dynamic);
+        body.SetMotionType(PhysicsMobilityType.Dynamic);
         context.Physics2D.QueryPlanarContinuousCollisionCandidates(originBounds)
             .Should().Contain(body.DynamicId);
     }
@@ -2692,11 +2692,11 @@ public sealed partial class ContinuousCollision2DTests
             Mass = Fixed64.One
         };
         body.Collider.Layer = layer;
-        BodyMotionType motionType = !isDynamic || immovable
-            ? BodyMotionType.Static
+        PhysicsMobilityType motionType = !isDynamic || immovable
+            ? PhysicsMobilityType.Static
             : isKinematic
-                ? BodyMotionType.Kinematic
-                : BodyMotionType.Dynamic;
+                ? PhysicsMobilityType.Kinematic
+                : PhysicsMobilityType.Dynamic;
         body.Initialize(position, motionType: motionType);
         return body;
     }

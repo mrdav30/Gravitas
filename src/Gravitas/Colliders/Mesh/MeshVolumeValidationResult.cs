@@ -10,7 +10,7 @@ namespace Gravitas.Colliders;
 /// <summary>
 /// Describes the deterministic closed-volume validation result for a triangle mesh.
 /// </summary>
-public enum MeshVolumeValidationResult
+public enum MeshVolumeValidationResult : byte
 {
     /// <summary>
     /// The mesh is one consistently wound closed volume.

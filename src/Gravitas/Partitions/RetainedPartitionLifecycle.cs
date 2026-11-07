@@ -11,8 +11,6 @@ using SwiftCollections;
 
 namespace Gravitas;
 
-
-
 internal static class RetainedPartitionLifecycle
 {
     internal static void DetachAll<TPartition, TOwner>(

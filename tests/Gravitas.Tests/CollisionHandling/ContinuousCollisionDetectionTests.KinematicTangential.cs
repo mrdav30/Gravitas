@@ -259,7 +259,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             new FixedTransform(start, rotation, Vector3d.One));
         var body = new SolidBody(agent, collider);
         body.UseManualGrounding();
-        body.Initialize(start, rotation, BodyMotionType.Kinematic);
+        body.Initialize(start, rotation, PhysicsMobilityType.Kinematic);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         var hostTarget = start + Vector3d.Right * Fixed64.FromFraction(1, 64);
 

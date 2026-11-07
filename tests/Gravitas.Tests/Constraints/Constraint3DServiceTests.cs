@@ -78,7 +78,7 @@ public sealed class Constraint3DServiceTests
         firstJoint.AccumulatedImpulseMagnitude = Fixed64.One;
         secondJoint.AccumulatedImpulseMagnitude = Fixed64.One;
 
-        first.Body.SetMotionType(BodyMotionType.Kinematic);
+        first.Body.SetMotionType(PhysicsMobilityType.Kinematic);
 
         firstJoint.AccumulatedImpulseMagnitude.Should().Be(Fixed64.Zero);
         secondJoint.AccumulatedImpulseMagnitude.Should().Be(Fixed64.Zero);
@@ -1484,8 +1484,8 @@ public sealed class Constraint3DServiceTests
 
         deactivate.Should().Throw<ArgumentException>();
         runtime.IsActive.Should().BeTrue();
-        root.Body.MotionType.Should().Be(BodyMotionType.Dynamic);
-        child.Body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        root.Body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
+        child.Body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         runtime.GetJoint(0).IsEnabled.Should().BeTrue();
     }
 

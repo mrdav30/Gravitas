@@ -10,10 +10,6 @@ using SwiftCollections;
 
 namespace Gravitas;
 
-
-
-
-
 internal static class IslandGraphUtility
 {
     public static void SortAndDeduplicate<TNode>(SwiftList<TNode> nodes, IComparer<TNode> comparer)

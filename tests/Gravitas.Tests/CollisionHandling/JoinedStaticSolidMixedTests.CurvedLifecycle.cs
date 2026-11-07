@@ -27,7 +27,7 @@ public sealed partial class JoinedStaticSolidMixedTests
             {
                 Vector2d center = member.Center; member.Deactivate();
                 var stationary = new SolidBody2D(new TestMatterAgent(scene.Context), member);
-                stationary.Initialize(center, motionType: BodyMotionType.Static);
+                stationary.Initialize(center, motionType: PhysicsMobilityType.Static);
             }
         LSCollider mover, leaf;
         if (compoundMover)

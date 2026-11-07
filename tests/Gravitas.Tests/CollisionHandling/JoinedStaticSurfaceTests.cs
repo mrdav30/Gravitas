@@ -461,7 +461,7 @@ public sealed class JoinedStaticSurfaceTests
         using var surface = scene.Context.Physics.CreateStaticSurface(new[] { left, right });
         LSMeshCollider candidate = invalidKind == 2 ? Floor(foreign, 0, 8, false) : Floor(scene, 8, 12, true);
         using var otherSurface = scene.Context.Physics.CreateStaticSurface(invalidKind == 6 ? new[] { candidate } : Array.Empty<LSMeshCollider>());
-        if (invalidKind == 3) candidate.Body!.SetMotionType(BodyMotionType.Dynamic);
+        if (invalidKind == 3) candidate.Body!.SetMotionType(PhysicsMobilityType.Dynamic);
         if (invalidKind == 4) candidate.IsActive = false;
         if (invalidKind == 5)
         {
@@ -514,7 +514,7 @@ public sealed class JoinedStaticSurfaceTests
         using var scene = PhysicsScenarioBuilder.Create();
         LSMeshCollider left = Floor(scene, -8, 0, true), right = Floor(scene, 0, 8, false);
         using var surface = scene.Context.Physics.CreateStaticSurface(new[] { left, right });
-        left.Body!.SetMotionType(BodyMotionType.Dynamic);
+        left.Body!.SetMotionType(PhysicsMobilityType.Dynamic);
         Assert.Null(left.StaticSurface);
         right.Deactivate();
         Assert.Null(right.StaticSurface);

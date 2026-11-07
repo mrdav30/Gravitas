@@ -115,7 +115,7 @@ internal static class ContinuousCollisionBenchmarkSupport
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Static);
+        body.Initialize(position, FixedQuaternion.Identity, PhysicsMobilityType.Static);
     }
 
     public static void CreateStaticCuboid3D(GravitasWorldContext context, Vector3d position, Vector3d size)
@@ -126,7 +126,7 @@ internal static class ContinuousCollisionBenchmarkSupport
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Static);
+        body.Initialize(position, FixedQuaternion.Identity, PhysicsMobilityType.Static);
     }
 
     public static void CreateStaticCircle2D(GravitasWorldContext context, Vector2d position)
@@ -137,7 +137,7 @@ internal static class ContinuousCollisionBenchmarkSupport
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
     }
 
     public static void CreateStaticAabb2D(GravitasWorldContext context, Vector2d position, Vector2d size)
@@ -148,7 +148,7 @@ internal static class ContinuousCollisionBenchmarkSupport
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
     }
 
     public static void Reset3DBodies(SwiftList<SolidBody> bodies, Vector3d[] positions, bool pairedDirections)

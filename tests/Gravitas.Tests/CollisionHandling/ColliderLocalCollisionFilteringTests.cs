@@ -424,7 +424,7 @@ public sealed class ColliderLocalCollisionFilteringTests
             Mass = Fixed64.One
         };
         body.Collider.Layer = layer;
-        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 
@@ -444,7 +444,7 @@ public sealed class ColliderLocalCollisionFilteringTests
         body.Initialize(
             position,
             FixedQuaternion.Identity,
-            immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+            immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 

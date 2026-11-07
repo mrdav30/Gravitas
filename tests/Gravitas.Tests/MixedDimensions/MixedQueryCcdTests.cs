@@ -5732,11 +5732,11 @@ public sealed partial class MixedQueryCcdTests
             Mass = Fixed64.One
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
-        BodyMotionType motionType = !isDynamic || immovable
-            ? BodyMotionType.Static
+        PhysicsMobilityType motionType = !isDynamic || immovable
+            ? PhysicsMobilityType.Static
             : isKinematic
-                ? BodyMotionType.Kinematic
-                : BodyMotionType.Dynamic;
+                ? PhysicsMobilityType.Kinematic
+                : PhysicsMobilityType.Dynamic;
         body.Initialize(position, startRotation, motionType);
         return new ScenarioBody<TCollider>(body, collider);
     }
@@ -5757,11 +5757,11 @@ public sealed partial class MixedQueryCcdTests
             Mass = Fixed64.One
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
-        BodyMotionType motionType = !isDynamic || immovable
-            ? BodyMotionType.Static
+        PhysicsMobilityType motionType = !isDynamic || immovable
+            ? PhysicsMobilityType.Static
             : isKinematic
-                ? BodyMotionType.Kinematic
-                : BodyMotionType.Dynamic;
+                ? PhysicsMobilityType.Kinematic
+                : PhysicsMobilityType.Dynamic;
         body.Initialize(position, motionType: motionType);
         return body;
     }

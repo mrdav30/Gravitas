@@ -84,7 +84,7 @@ public sealed class LSConvexCollider2DCanonicalGeometryTests
         var body = new SolidBody2D(new TestMatterAgent(context), collider);
         body.Initialize(
             new Vector2d(centerX, Fixed64.Zero),
-            motionType: BodyMotionType.Static);
+            motionType: PhysicsMobilityType.Static);
     }
 
     private static GravitasWorldContext CreateScalarFaceContext(bool positiveFace)

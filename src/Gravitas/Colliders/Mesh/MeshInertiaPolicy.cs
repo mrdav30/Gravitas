@@ -10,7 +10,7 @@ namespace Gravitas.Colliders;
 /// <summary>
 /// Selects how mesh inertia is derived when a mesh body participates in angular dynamics.
 /// </summary>
-public enum MeshInertiaPolicy
+public enum MeshInertiaPolicy : byte
 {
     /// <summary>
     /// Require a validated closed triangle volume and compute solid mass properties.

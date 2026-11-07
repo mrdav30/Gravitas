@@ -250,7 +250,7 @@ public sealed class SleepingQueryGroundingParityTests
             else
             {
                 _floorBody = new SolidBody2D(_floorAgent, _floor) { Mass = Fixed64.One };
-                _floorBody.Initialize(floorPosition, motionType: BodyMotionType.Static);
+                _floorBody.Initialize(floorPosition, motionType: PhysicsMobilityType.Static);
             }
             // The feet-origin probe sees the floor, while the actual circle's
             // offset leaves a half-unit gap and therefore no physical pair.
@@ -303,7 +303,7 @@ public sealed class SleepingQueryGroundingParityTests
                 _floor.Deactivate();
                 _floorAgent.Transform.TrySetWorldPosition(new Vector3d(position.X, Fixed64.Zero, position.Y))
                     .Should().BeTrue();
-                if (_floorBody != null) _floorBody.Initialize(position, motionType: BodyMotionType.Static);
+                if (_floorBody != null) _floorBody.Initialize(position, motionType: PhysicsMobilityType.Static);
                 else _floor.InitializeWithNoBody(_floorAgent);
             }
         }

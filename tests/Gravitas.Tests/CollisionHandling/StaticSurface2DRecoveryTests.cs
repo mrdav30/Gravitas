@@ -88,7 +88,7 @@ public sealed class StaticSurface2DRecoveryTests
         {
             member = new LSAABBoxCollider2D(new Vector2d(4, 4));
             var staticBody = new SolidBody2D(new TestMatterAgent(context), member) { Mass = Fixed64.One };
-            staticBody.Initialize(Vector2d.Zero, motionType: BodyMotionType.Static);
+            staticBody.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Static);
         }
         else member = Rectangle(context, new(4, 4), Vector2d.Zero);
         using var surface = context.Physics2D.CreateStaticSurface(new[] { member });
@@ -103,7 +103,7 @@ public sealed class StaticSurface2DRecoveryTests
         {
             var body = new SolidBody2D(new TestMatterAgent(context), mover)
             { Mass = kind == 2 ? Fixed64.Zero : Fixed64.One };
-            body.Initialize(Vector2d.Zero, motionType: kind == 3 ? BodyMotionType.Static : BodyMotionType.Dynamic);
+            body.Initialize(Vector2d.Zero, motionType: kind == 3 ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         }
         var pair = new CollisionPair2D(member, mover);
         Assert.True(CollisionDetection2D.TryCollide(pair, pair.Manifold, 0));

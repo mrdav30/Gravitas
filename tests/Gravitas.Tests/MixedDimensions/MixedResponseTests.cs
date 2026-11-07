@@ -1359,10 +1359,10 @@ public sealed partial class MixedResponseTests
             position,
             FixedQuaternion.Identity,
             immovable
-                ? BodyMotionType.Static
+                ? PhysicsMobilityType.Static
                 : isKinematic
-                    ? BodyMotionType.Kinematic
-                    : BodyMotionType.Dynamic);
+                    ? PhysicsMobilityType.Kinematic
+                    : PhysicsMobilityType.Dynamic);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 
@@ -1399,7 +1399,7 @@ public sealed partial class MixedResponseTests
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
         body.Initialize(
             position,
-            motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+            motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 

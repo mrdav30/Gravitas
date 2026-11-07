@@ -122,9 +122,9 @@ public sealed class RagdollRuntime2D : IRecordable
             nameof(RagdollRuntime2D),
             "Removed ragdolls cannot mutate simulation state.");
 
-        BodyMotionType targetMotionType = isActive
-            ? BodyMotionType.Dynamic
-            : BodyMotionType.Kinematic;
+        PhysicsMobilityType targetMotionType = isActive
+            ? PhysicsMobilityType.Dynamic
+            : PhysicsMobilityType.Kinematic;
 
         // Validate every link and publish every required host pose before any
         // runtime role or joint state changes. This keeps the ragdoll atomic if

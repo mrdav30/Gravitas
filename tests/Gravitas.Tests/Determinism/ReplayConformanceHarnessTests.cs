@@ -218,17 +218,17 @@ public sealed class ReplayConformanceHarnessTests
         }
         if (mode != PhysicsRuntimeMode.ThreeD)
         {
-            body2D = CreateCircle(scenario.Context, new Vector2d(Fixed64.Zero, (Fixed64)(-4)), BodyMotionType.Dynamic);
+            body2D = CreateCircle(scenario.Context, new Vector2d(Fixed64.Zero, (Fixed64)(-4)), PhysicsMobilityType.Dynamic);
             body2D.Collider.OnContactEnter += _ => contacts[1]++;
             body2D.Collider.OnMixedContactEnter += _ => contacts[2]++;
-            _ = CreateCircle(scenario.Context, new Vector2d(Fixed64.FromFraction(3, 4), (Fixed64)(-4)), BodyMotionType.Static);
+            _ = CreateCircle(scenario.Context, new Vector2d(Fixed64.FromFraction(3, 4), (Fixed64)(-4)), PhysicsMobilityType.Static);
         }
         if (mode == PhysicsRuntimeMode.Mixed)
             _ = scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, (Fixed64)(-4)), immovable: true);
         return (body3D, body2D);
     }
 
-    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, BodyMotionType motionType)
+    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, PhysicsMobilityType motionType)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One);
         var body = new SolidBody2D(new TestMatterAgent(context, transform), new LSCircleCollider2D(Fixed64.Half))

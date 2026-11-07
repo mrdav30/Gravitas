@@ -20,8 +20,8 @@ public sealed class Physics2DPartitionCandidateTransitionTests
             new Vector3d(96, 0, 96), new Vector3d(128, 0, 128),
             topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)16, Fixed64.One, (Fixed64)16)), out _)
             .Should().BeTrue();
-        SolidBody2D moving = CreateCircle(context, new Vector2d(113, 116), BodyMotionType.Dynamic);
-        SolidBody2D target = CreateCircle(context, new Vector2d(119, 116), BodyMotionType.Static);
+        SolidBody2D moving = CreateCircle(context, new Vector2d(113, 116), PhysicsMobilityType.Dynamic);
+        SolidBody2D target = CreateCircle(context, new Vector2d(119, 116), PhysicsMobilityType.Static);
         var coordinate = moving.Collider.PartitionCoordinates![0];
         int enters = 0;
         moving.Collider.OnContactEnter += _ => enters++;
@@ -46,8 +46,8 @@ public sealed class Physics2DPartitionCandidateTransitionTests
             new Vector3d(96, 0, 96), new Vector3d(128, 0, 128),
             topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)16, Fixed64.One, (Fixed64)16)), out _)
             .Should().BeTrue();
-        SolidBody2D moving = CreateCircle(context, new Vector2d(113, 116), BodyMotionType.Dynamic);
-        SolidBody2D target = CreateCircle(context, new Vector2d(119, 116), BodyMotionType.Static);
+        SolidBody2D moving = CreateCircle(context, new Vector2d(113, 116), PhysicsMobilityType.Dynamic);
+        SolidBody2D target = CreateCircle(context, new Vector2d(119, 116), PhysicsMobilityType.Static);
         moving.Collider.PartitionCoordinates!.Count.Should().Be(1);
         target.Collider.PartitionCoordinates!.Count.Should().Be(1);
         moving.Collider.PartitionCoordinates[0].Should().Be(target.Collider.PartitionCoordinates[0]);
@@ -108,7 +108,7 @@ public sealed class Physics2DPartitionCandidateTransitionTests
         exits.Should().Be(1);
     }
 
-    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, BodyMotionType motionType)
+    private static SolidBody2D CreateCircle(GravitasWorldContext context, Vector2d position, PhysicsMobilityType motionType)
     {
         var transform = new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y),
             FixedQuaternion.Identity, Vector3d.One);

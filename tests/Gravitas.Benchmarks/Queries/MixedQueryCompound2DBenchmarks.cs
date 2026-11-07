@@ -231,7 +231,7 @@ public class MixedQueryCompound2DBenchmarks
         };
         body.Initialize(
             new Vector2d(position.X, position.Z),
-            motionType: BodyMotionType.Static);
+            motionType: PhysicsMobilityType.Static);
         return body;
     }
 

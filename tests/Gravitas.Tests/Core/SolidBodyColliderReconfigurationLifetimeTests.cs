@@ -109,7 +109,7 @@ public sealed class SolidBodyColliderReconfigurationLifetimeTests
             if (reinitialized) return;
             reinitialized = true;
             actor.Body.Deactivate();
-            actor.Body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Dynamic);
+            actor.Body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, PhysicsMobilityType.Dynamic);
             scenario.Context.LateSimulate();
             freshPair = scenario.Context.Physics.GetCollisionPair(actor.Collider.Id, trigger.Id);
             freshPair.Should().NotBeNull();

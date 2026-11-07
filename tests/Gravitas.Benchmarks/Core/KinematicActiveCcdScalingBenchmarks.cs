@@ -326,7 +326,7 @@ public class KinematicActiveCcdScalingBenchmarks
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        body.Initialize(position, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         return body;
     }
 
@@ -344,7 +344,7 @@ public class KinematicActiveCcdScalingBenchmarks
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
+        body.Initialize(position, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
         return body;
     }
 
@@ -357,7 +357,7 @@ public class KinematicActiveCcdScalingBenchmarks
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, motionType: BodyMotionType.Kinematic);
+        body.Initialize(position, motionType: PhysicsMobilityType.Kinematic);
         return body;
     }
 
@@ -375,7 +375,7 @@ public class KinematicActiveCcdScalingBenchmarks
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, motionType: BodyMotionType.Kinematic);
+        body.Initialize(position, motionType: PhysicsMobilityType.Kinematic);
         return body;
     }
 

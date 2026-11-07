@@ -10,7 +10,7 @@ internal sealed class ReplayActor
     public long[] PositionRaw { get; set; } = Array.Empty<long>();
     public long[] SizeRaw { get; set; } = Array.Empty<long>();
     public long MassRaw { get; set; }
-    public BodyMotionType MotionType { get; set; }
+    public PhysicsMobilityType MotionType { get; set; }
     public bool Continuous { get; set; }
     public bool StartActive { get; set; } = true;
     public bool Frictionless { get; set; }

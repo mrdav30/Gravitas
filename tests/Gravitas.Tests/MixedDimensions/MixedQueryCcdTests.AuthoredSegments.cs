@@ -130,7 +130,7 @@ public sealed partial class MixedQueryCcdTests
         context.Settings.ContinuousCollisionMaxToiIterations = 1;
         Vector3d start = new(-1, 0, 0), end = new(2, 0, 4);
         Vector3d expected = new(-Fixed64.Quarter, Fixed64.Zero, Fixed64.One);
-        BodyMotionType motion = kinematic ? BodyMotionType.Kinematic : BodyMotionType.Dynamic;
+        PhysicsMobilityType motion = kinematic ? PhysicsMobilityType.Kinematic : PhysicsMobilityType.Dynamic;
         if (spatial)
         {
             CreateBodyless3D(context, new LSCuboidCollider

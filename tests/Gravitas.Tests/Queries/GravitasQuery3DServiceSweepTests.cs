@@ -3725,11 +3725,11 @@ public sealed class GravitasQuery3DServiceSweepTests
             Mass = Fixed64.One
         };
 
-        BodyMotionType motionType = !isDynamic || immovable
-            ? BodyMotionType.Static
+        PhysicsMobilityType motionType = !isDynamic || immovable
+            ? PhysicsMobilityType.Static
             : isKinematic
-                ? BodyMotionType.Kinematic
-                : BodyMotionType.Dynamic;
+                ? PhysicsMobilityType.Kinematic
+                : PhysicsMobilityType.Dynamic;
         body.Initialize(position, rotation ?? FixedQuaternion.Identity, motionType);
         return collider;
     }

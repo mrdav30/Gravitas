@@ -656,7 +656,7 @@ public sealed class MixedEmbedded2DGeometryTests
         body.Initialize(
             position,
             rotation,
-            BodyMotionType.Static);
+            PhysicsMobilityType.Static);
         return body;
     }
 

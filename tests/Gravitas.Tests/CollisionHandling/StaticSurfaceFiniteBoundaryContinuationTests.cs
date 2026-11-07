@@ -25,7 +25,7 @@ public sealed class StaticSurfaceFiniteBoundaryContinuationTests
         {
             var wall = new LSAABBoxCollider2D(new Vector2d(Fixed64.Half, (Fixed64)4)) { Material = PhysicsMaterial.Frictionless };
             var wallBody = new SolidBody2D(new TestMatterAgent(scene.Context), wall);
-            wallBody.Initialize(new(Fixed64.One, Fixed64.One), Fixed64.Zero, BodyMotionType.Static);
+            wallBody.Initialize(new(Fixed64.One, Fixed64.One), Fixed64.Zero, PhysicsMobilityType.Static);
         }
         var capsule = new LSCapsuleCollider2D(Fixed64.Half, Fixed64.Two)
         { Material = PhysicsMaterial.Frictionless, MixedHalfThicknessOverride = Fixed64.Half };

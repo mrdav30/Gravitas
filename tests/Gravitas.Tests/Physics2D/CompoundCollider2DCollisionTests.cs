@@ -103,7 +103,7 @@ public sealed class CompoundCollider2DCollisionTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return body;
     }
 

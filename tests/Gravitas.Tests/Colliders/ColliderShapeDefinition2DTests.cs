@@ -237,7 +237,7 @@ public sealed class ColliderShapeDefinition2DTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: BodyMotionType.Static);
+        body.Initialize(position, motionType: PhysicsMobilityType.Static);
         return body;
     }
 }

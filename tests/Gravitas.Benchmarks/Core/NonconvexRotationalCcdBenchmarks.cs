@@ -131,13 +131,13 @@ public class NonconvexRotationalCcdBenchmarks
         var mesh = new LSMeshCollider(vertices, triangles, MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation)
         { Material = PhysicsMaterial.Frictionless };
-        CreateBody3D(context, mesh, Vector3d.Zero, BodyMotionType.Static);
+        CreateBody3D(context, mesh, Vector3d.Zero, PhysicsMobilityType.Static);
         SolidBody source = CreateBody3D(context, new LSConeCollider
         {
             Radius = Fixed64.Half,
             Size = Vector3d.One,
             Material = PhysicsMaterial.Frictionless
-        }, ConePosition, BodyMotionType.Kinematic);
+        }, ConePosition, PhysicsMobilityType.Kinematic);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         return (context, source);
     }
@@ -150,11 +150,11 @@ public class NonconvexRotationalCcdBenchmarks
         {
             Vector3d.Zero, Vector3d.Right * (Fixed64)10, Vector3d.Up * (Fixed64)10
         }, new[] { 0, 1, 2 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
-        CreateBody3D(context, mesh, Vector3d.Zero, BodyMotionType.Static);
+        CreateBody3D(context, mesh, Vector3d.Zero, PhysicsMobilityType.Static);
         SolidBody source = CreateBody3D(context, new LSCuboidCollider
         {
             Size = new Vector3d((Fixed64)12, Fixed64.FromFraction(1, 10), Fixed64.FromFraction(1, 10))
-        }, TriangleCornerPosition, BodyMotionType.Kinematic);
+        }, TriangleCornerPosition, PhysicsMobilityType.Kinematic);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         return (context, source);
     }
@@ -164,7 +164,7 @@ public class NonconvexRotationalCcdBenchmarks
         GravitasWorldContext context = CreateContext2D(16, 16);
         context.Environment.DampingFactor = Fixed64.Zero;
         SolidBody2D source = CreateThinPolygon2D(context, Vector2d.Zero);
-        source.SetMotionType(BodyMotionType.Kinematic);
+        source.SetMotionType(PhysicsMobilityType.Kinematic);
         source.UseManualGrounding();
         source.Collider.Material = PhysicsMaterial.Frictionless;
         Vector2d wallSize = new((Fixed64)8, Fixed64.FromFraction(1, 5));
@@ -173,7 +173,7 @@ public class NonconvexRotationalCcdBenchmarks
                 CompoundColliderPart2D.AABBox(wallSize, new Vector2d(Fixed64.Zero, (Fixed64)wallCenter)),
                 CompoundColliderPart2D.AABBox(wallSize, new Vector2d(Fixed64.Zero, (Fixed64)(-wallCenter)))));
         target.Collider.Material = PhysicsMaterial.Frictionless;
-        target.Initialize(Vector2d.Zero, motionType: BodyMotionType.Static);
+        target.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Static);
         return (context, source);
     }
 
@@ -187,7 +187,7 @@ public class NonconvexRotationalCcdBenchmarks
             Vector3d.Zero, Vector3d.Right * (Fixed64)10, Vector3d.Forward * (Fixed64)10
         }, new[] { 0, 1, 2 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         SolidBody spatial = CreateBody3D(context, mesh, Vector3d.Zero,
-            meshSource ? BodyMotionType.Kinematic : BodyMotionType.Static);
+            meshSource ? PhysicsMobilityType.Kinematic : PhysicsMobilityType.Static);
         spatial.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         var polygon = new LSPolygonCollider2D(
             new Vector2d((Fixed64)(-6), Fixed64.FromFraction(-1, 20)),
@@ -203,7 +203,7 @@ public class NonconvexRotationalCcdBenchmarks
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous
         };
         planar.Initialize(new Vector2d(9, 9),
-            motionType: meshSource ? BodyMotionType.Static : BodyMotionType.Kinematic);
+            motionType: meshSource ? PhysicsMobilityType.Static : PhysicsMobilityType.Kinematic);
         planar.UseManualGrounding();
         return (context, spatial, planar);
     }
@@ -216,7 +216,7 @@ public class NonconvexRotationalCcdBenchmarks
     }
 
     private static SolidBody CreateBody3D(GravitasWorldContext context, LSCollider collider,
-        Vector3d position, BodyMotionType motionType)
+        Vector3d position, PhysicsMobilityType motionType)
     {
         var body = new SolidBody(new BenchmarkMatterAgent(context, position), collider) { Mass = Fixed64.One };
         body.Initialize(position, FixedQuaternion.Identity, motionType);

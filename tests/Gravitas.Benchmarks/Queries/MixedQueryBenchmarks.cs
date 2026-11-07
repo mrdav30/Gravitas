@@ -457,7 +457,7 @@ public class MixedQueryBenchmarks
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, startRotation, BodyMotionType.Static);
+        body.Initialize(position, startRotation, PhysicsMobilityType.Static);
         return body;
     }
 

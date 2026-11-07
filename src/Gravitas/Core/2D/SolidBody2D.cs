@@ -37,7 +37,7 @@ public sealed partial class SolidBody2D : IRecordable
     private Fixed64 _deltaAngularAcceleration;
     private Fixed64 _angularSpeed;
     private bool _isSleeping;
-    private BodyMotionType _motionType;
+    private PhysicsMobilityType _motionType;
     private int _sleepFrameCount;
     private bool _sleepEnabled = true;
     private int _sleepFrameThreshold = 16;
@@ -126,22 +126,22 @@ public sealed partial class SolidBody2D : IRecordable
     /// Gets this body's explicit solver-controlled, host-controlled, or static
     /// runtime role.
     /// </summary>
-    public BodyMotionType MotionType => _motionType;
+    public PhysicsMobilityType MotionType => _motionType;
 
     /// <summary>
     /// Gets whether the solver controls this body.
     /// </summary>
-    public bool IsDynamic => _motionType == BodyMotionType.Dynamic;
+    public bool IsDynamic => _motionType == PhysicsMobilityType.Dynamic;
 
     /// <summary>
     /// Gets whether this body is excluded from per-frame motion.
     /// </summary>
-    public bool IsStatic => _motionType == BodyMotionType.Static;
+    public bool IsStatic => _motionType == PhysicsMobilityType.Static;
 
     /// <summary>
     /// Gets whether the host controls this body's pose.
     /// </summary>
-    public bool IsKinematic => _motionType == BodyMotionType.Kinematic;
+    public bool IsKinematic => _motionType == PhysicsMobilityType.Kinematic;
 
     /// <summary>
     /// Changes this registered body's runtime role between fixed-step
@@ -159,7 +159,7 @@ public sealed partial class SolidBody2D : IRecordable
     /// The body is not currently registered, its context registration has been
     /// reset, or a simulation transaction or callback is active.
     /// </exception>
-    public void SetMotionType(BodyMotionType motionType)
+    public void SetMotionType(PhysicsMobilityType motionType)
     {
         if (!PrepareMotionTypeTransition(motionType))
             return;
@@ -167,7 +167,7 @@ public sealed partial class SolidBody2D : IRecordable
         CommitMotionTypeTransition(motionType);
     }
 
-    internal bool PrepareMotionTypeTransition(BodyMotionType motionType)
+    internal bool PrepareMotionTypeTransition(PhysicsMobilityType motionType)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
         ThrowIfRuntimeRegistrationMissing();
@@ -176,13 +176,13 @@ public sealed partial class SolidBody2D : IRecordable
 
         Context.ThrowIfFixedStepMutationNotAllowed();
         Collider.ValidateCurrentRuntimeTransform();
-        if (motionType != BodyMotionType.Dynamic)
+        if (motionType != PhysicsMobilityType.Dynamic)
             PublishAuthoritativePose();
 
         return true;
     }
 
-    internal void CommitMotionTypeTransition(BodyMotionType motionType)
+    internal void CommitMotionTypeTransition(PhysicsMobilityType motionType)
     {
         ReconcileMotionTypeRegistration(motionType);
 
@@ -195,7 +195,7 @@ public sealed partial class SolidBody2D : IRecordable
         RefreshPartitionMobility();
     }
 
-    internal void ApplyLoadedMotionType(BodyMotionType motionType)
+    internal void ApplyLoadedMotionType(PhysicsMobilityType motionType)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
         if (_motionType == motionType)
@@ -211,7 +211,7 @@ public sealed partial class SolidBody2D : IRecordable
         InvalidateContinuousCollisionFrame();
     }
 
-    internal void PreflightLoadedMotionType(BodyMotionType motionType)
+    internal void PreflightLoadedMotionType(PhysicsMobilityType motionType)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
         if (!Active)
@@ -235,9 +235,9 @@ public sealed partial class SolidBody2D : IRecordable
             "2D body runtime state cannot change after its registration has been reset or replaced.");
     }
 
-    private void ReconcileMotionTypeRegistration(BodyMotionType motionType)
+    private void ReconcileMotionTypeRegistration(PhysicsMobilityType motionType)
     {
-        BodyMotionType previousMotionType = _motionType;
+        PhysicsMobilityType previousMotionType = _motionType;
         InvalidateMassDependentSolverState();
 
         _motionType = motionType;
@@ -549,7 +549,7 @@ public sealed partial class SolidBody2D : IRecordable
     public void Initialize(
         Vector2d position,
         Fixed64 rotation = default,
-        BodyMotionType motionType = BodyMotionType.Dynamic)
+        PhysicsMobilityType motionType = PhysicsMobilityType.Dynamic)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
         ChronicleGuard.ThrowIfTrue(Active, nameof(SolidBody2D), "2D body is already initialized.");

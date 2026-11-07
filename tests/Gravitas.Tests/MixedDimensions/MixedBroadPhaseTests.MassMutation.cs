@@ -34,7 +34,7 @@ public sealed partial class MixedBroadPhaseTests
 
         body.Mass = initiallyZero ? Fixed64.One : Fixed64.Zero;
 
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().Be(dynamicId);
         body.CanTranslate.Should().Be(initiallyZero);
         body.CanRotate.Should().Be(initiallyZero);
@@ -88,7 +88,7 @@ public sealed partial class MixedBroadPhaseTests
 
         body.Mass = initiallyNonpositive ? Fixed64.One : (Fixed64)nonpositiveMass;
 
-        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.MotionType.Should().Be(PhysicsMobilityType.Dynamic);
         body.DynamicId.Should().Be(dynamicId);
         body.InverseMass.Should().Be(initiallyNonpositive ? Fixed64.One : Fixed64.Zero);
         body.CanTranslate.Should().Be(initiallyNonpositive);

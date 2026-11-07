@@ -108,10 +108,10 @@ internal sealed class ReplayFixture
             if (actor.Dimension == "2D" && actor.Shape == "Box")
                 Require(actor.SizeRaw[1] == 1L << 32, $"Actor {actor.Id} 2D Box SizeRaw Y must be fixed-point one.");
             Require(actor.MassRaw > 0, $"Actor {actor.Id} MassRaw must be positive.");
-            Require(actor.MotionType is BodyMotionType.Dynamic or BodyMotionType.Kinematic or BodyMotionType.Static,
+            Require(actor.MotionType is PhysicsMobilityType.Dynamic or PhysicsMobilityType.Kinematic or PhysicsMobilityType.Static,
                 $"Actor {actor.Id} MotionType is unsupported.");
             Require(actor.SurfaceGroup == 0 || actor.SurfaceGroup > 0 && actor.StartActive
-                && actor.MotionType == BodyMotionType.Static && (actor.Dimension == "2D" || actor.Shape == "Mesh"),
+                && actor.MotionType == PhysicsMobilityType.Static && (actor.Dimension == "2D" || actor.Shape == "Mesh"),
                 $"Actor {actor.Id} joined membership requires an initially active static surface piece.");
         }
 

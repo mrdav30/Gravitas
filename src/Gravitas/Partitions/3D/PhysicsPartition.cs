@@ -13,8 +13,6 @@ using SwiftCollections;
 
 namespace Gravitas;
 
-
-
 /// <summary>
 /// Stores the 3D collider IDs assigned to one GridForge voxel.
 /// </summary>

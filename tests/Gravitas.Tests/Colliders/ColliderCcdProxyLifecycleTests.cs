@@ -20,7 +20,7 @@ public sealed class ColliderCcdProxyLifecycleTests
         context.Settings.RuntimeMode = mixed ? PhysicsRuntimeMode.Mixed : PhysicsRuntimeMode.TwoD;
         var collider = new LSCircleCollider2D(Fixed64.Half);
         var body = new SolidBody2D(new TestMatterAgent(context), collider);
-        body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+        body.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Kinematic);
         var hits = new SwiftList<Physics2DHit>();
         Vector2d grownPoint = Vector2d.Right * (Fixed64)3;
         context.Query2D.OverlapCircleAll(grownPoint, Fixed64.Quarter, hits).Should().Be(0);

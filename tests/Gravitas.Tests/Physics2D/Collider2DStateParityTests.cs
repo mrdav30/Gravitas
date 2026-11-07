@@ -47,9 +47,9 @@ public sealed class Collider2DStateParityTests
         body.Collider.IsStatic.Should().BeFalse();
         body.CanRotate.Should().BeTrue();
 
-        body.SetMotionType(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
         body.Collider.IsStatic.Should().BeTrue();
-        body.SetMotionType(BodyMotionType.Kinematic);
+        body.SetMotionType(PhysicsMobilityType.Kinematic);
         body.Collider.IsStatic.Should().BeFalse();
     }
 
@@ -532,7 +532,7 @@ public sealed class Collider2DStateParityTests
         };
         body.Initialize(
             position,
-            motionType: isDynamic && !immovable ? BodyMotionType.Dynamic : BodyMotionType.Static);
+            motionType: isDynamic && !immovable ? PhysicsMobilityType.Dynamic : PhysicsMobilityType.Static);
         return body;
     }
 

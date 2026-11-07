@@ -10,7 +10,7 @@ namespace Gravitas;
 /// <summary>
 /// Selects which deterministic runtime state is included in replay hashes.
 /// </summary>
-public enum GravitasReplayHashMode
+public enum GravitasReplayHashMode : byte
 {
     /// <summary>
     /// Includes authoritative state that determines deterministic continuation.

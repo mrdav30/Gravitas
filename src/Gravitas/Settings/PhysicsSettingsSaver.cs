@@ -14,8 +14,6 @@ using MemoryPack;
 
 namespace Gravitas;
 
-
-
 /// <summary>
 /// Serializes optional physics settings and applies them to an explicit world context.
 /// </summary>

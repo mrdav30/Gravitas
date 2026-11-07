@@ -415,7 +415,7 @@ public sealed class SleepingContactInvalidationParityTests
                 Vector2d center = kind == 0 ? -Vector2d.Forward * Fixed64.Half : Vector2d.Zero;
                 var agent = CreateAgent(new Vector3d(center.X, Fixed64.Zero, center.Y));
                 if (bodyless) _floor2D.InitializeWithNoBody(agent);
-                else new SolidBody2D(agent, _floor2D).Initialize(center, motionType: BodyMotionType.Static);
+                else new SolidBody2D(agent, _floor2D).Initialize(center, motionType: PhysicsMobilityType.Static);
                 _floor2D.OnMixedContactEnter += _ => _hasMixedSupport = true;
                 _floor2D.OnMixedContactExit += _ => _hasMixedSupport = false;
             }

@@ -54,7 +54,7 @@ public sealed partial class GravitasQuery2DService
             {
                 LSCollider2D collider = _queryCandidates[i];
                 if (ReferenceEquals(collider, request.Source) || collider.IsTrigger
-                    || collider.Body?.MotionType == BodyMotionType.Dynamic
+                    || collider.Body?.MotionType == PhysicsMobilityType.Dynamic
                     || !_context.Physics2D.RequireCollisionPair(request.Source, collider)
                     || !QueryDetection2D.TryFindSupport(request, end, collider, out Physics2DHit candidate)
                     || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))

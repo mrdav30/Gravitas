@@ -50,18 +50,18 @@ public class BodyMotionTypeTransitionBenchmarks
     [Benchmark]
     public int Transition3D()
     {
-        _body3D.SetMotionType(BodyMotionType.Static);
-        _body3D.SetMotionType(BodyMotionType.Kinematic);
-        _body3D.SetMotionType(BodyMotionType.Dynamic);
+        _body3D.SetMotionType(PhysicsMobilityType.Static);
+        _body3D.SetMotionType(PhysicsMobilityType.Kinematic);
+        _body3D.SetMotionType(PhysicsMobilityType.Dynamic);
         return _body3D.DynamicId;
     }
 
     [Benchmark]
     public int Transition2D()
     {
-        _body2D.SetMotionType(BodyMotionType.Static);
-        _body2D.SetMotionType(BodyMotionType.Kinematic);
-        _body2D.SetMotionType(BodyMotionType.Dynamic);
+        _body2D.SetMotionType(PhysicsMobilityType.Static);
+        _body2D.SetMotionType(PhysicsMobilityType.Kinematic);
+        _body2D.SetMotionType(PhysicsMobilityType.Dynamic);
         return _body2D.DynamicId;
     }
 

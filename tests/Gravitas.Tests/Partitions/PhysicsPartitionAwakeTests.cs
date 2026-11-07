@@ -149,19 +149,19 @@ public sealed class PhysicsPartitionAwakeTests
         PhysicsPartition partition = GetFirstPartition(scenario, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: true, kinematic: false, @static: false);
 
-        body.Body.SetMotionType(BodyMotionType.Kinematic);
+        body.Body.SetMotionType(PhysicsMobilityType.Kinematic);
         body.Collider.Simulate();
 
         partition = GetFirstPartition(scenario, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: true, @static: false);
 
-        body.Body.SetMotionType(BodyMotionType.Static);
+        body.Body.SetMotionType(PhysicsMobilityType.Static);
         body.Collider.Simulate();
 
         partition = GetFirstPartition(scenario, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: false, @static: true);
 
-        body.Body.SetMotionType(BodyMotionType.Dynamic);
+        body.Body.SetMotionType(PhysicsMobilityType.Dynamic);
         body.Collider.Simulate();
 
         partition = GetFirstPartition(scenario, body.Collider);
@@ -174,7 +174,7 @@ public sealed class PhysicsPartitionAwakeTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> staticBody = scenario.CreateSphere(Vector3d.Zero, immovable: true);
         ScenarioBody<LSSphereCollider> kinematicBody = scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
-        kinematicBody.Body.SetMotionType(BodyMotionType.Kinematic);
+        kinematicBody.Body.SetMotionType(PhysicsMobilityType.Kinematic);
         staticBody.Body.Sleep();
         kinematicBody.Body.Sleep();
 

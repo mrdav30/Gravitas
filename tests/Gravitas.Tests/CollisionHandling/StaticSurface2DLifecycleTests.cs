@@ -58,7 +58,7 @@ public sealed class StaticSurface2DLifecycleTests
         {
             candidate.Deactivate();
             var body = new SolidBody2D(new TestMatterAgent(context), candidate);
-            body.Initialize(Vector2d.Zero, motionType: invalidKind == 3 ? BodyMotionType.Dynamic : BodyMotionType.Kinematic);
+            body.Initialize(Vector2d.Zero, motionType: invalidKind == 3 ? PhysicsMobilityType.Dynamic : PhysicsMobilityType.Kinematic);
         }
         if (invalidKind == 4) candidate.IsActive = false;
         if (invalidKind == 5)
@@ -187,18 +187,18 @@ public sealed class StaticSurface2DLifecycleTests
     }
 
     [Theory]
-    [InlineData(BodyMotionType.Dynamic)]
-    [InlineData(BodyMotionType.Kinematic)]
-    public void LosingTheStaticRole_ShouldRemoveMembershipBeforeBodyReuse(BodyMotionType nextRole)
+    [InlineData(PhysicsMobilityType.Dynamic)]
+    [InlineData(PhysicsMobilityType.Kinematic)]
+    public void LosingTheStaticRole_ShouldRemoveMembershipBeforeBodyReuse(PhysicsMobilityType nextRole)
     {
         using var context = Physics2DTestWorld.CreateContext();
         var member = new LSAABBoxCollider2D(Vector2d.One);
         var body = new SolidBody2D(new TestMatterAgent(context), member);
-        body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Static);
+        body.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Static);
         using var surface = context.Physics2D.CreateStaticSurface(new[] { member });
         body.SetMotionType(nextRole);
         Assert.Null(member.StaticSurface);
-        body.SetMotionType(BodyMotionType.Static);
+        body.SetMotionType(PhysicsMobilityType.Static);
         Assert.Null(member.StaticSurface);
         surface.ReplaceMembers(new[] { member });
         Assert.Same(surface, member.StaticSurface);

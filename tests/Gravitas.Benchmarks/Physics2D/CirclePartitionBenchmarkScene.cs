@@ -65,7 +65,7 @@ internal sealed class CirclePartitionBenchmarkScene : IDisposable
             Vector2d targetPosition = position + new Vector2d(3, 4);
             var target = new SolidBody2D(new BenchmarkMatterAgent(Context,
                 new Vector3d(targetPosition.X, Fixed64.Zero, targetPosition.Y)), targetCollider);
-            target.Initialize(targetPosition, motionType: BodyMotionType.Static);
+            target.Initialize(targetPosition, motionType: PhysicsMobilityType.Static);
             Bodies[i] = body;
             Targets[i] = targetCollider;
         }

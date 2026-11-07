@@ -218,7 +218,7 @@ public partial class CollisionResponseBenchmarks
         body.Initialize(
             position,
             FixedQuaternion.Identity,
-            immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+            immovable ? PhysicsMobilityType.Static : PhysicsMobilityType.Dynamic);
         return new ScenarioBody<TCollider>(body, collider);
     }
 
