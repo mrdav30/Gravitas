@@ -5,6 +5,12 @@ using System.Reflection;
 using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Toolchains.CsProj;
 
+#if USE_LOCAL_LSF_STACK
+using System.Xml.Linq;
+using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Toolchains;
+#endif
+
 namespace Gravitas.Benchmarks;
 
 internal sealed class BenchmarkProjectGenerator : CsProjGenerator

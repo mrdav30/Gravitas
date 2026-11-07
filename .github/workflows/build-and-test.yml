@@ -106,7 +106,8 @@ jobs:
         run: dotnet restore Gravitas.slnx --property:Configuration=${{ matrix.configuration }} -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} -p:DisableTransitiveProjectReferences=${{ env.UseLocalLsfStack }}
 
       - name: Build Solution
-        run: dotnet build Gravitas.slnx --configuration ${{ matrix.configuration }} --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} -p:DisableTransitiveProjectReferences=${{ env.UseLocalLsfStack }}
+        # Source references can target the same assembly output with different global properties.
+        run: dotnet build Gravitas.slnx --configuration ${{ matrix.configuration }} --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} -p:DisableTransitiveProjectReferences=${{ env.UseLocalLsfStack }} ${{ env.UseLocalLsfStack == 'true' && '-m:1 -p:BuildInParallel=false' || '' }}
 
       - name: Record source and SDK provenance
         shell: pwsh
