@@ -196,19 +196,23 @@ Build the benchmark project, then run the specialized verifier directly:
 
 ```bash
 dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-2d
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-2d 1024
 ```
 
 This command is separate from the base test suite and BenchmarkDotNet
-selections, including `all`. It runs the 256-actor scenario twice in fresh
-contexts, validates the scheduled work and compares each frame's authoritative
-hash, ordered query observations and work counts. A mismatch fails the command
-and reports the first divergent frame. The printed trace identifies the full
-sequence of verified observations.
+selections, including `all`. The default tier uses one 256-actor region. The
+1,024-actor tier runs the same schedule in four translated regions of one
+world. Each tier runs twice in fresh contexts, validates the scheduled work,
+and compares each frame's authoritative hash, ordered query observations and
+work counts. A mismatch fails the command and reports the first divergent
+frame. The printed trace identifies the full sequence of verified observations.
 
 The second replay samples only `Simulate` and `LateSimulate` after eight quiet
-warmup frames. Its elapsed time and current-thread managed allocation totals
-are smoke evidence for this run. The sparse and crowded samples include the
-first exercise of their respective physics paths in a fresh context.
+warmup frames. It reports elapsed time, current-thread managed allocation
+totals and the number of sampled physics steps exceeding the 60 Hz interval.
+The sparse and crowded samples include first-use work in a fresh context.
+These measurements are physics-step smoke samples. Host tick headroom
+requires a complete scenario-frame capture.
 
 ### Pure-2D circle contact simulation
 

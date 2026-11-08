@@ -1,7 +1,7 @@
 # Evolving Game Capacity And Soak Plan
 
 **Date:** 2026-10-06  
-**Status:** Phase 1 in progress. The opt-in 256-actor 2D workload is verified.  
+**Status:** Phase 1 in progress. Both opt-in 2D tiers are verified. The comparable 3D case is pending.  
 **Owner:** Gravitas benchmark workloads; lower-stack changes only when profiles
 justify them.
 
@@ -46,8 +46,8 @@ effects with a control that disables measurement while preserving commands.
 - [x] Declare and verify the 256-actor pure 2D baseline, including static
       obstacles, motion/sleep/grounding policy, command trace, cell size, frame
       rate and solver/CCD settings.
-- [ ] Run the 1,024-actor tier after the 256-actor layout and work counts
-      validate. Record budget overruns rather than silently dropping physics work.
+- [x] Run the 1,024-actor tier after the 256-actor layout and work counts
+      validate. Record sampled budget overruns and execute all scheduled work.
 - [x] Run three stages within the 256-actor scene: mostly sleeping/inactive
       population, sparse commanded movement, and a crowded encounter with
       connected contact islands. Distinguish sleeping registered bodies from
@@ -59,8 +59,8 @@ effects with a control that disables measurement while preserving commands.
       gravity, ground contacts, shapes and mobility differences; require valid
       physical behavior, not identical hashes or identical contact counts across
       dimensions.
-- [x] Verify repeated full-loop replay and command/fixture identity for the
-      256-actor 2D workload.
+- [x] Verify repeated full-loop replay and command/fixture identity for both
+      2D tiers.
 
 Exit: one reproducible evolving workload, explicit workload assumptions, real
 phase transitions and verified work counts in 2D and comparable 3D.
@@ -112,6 +112,37 @@ headroom require the later capture phases.
 Package-backed base suites passed 8,348 Release and 8,277 ReleaseLean tests.
 Four BenchmarkDotNet dry cases also passed for the shared planar-grid setup
 across circle contact, cold registration and partition maintenance.
+
+### 1,024-Actor 2D Checkpoint
+
+`verify-strategy-2d 1024` runs `strategy-2d-1024-v1`. Four copies of the
+256-actor region share one world, with origins at (0, 0), (192, 0), (0, 192)
+and (192, 192) in X/Z. One grid covers the four regions with the original
+8-unit cells. Each region retains the original actor spacing, two static
+boxes, command and query schedule, and physics settings. The four encounter
+chains preserve local contact density and all complete on frame 67.
+
+| Stage | Registered actors | Peak awake | Candidate pairs dispatched across stage | Peak adjacent encounter contacts | TOI iterations | Query calls / hits |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Quiet | 1,024 | 0 | 0 | 0 | 0 | 32 / 48 |
+| Sparse | 1,016–1,024 | 40 | 104 | 0 | 8 | 32 / 48 |
+| Crowded | 1,024 | 128 | 2,756 | 92 | 0 | 32 / 48 |
+
+The verifier checked grid membership for every registered actor and
+confirmed eight projectile stops and all region-local query targets. All
+96 frames matched between fresh contexts. Two Release processes and one
+ReleaseLean process printed the same trace `7bece61d4c37790c1c14a89a2fa3db51`
+on the Windows x64 host and released package graph used for the baseline.
+The 256-actor command still produced its recorded trace in both profiles.
+These runs used the scaling changes on Gravitas `9b905b79`.
+
+Across the three 1,024-actor smoke runs, the quiet, sparse and crowded
+stage means ranged from 0.95–1.00, 1.40–2.32 and 5.81–7.98 ms per physics
+step, respectively. Current-thread managed allocations totaled 0, 20,256
+and 147,056 bytes in those windows on each run. One sampled sparse step in
+Release and one crowded step in ReleaseLean exceeded 16.67 ms. These samples
+include first-use work and omit commands, queries and observation. Use the
+later frame and soak captures to assess tick headroom and sustained behavior.
 
 ## Phase 2: Capacity And Curved-Feature Attribution
 

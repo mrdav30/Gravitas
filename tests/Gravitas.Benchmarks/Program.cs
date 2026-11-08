@@ -25,8 +25,16 @@ internal static class Program
 
         string command = args[0];
 
-        if (string.Equals(command, "verify-strategy-2d", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
-            return Strategy2DWorkload.Verify();
+        if (string.Equals(command, "verify-strategy-2d", StringComparison.OrdinalIgnoreCase))
+        {
+            if (args.Length == 1)
+                return Strategy2DWorkload.Verify(256);
+            if (args.Length == 2 && args[1] == "1024")
+                return Strategy2DWorkload.Verify(1024);
+
+            Console.Error.WriteLine("Usage: verify-strategy-2d [1024]");
+            return 1;
+        }
 
         if ((string.Equals(command, "list", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(command, "ls", StringComparison.OrdinalIgnoreCase)) &&
@@ -148,7 +156,7 @@ internal static class Program
         Console.WriteLine("Usage:");
         Console.WriteLine("  dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all --list flat");
-        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-2d");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-2d [1024]");
         Console.WriteLine();
         Console.WriteLine("Leading arguments that do not start with '-' are treated as benchmark selections.");
         Console.WriteLine("Remaining arguments are forwarded to BenchmarkDotNet.");
