@@ -1,8 +1,7 @@
 # Evolving Game Capacity And Soak Plan
 
 **Date:** 2026-10-06  
-**Status:** Proposed; queued after complete replay stepping and shared trace
-format.  
+**Status:** Phase 1 in progress. The opt-in 256-actor 2D workload is verified.  
 **Owner:** Gravitas benchmark workloads; lower-stack changes only when profiles
 justify them.
 
@@ -44,26 +43,75 @@ effects with a control that disables measurement while preserving commands.
 
 ## Phase 1: One Evolving Strategy Workload
 
-- [ ] Declare a baseline of pure 2D circle actors and static obstacles, actor
-      motion/sleep/grounding policy, command trace, cell size, frame rate and
-      solver/CCD settings. Use 256 and 1,024 actors initially; extend scale only
-      after the layout and work counts validate. Record budget overruns rather
-      than silently dropping physics work.
-- [ ] Run three stages within the scene: mostly sleeping/inactive population,
-      sparse commanded movement, and a crowded encounter with connected contact
-      islands. Distinguish sleeping registered bodies from unregistered actors.
-- [ ] Include bounded deterministic overlap/raycast queries, projectiles with
+- [x] Declare and verify the 256-actor pure 2D baseline, including static
+      obstacles, motion/sleep/grounding policy, command trace, cell size, frame
+      rate and solver/CCD settings.
+- [ ] Run the 1,024-actor tier after the 256-actor layout and work counts
+      validate. Record budget overruns rather than silently dropping physics work.
+- [x] Run three stages within the 256-actor scene: mostly sleeping/inactive
+      population, sparse commanded movement, and a crowded encounter with
+      connected contact islands. Distinguish sleeping registered bodies from
+      unregistered actors.
+- [x] Include bounded deterministic overlap/raycast queries, projectiles with
       opt-in CCD, scheduled spawn/despawn and wake bursts. Preflight that these
       features actually occur; report query/pair counts and actor roles.
 - [ ] Add a comparable 3D footprint/population/command schedule. Declare
       gravity, ground contacts, shapes and mobility differences; require valid
       physical behavior, not identical hashes or identical contact counts across
       dimensions.
-- [ ] Verify repeated full-loop replay and command/fixture identities before
-      using the timing results to justify a refactor.
+- [x] Verify repeated full-loop replay and command/fixture identity for the
+      256-actor 2D workload.
 
 Exit: one reproducible evolving workload, explicit workload assumptions, real
 phase transitions and verified work counts in 2D and comparable 3D.
+
+### 256-Actor 2D Checkpoint
+
+Run the [opt-in verifier](../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-2d-strategy-workload).
+[`strategy-2d-256-v1`](../../tests/Gravitas.Benchmarks/Physics2D/Strategy2DWorkload.cs)
+uses an explicit fixed-point layout and a frame-indexed command sequence with
+no random inputs. The scenario runs at 60 Hz with 8-unit rectangular cells,
+unit-mass radius-one actors, manual grounding with no ground support, zero
+gravity, sleep enabled, six discrete solver iterations and a four-iteration
+TOI budget. Two static boxes supply a projectile barrier and ray targets.
+Only the two radius-half projectiles opt into CCD.
+
+- Frames 1–32 keep all 256 registered actors asleep. Every eighth frame across
+  the run checks an all-hit ray through the two obstacles and a fixed-area
+  overlap that must include the designated scout.
+- Frame 33 wakes eight scouts with an impulse. Two actor slots retire on
+  frame 40, receive two fresh projectiles on frame 44, and retire again on
+  frame 57. Each projectile's free-flight endpoint crosses the barrier. Each
+  takes one TOI iteration and stops at the near face with the radius accounted for.
+- Frame 65 refills both empty slots and wakes the 24 encounter actors with
+  inward impulses. The first complete connected contact chain is on frame 67.
+
+| Stage | Registered actors | Peak awake | Candidate pairs dispatched across stage | Peak adjacent encounter contacts | TOI iterations | Query calls / hits |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Quiet | 256 | 0 | 0 | 0 | 0 | 8 / 12 |
+| Sparse | 254–256 | 10 | 26 | 0 | 2 | 8 / 12 |
+| Crowded | 256 | 32 | 689 | 23 | 0 | 8 / 12 |
+
+On Windows x64 (Core i7-9700K, SDK 10.0.302, runtime 10.0.10), two Release
+processes and one ReleaseLean process each ran two fresh contexts. All 96
+authoritative frame hashes, ordered query observations and per-frame work counts
+matched within each process. All three processes printed observation digest
+`ed0ba077af1d3a4952fbecac69fbcf7c`. The runs used the Phase 1 working changes
+on Gravitas `13f73bdc` with released Chronicler 1.0.0, FixedMathSharp 8.0.0,
+SwiftCollections 8.0.0 and GridForge 10.0.0 dependencies.
+
+Smoke sampling covered only the complete physics step in the second context
+of each process. The Release runs averaged 1.26–1.32 ms across 24 quiet samples,
+1.63–1.67 ms across 32 sparse samples and 3.57–3.85 ms across 32 crowded
+samples. Current-thread allocation totaled 0, 4,992 and 36,800 bytes in those
+windows, respectively, in both profiles. The active stages include first-use
+work in the fresh context. Commands, scheduled queries, hashing and observation
+reduction were outside the samples. Frame tails, retention and host tick
+headroom require the later capture phases.
+
+Package-backed base suites passed 8,348 Release and 8,277 ReleaseLean tests.
+Four BenchmarkDotNet dry cases also passed for the shared planar-grid setup
+across circle contact, cold registration and partition maintenance.
 
 ## Phase 2: Capacity And Curved-Feature Attribution
 

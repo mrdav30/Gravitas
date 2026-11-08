@@ -3,8 +3,6 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Queries;
-using GridForge.Configuration;
-using GridForge.Grids.Topology;
 
 namespace Gravitas.Benchmarks;
 
@@ -26,16 +24,11 @@ internal sealed class CirclePartitionBenchmarkScene : IDisposable
     internal CirclePartitionBenchmarkScene(int colliderCount, int cellSize)
     {
         int pairCount = colliderCount / 2;
-        Context = BenchmarkEnvironment.PrepareOwnedContext();
-        Context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
         const int columns = 32;
         const int spacing = 16;
         int rows = (pairCount + columns - 1) / columns;
-        if (!Context.World.TryAddGrid(new GridConfiguration(
-            new Vector3d(-16, 0, -16),
-            new Vector3d(columns * spacing + 16, 0, rows * spacing + 16),
-            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)cellSize, Fixed64.One, (Fixed64)cellSize)), out _))
-            throw new InvalidOperationException("Unable to create the partition scaling grid.");
+        Context = BenchmarkPhysicsScene.CreatePlanarContext(new Vector2d(-16, -16),
+            new Vector2d(columns * spacing + 16, rows * spacing + 16), cellSize);
 
         Bodies = new SolidBody2D[pairCount];
         Positions = new Vector2d[pairCount];

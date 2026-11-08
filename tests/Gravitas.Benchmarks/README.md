@@ -190,6 +190,26 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all
 
 Do not treat short-run numbers as canonical measurements.
 
+### Opt-in evolving 2D strategy workload
+
+Build the benchmark project, then run the specialized verifier directly:
+
+```bash
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-2d
+```
+
+This command is separate from the base test suite and BenchmarkDotNet
+selections, including `all`. It runs the 256-actor scenario twice in fresh
+contexts, validates the scheduled work and compares each frame's authoritative
+hash, ordered query observations and work counts. A mismatch fails the command
+and reports the first divergent frame. The printed trace identifies the full
+sequence of verified observations.
+
+The second replay samples only `Simulate` and `LateSimulate` after eight quiet
+warmup frames. Its elapsed time and current-thread managed allocation totals
+are smoke evidence for this run. The sparse and crowded samples include the
+first exercise of their respective physics paths in a fresh context.
+
 ### Pure-2D circle contact simulation
 
 The `circle-contact-simulation` selection measures 64, 256 and 1024 independent

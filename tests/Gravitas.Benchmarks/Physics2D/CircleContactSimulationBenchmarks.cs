@@ -3,8 +3,6 @@ using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
-using GridForge.Configuration;
-using GridForge.Grids.Topology;
 
 namespace Gravitas.Benchmarks;
 
@@ -52,18 +50,13 @@ public class CircleContactSimulationBenchmarks
                 throw new InvalidOperationException("Unknown circle contact geometry.");
         }
 
-        _context = BenchmarkEnvironment.PrepareOwnedContext();
-        _context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
         const int columns = 32;
         const int spacing = 16;
         int rows = (PairCount + columns - 1) / columns;
         // Cell size changes partition fanout while pair spacing, contact
         // geometry and the complete simulation workload remain identical.
-        if (!_context.World.TryAddGrid(new GridConfiguration(
-            new Vector3d(-16, 0, -16),
-            new Vector3d(columns * spacing + 16, 0, rows * spacing + 16),
-            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)CellSize, Fixed64.One, (Fixed64)CellSize)), out _))
-            throw new InvalidOperationException("Unable to create the circle contact benchmark grid.");
+        _context = BenchmarkPhysicsScene.CreatePlanarContext(new Vector2d(-16, -16),
+            new Vector2d(columns * spacing + 16, rows * spacing + 16), CellSize);
 
         _bodies = new SolidBody2D[PairCount];
         _targets = new LSCircleCollider2D[PairCount];

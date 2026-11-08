@@ -4,6 +4,7 @@ using Chronicler.Diagnostics;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Configuration;
+using GridForge.Grids.Topology;
 using SwiftCollections;
 
 namespace Gravitas.Benchmarks;
@@ -19,6 +20,20 @@ internal static class BenchmarkPhysicsScene
         GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext(clearAllPools);
         AddGrid(context, gridExtent);
         return context;
+    }
+
+    public static GravitasWorldContext CreatePlanarContext(Vector2d min, Vector2d max, int cellSize)
+    {
+        GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        if (context.World.TryAddGrid(new GridConfiguration(
+            new Vector3d(min.X, Fixed64.Zero, min.Y),
+            new Vector3d(max.X, Fixed64.Zero, max.Y),
+            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)cellSize, Fixed64.One, (Fixed64)cellSize)), out _))
+            return context;
+
+        context.Dispose();
+        throw new InvalidOperationException($"Unable to create the planar benchmark grid from {min} to {max}.");
     }
 
     public static GravitasWorldContext CreateMixedContext(int extentX, int extentZ, bool clearAllPools = false)
