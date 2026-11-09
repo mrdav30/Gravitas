@@ -1,7 +1,7 @@
 # Long-Duration Physics Quality And Tuning Plan
 
 **Date:** 2026-10-06  
-**Status:** Phase 1 in progress. The free-stack and tilted-capsule baseline is verified.  
+**Status:** Phase 1 in progress. The free-stack baseline, 3D high-mass support controls, and support response trace are verified.  
 **Owner:** Gravitas contact/constraint quality and configuration guidance.
 
 ## Goal
@@ -130,10 +130,134 @@ The optional CSV capture matched those digests and recorded frames 0–256
 for each fixture. Default BenchmarkDotNet discovery excludes the verifier.
 Raw captures are in ignored `artifacts/physics-quality-phase1`. The two
 tilted capsules and 2D equal-mass stack met the initial bounds. Retain the
-five other cases as stress evidence. Before expanding to long duration,
-isolate the high-mass support failure using matched alignment and load
-controls. The chain, ragdoll, mixed parity, and controlled work checkpoints
-remain in Phase 1.
+five other cases as stress evidence. The matched controls below isolate the
+high-mass support failure. The chain, ragdoll, mixed parity, and controlled
+work checkpoints remain in Phase 1.
+
+### 3D High-Mass Support Controls
+
+The [opt-in support verifier](../../tests/Gravitas.Benchmarks/README.md#opt-in-physics-quality-stacks)
+reuses the 3D cuboid stack, step settings, and replay checks from the
+checkpoint above. This capture used `d7ffa17b` plus the support verifier,
+.NET SDK 10.0.302, and runtime 10.0.10 on Windows x64 with released LSF
+packages. Each lower/upper mass combination runs with the original 1/64-unit
+upper X offset and with both boxes centered on the same vertical axis. The
+100/1 swap preserves total mass and gravity load. The 100/100 control
+preserves the upper mass and raises the total mass from 101 to 200. The
+1/1 case is the original equal-light comparison. Positions, gaps, and
+solver settings stay fixed within each alignment.
+
+At each completed step, detached narrow-phase probes record overlap and
+maximum residual depth separately for floor/lower, lower/upper, and
+floor/upper. The live pair sample counts manifold rows stamped with the
+current frame and the subset whose normal points upward toward the higher
+box in the original stack. These counts measure contact generation. The
+solver can skip rows, and pair processing can refresh a manifold after
+response, so these counts do not measure applied impulse.
+
+| Lower / upper mass | Upper X offset | First floor/lower residual > 1/16 | First direct floor/upper overlap | First lower COM ≤ 0 | Minimum lower COM (units) | Peak floor/lower residual (units) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 / 100 | 1/64 | 11 | 29 | 29 | −0.035170 | 0.569897 |
+| 1 / 100 | 0 | 12 | 29 | 29 | −0.040109 | 0.559860 |
+| 100 / 1 | 1/64 | — | — | — | 0.489545 | 0.013801 |
+| 100 / 1 | 0 | — | — | — | 0.488809 | 0.013894 |
+| 100 / 100 | 1/64 | 57 | — | — | 0.449891 | 0.063323 |
+| 100 / 100 | 0 | 84 | — | — | 0.442539 | 0.068811 |
+| 1 / 1 | 1/64 | 57 | — | — | 0.449891 | 0.063323 |
+| 1 / 1 | 0 | 84 | — | — | 0.442539 | 0.068811 |
+
+Every case first showed upward manifold rows at the floor on frame 5 and
+at both original interfaces on frame 7. The floor manifold went from four
+upward rows on frame 5 to one on frame 6 in every case, before inter-box
+contact. On frame 7 the lower box in the 1/100 cases was already moving
+downward at 0.559092 (offset) or 0.480323 (centered) units/s. Its floor
+residual was still 0.011480 units in both. Both original interfaces first
+exceeded 1/16 unit together at frame 11 (offset) or 12 (centered). On frame
+29, about 0.48 seconds in, the lower COM crossed the plane and the upper
+box first overlapped the floor directly. Each 1/100 case recorded 94
+samples with the lower COM at or below zero. Both original interfaces
+retained fresh upward manifold rows on every frame from 7 through 256.
+
+In this fixture, severe compression required the heavy box above the light
+one. Centering did not prevent it, reversing the same total load avoided it,
+and keeping the heavy upper box while strengthening the lower box avoided
+it even with a larger total load. Both equal-mass cases still exceeded the
+residual threshold later. Contact generation was present during the failure.
+The [response trace](#3d-support-response-on-frames-712) below separates
+velocity changes from positional correction during the onset window.
+
+All eight cases matched two independent state/observation traces, exact
+per-frame support samples within each configuration, and terminal hashes
+from observation-free runs. Release and ReleaseLean produced identical
+printed CSV and hashes. The offset 1/100 case reproduced the prior trace
+`ec4e508ec695a2e0a07088629c41be44` and terminal
+`b492487c1f6acea7800655f5b5ddce32`. The original eight-fixture verifier
+output was unchanged in both configurations. Raw support captures are in
+ignored `artifacts/physics-quality-phase1/support-*.csv.txt`.
+
+### 3D Support Response On Frames 7–12
+
+Reused the eight cases above against released LSF packages on Windows x64
+(.NET SDK 10.0.302 and runtime 10.0.10). The runtime was `d7ffa17b` with
+read-only probes applied to a disposable copy of the support-control tree.
+Run `verify-quality-stack-support` with `GRAVITAS_QUALITY_FRAME_CSV=1` for
+the clean baseline. In the disposable copy, sample both endpoints' raw
+Q32.32 `Position3d.Y` and `LinearVelocity.Y` in the internal
+`CollisionResponse.CalculateImpulse` overload at entry, after the first-pass
+correction/warm-start loop, and after the incremental normal and friction
+loop. Log pair IDs, frame, and first-pass flag. Compare the two observed
+runs and capture published COM Y and vertical velocity on frames 6–12 to
+reconcile the pair deltas with completed steps. The cuboids' COM is at the
+body origin. The observer-free control runs with the probes disabled.
+
+Each frame had six passes in floor/lower then lower/upper order, with
+position correction on the first pass only. Across all cases the raw
+per-pass deltas reconciled exactly with the published position and velocity.
+The inter-box velocity changes summed to zero vertical momentum at the
+reported precision. The warm-start loop produced zero net vertical velocity
+change in this window. The measured velocity response came from the
+incremental normal and friction loop, which this probe measured together.
+
+The table sums frames 7–12. Corrections are signed Y displacements in
+world units. Floor momentum is the lower mass times its net floor-pair
+vertical velocity change. The percentage compares that momentum with the
+magnitude lost to gravity by both boxes over the same six steps.
+
+| Lower / upper mass | Upper X offset | Floor correction to lower | Inter-box correction to lower | Net correction to lower | Lower integration | Floor momentum / gravity loss |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 / 100 | 1/64 | +0.202231 | −0.170460 | +0.031771 | −0.093681 | 1.32% |
+| 1 / 100 | 0 | +0.176994 | −0.162497 | +0.014497 | −0.077801 | 1.81% |
+| 100 / 1 | 1/64 | +0.044032 | −0.000798 | +0.043234 | −0.042605 | 79.51% |
+| 100 / 1 | 0 | +0.044200 | −0.000725 | +0.043475 | −0.042698 | 79.53% |
+| 100 / 100 | 1/64 | +0.111500 | −0.059454 | +0.052046 | −0.066246 | 50.22% |
+| 100 / 100 | 0 | +0.101010 | −0.055213 | +0.045797 | −0.060428 | 58.48% |
+| 1 / 1 | 1/64 | +0.111500 | −0.059454 | +0.052046 | −0.066246 | 50.22% |
+| 1 / 1 | 0 | +0.101010 | −0.055213 | +0.045797 | −0.060428 | 58.48% |
+
+The velocity shortfall was visible on frame 7, before the first inter-box
+position correction. With the offset, the floor added 0.026171 units/s to
+the lower box while the upper box drove its velocity down by 0.287130 units/s.
+When centered, the floor's net contribution was zero and the inter-box
+response drove the lower box down by 0.182191 units/s. Over the six frames,
+the two 1/100 cases gained just 1.306699 (offset) or 1.786828 (centered)
+mass·units/s from the floor against 98.980000 lost to gravity. The upper
+box received only +0.001705 (offset) or +0.001625 (centered) units of
+inter-box position correction as inverse-mass weighting placed almost all
+of the separation on the lower box. The lower box still received net
+upward correction in both cases, but integrated downward by more. This
+establishes an early velocity support deficit and shows how correction is
+distributed. The cause of the weak velocity response within the contact
+solve remains open.
+
+Release and ReleaseLean produced identical traces and measurements. Each
+of the eight cases matched both instrumented repeats exactly, including
+72 pair calls and seven published checkpoints per repeat. Removing probe
+lines reproduced the full clean support-control output, including hashes
+and all 257 frame samples per case. The existing verifier also checked
+terminal replay with observation disabled. Ignored
+`artifacts/physics-quality-phase1/support-response-probe` contains the
+probe patch, raw captures, and per-frame reduction. The maintained change
+is this investigation record.
 
 ## Phase 2: Duration And Continuation
 

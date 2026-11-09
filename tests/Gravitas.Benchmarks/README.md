@@ -288,6 +288,20 @@ verifier is separate from base tests and BenchmarkDotNet selections.
 The [Phase 1 checkpoint](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#free-stack-and-tilted-capsule-checkpoint)
 records the setup, bounds, and measured results.
 
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stack-support
+```
+
+This opt-in command crosses centered and offset 3D stacks with four
+lower/upper mass combinations. It reports when the lower body's floor
+overlap exceeds 1/16 unit, when the upper body first overlaps the floor,
+and when the lower COM first reaches the floor plane. With
+`GRAVITAS_QUALITY_FRAME_CSV=1`, it also prints both COM heights, lower vertical
+velocity, and each pair's published-pose overlap, residual depth, and fresh
+manifold row counts, including the upward-facing subset. The row counts
+describe contact geometry. The [matched controls](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#3d-high-mass-support-controls)
+record the results and their limits.
+
 ### Opt-in curved-contact step envelopes
 
 ```bash
