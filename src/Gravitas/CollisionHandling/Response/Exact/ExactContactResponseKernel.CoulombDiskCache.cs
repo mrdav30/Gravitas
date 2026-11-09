@@ -90,9 +90,7 @@ internal static partial class ExactContactResponseKernel
         if (WideArithmetic.IsZeroMagnitude(numerator)) return;
         // The bit enclosure only bounds the integer search. Every admitted bit
         // and the final midpoint are compared against the exact radical.
-        int bits = Math.Max(0, WideArithmetic.GetMagnitudeBitLength(numerator)
-            - WideArithmetic.GetMagnitudeBitLength(denominator)
-            - (WideArithmetic.GetMagnitudeBitLength(radicand) - 1) / 2 + 2);
+        int bits = Math.Max(0, GetRadialQuotientBitBound(numerator, denominator, radicand));
 #if DEBUG
         // The enclosure adds at most two bits to the <2150-bit tangent bound.
         System.Diagnostics.Debug.Assert(bits <= result.Length * 64);
@@ -211,7 +209,13 @@ internal static partial class ExactContactResponseKernel
         }
 
         ulong low = 0UL;
-        ulong high = limit;
+        // Each magnitude is below its power-of-two bound. One more bit
+        // bounds their sum, even if the signed terms cancel.
+        int rationalBits = WideArithmetic.GetMagnitudeBitLength(rationalNumerator)
+            - WideArithmetic.GetMagnitudeBitLength(rationalDenominator) + 1;
+        int bits = Math.Max(0, Math.Max(rationalBits,
+            GetRadialQuotientBitBound(radicalNumerator, radicalDenominator, radicand)) + 1);
+        ulong high = bits < 63 ? (1UL << bits) - 1UL : limit;
         while (low < high)
         {
             ulong difference = high - low;
@@ -261,6 +265,14 @@ internal static partial class ExactContactResponseKernel
                 : (long)quotient);
         return true;
     }
+
+    private static int GetRadialQuotientBitBound(
+        ReadOnlySpan<ulong> numerator,
+        ReadOnlySpan<ulong> denominator,
+        ReadOnlySpan<ulong> radicand) =>
+        WideArithmetic.GetMagnitudeBitLength(numerator)
+        - WideArithmetic.GetMagnitudeBitLength(denominator)
+        - (WideArithmetic.GetMagnitudeBitLength(radicand) - 1) / 2 + 2;
 
     private static int CompareSignedRadicalAndRationalSumToMagnitude(
         ReadOnlySpan<ulong> radicalNumerator,

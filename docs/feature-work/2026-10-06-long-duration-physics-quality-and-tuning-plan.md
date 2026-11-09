@@ -490,6 +490,13 @@ links back to these measurements.
 | Release | 8,393 | 54,012 / 54,012 | 22,080 / 22,080 | 5,634 / 5,634 |
 | ReleaseLean | 8,322 | 54,010 / 54,010 | 22,080 / 22,080 | 5,633 / 5,633 |
 
+The measured cost of sustained cuboid support is the active
+[GRV-Benchmark-034](benchmark-signal-hardening-backlog.md#grv-benchmark-034)
+follow-up before expanding the Phase 1 workloads to chains and ragdolls.
+Preserve the corrected stack's replay and support bounds when comparing
+response cost. Phase 3 will compare solver settings across the wider workload
+set.
+
 ## Phase 2: Duration And Continuation
 
 - [ ] Measure settling, sustained rest and repeated controlled disturbances over

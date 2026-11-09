@@ -405,15 +405,21 @@ internal static partial class ExactContactResponseKernel
         ReadOnlySpan<ulong> effectiveNumerator, ReadOnlySpan<ulong> effectiveDenominator,
         Span<ulong> numerator, Span<ulong> denominator)
     {
-        ExactLever3D.GetRelativePointVelocityRatio(impact.LinearA, impact.AngularA,
-            first.Lever, impact.LinearB, impact.AngularB, second.Lever, normal,
-            out Signed832 incoming, out Signed832 incomingDenominator,
-            firstPlanarAngularVelocity: first.PlanarAngularVelocity.HasValue ? impact.PlanarAngularA : null,
-            secondPlanarAngularVelocity: second.PlanarAngularVelocity.HasValue ? impact.PlanarAngularB : null);
-        bool representable = Fixed64.TryGetSignedRawRatio(incoming, incomingDenominator,
-            0, out Fixed64 incomingVelocity);
-        Fixed64 bounce = incoming.Sign * incomingDenominator.Sign < 0
-            && (!representable || incomingVelocity < -threshold) ? restitution : Fixed64.Zero;
+        Signed832 incoming = default;
+        Fixed64 bounce = Fixed64.Zero;
+        if (restitution != Fixed64.Zero)
+        {
+            ExactLever3D.GetRelativePointVelocityRatio(impact.LinearA, impact.AngularA,
+                first.Lever, impact.LinearB, impact.AngularB, second.Lever, normal,
+                out incoming, out Signed832 incomingDenominator,
+                firstPlanarAngularVelocity: first.PlanarAngularVelocity.HasValue ? impact.PlanarAngularA : null,
+                secondPlanarAngularVelocity: second.PlanarAngularVelocity.HasValue ? impact.PlanarAngularB : null);
+            bool representable = Fixed64.TryGetSignedRawRatio(incoming, incomingDenominator,
+                0, out Fixed64 incomingVelocity);
+            if (incoming.Sign * incomingDenominator.Sign < 0
+                && (!representable || incomingVelocity < -threshold))
+                bounce = restitution;
+        }
         Span<ulong> currentMagnitude = stackalloc ulong[MaxResponseWords];
         Span<ulong> incomingMagnitude = stackalloc ulong[MaxResponseWords];
         Span<ulong> error = stackalloc ulong[MaxCoulombWords + 2];
@@ -676,7 +682,7 @@ internal static partial class ExactContactResponseKernel
         int impulseSign,
         out Vector3d result)
     {
-        if (WideArithmetic.IsZeroMagnitude(impulseNumerator))
+        if (inverseInertia == Fixed3x3.Zero || WideArithmetic.IsZeroMagnitude(impulseNumerator))
         {
             result = Vector3d.Zero;
             return true;

@@ -1,3 +1,4 @@
+using System;
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
 using Xunit;
@@ -9,6 +10,23 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 /// </content>
 public sealed partial class ExactContactResponseKernelCoulombTests
 {
+    [Theory]
+    [InlineData(1, 0, 0)] // Half a raw unit rounds to even.
+    [InlineData(3, 0, 2)]
+    [InlineData(7, -2, 2)] // Opposite signs cancel before rounding.
+    [InlineData(-7, 2, -2)]
+    [InlineData(0, 3, 3)]
+    [InlineData(3, 7, 8)] // The rational term sets the larger search bound.
+    public void CoulombDiskCompositeMaterialization_ShouldRoundWithinTheBound(
+        long radical, long rational, long expectedRaw)
+    {
+        Assert.True(ExactContactResponseKernel.TryGetSignedRadicalAndRationalSum(
+            new[] { (ulong)Math.Abs(radical) }, new[] { 1UL }, new[] { 4UL },
+            Math.Sign(radical), new[] { (ulong)Math.Abs(rational) }, new[] { 1UL },
+            Math.Sign(rational), out Fixed64 actual));
+        Assert.Equal(Fixed64.FromRaw(expectedRaw), actual);
+    }
+
     [Fact]
     public void CoulombDiskCompositeMaterialization_ShouldHonorHalfEvenLimits()
     {

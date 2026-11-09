@@ -65,26 +65,15 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-No active ordered signals. Experimental signals below retain their separate
-evidence gaps.
-
-## Experimental Signals
-
-| Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| [GRV-Benchmark-034 — Rotated cuboid support step cost](#grv-benchmark-034) | Synthetic active step cost measured. Stage attribution and scene frequency are open. | Representative scenes establish the cost of sustained multi-point cuboid support islands. |
-| [GRV-Benchmark-033 — 1,024-actor 3D partition cost and first-wake spike](#grv-benchmark-033) | Capacity-sensitive. Sustained cost profiled, first-wake allocation owner open. | An equivalent workload exceeds the host's reserved budget or the first-use burst recurs in a target scene |
-| [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental. Synthetic step costs measured, representative frequency open. | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
-| GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
-
 <a id="grv-benchmark-034"></a>
 
 ### GRV-Benchmark-034 — Rotated Cuboid Support Step Cost
 
 **Discovered** 2026-11-09 during the GRV-Issue-151 verification.
 **Owner** Gravitas 3D cuboid contact generation and discrete island response.
-**Status** Experimental. The complete-step probe establishes a small-scene
-cost and zero warm allocation. Representative frequency remains open.
+**Status** Active. Stage attribution is complete for the matched stacks.
+The heavy-bottom controls and the cost at representative scene density
+remain open.
 
 Use the `verify-quality-stack-support` fixture in Release at 60 Hz and six
 iterations. For timing, disable sleep in both variants, warm 64 steps, and
@@ -100,9 +89,90 @@ the two support interfaces averaged two fresh rows per warm frame on
 stock and 7.16–8.00 on the candidate, depending on the case.
 [GRV-Issue-151 evidence](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-151-implementation)
 
-Next, separate oriented-face clipping, per-row friction and normal work,
-and the bounded island seed on representative supported cuboids. Revisit
-at scene scale if those paths materially consume a host's physics budget.
+In the 2026-11-09 attribution capture, disposable timing scopes recorded
+inclusive elapsed time inside the same eight warm workloads. Scope
+`DoCuboidsCheck` and its `TryBuildCuboidFaceContacts` child, the island's
+`TrySeedSupportedIslandNormals`, and the per-iteration
+`CollisionResponse.CalculateImpulse` and its exact-response children.
+Count compact failures by stage before the normal fallback. The
+percentages describe the instrumented runs. Use uninstrumented launches
+for throughput comparisons.
+
+| Stage | Share of warm step time | Observation |
+| --- | ---: | --- |
+| Cuboid detection | 5–13% | Finite face clipping accounted for 3–7% of the step. |
+| Contact-row response | 66–89% | Includes contact preparation, warm starts, normal and friction work. |
+| Coupled normal seed | 6% in both top-heavy stacks | The mass-swapped and equal-mass controls stayed sequential. |
+| Exact normal fallback | 34% offset, 49% centered in the heavy-bottom controls | 3,264 and 5,568 fallback calls out of 9,216 normal rows, respectively. All followed compact angular-delta rejection. |
+| Exact friction velocity deltas | 15% offset, 14% centered in the top-heavy stacks | 48 and 24 calls, respectively. The radical rounding search was expensive even at this frequency. |
+
+Keep the finite witnesses, solver order and iteration count. The first
+optimization bounds exact Coulomb rounding by the magnitudes of its
+terms, skips incoming point velocity when restitution is zero, and skips
+normal angular delta products for zero inverse inertia.
+
+Reproduce the equivalent-work timing with
+`measure-quality-stack-support` in the benchmark launcher. Copy the
+benchmark-only CLI and fixture changes onto `898dd811` for the corrected
+baseline. Both builds use the same released packages. The command disables
+sleep, checks both interfaces on each measured frame, and emits warm
+allocation counts, fresh support rows and the terminal replay hash. Use
+`verify-quality-stack-support` separately to compare per-frame replay,
+manifold rows and geometric support with normal sleep settings.
+
+On Windows x64 with .NET SDK 10.0.302 and runtime 10.0.10, five independent
+Release launches per revision ran in `A B B A A B B A A B` order. Times
+are medians of launch means in milliseconds. Both support interfaces were
+active in all 192 measured steps per case. Fresh row totals and sleep-disabled
+terminal hashes matched in every launch, with 0 B of managed allocation
+on the stepping thread.
+
+| Lower / upper mass | Alignment | Baseline ms | Candidate ms | Change | Fresh support rows |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 / 100 | Offset | 1.607 | 1.391 | −13.4% | 1,418 |
+| 1 / 100 | Centered | 0.963 | 0.879 | −8.7% | 1,376 |
+| 100 / 1 | Offset | 1.677 | 1.733 | +3.3% | 1,536 |
+| 100 / 1 | Centered | 1.988 | 1.933 | −2.8% | 1,536 |
+| 100 / 100 | Offset | 0.908 | 0.949 | +4.5% | 1,522 |
+| 100 / 100 | Centered | 0.812 | 0.816 | +0.5% | 1,527 |
+| 1 / 1 | Offset | 0.888 | 0.887 | −0.2% | 1,524 |
+| 1 / 1 | Centered | 0.869 | 0.849 | −2.2% | 1,531 |
+
+The top-heavy timing ranges separated across the five launches in each
+variant. The heavy-bottom controls and the offset heavy equal-mass
+control had overlapping launch ranges. Both heavy-bottom stacks remain
+expensive. The no-sleep top-heavy terminal hashes were
+`22a417806fe362272fc563376f09243b` offset and
+`9d4805f5d6ddde5238ada6a466fc7519` centered. In Release and ReleaseLean,
+the support and quality frame CSVs were byte-identical between builds.
+ReleaseLean also matched the warm support counts and terminal hashes
+with 0 B allocated. In both configurations, the 1,024-actor 3D strategy
+verifier matched its 96-frame trace `d5e9d21184fbb529b3b3b83e86f2b6b1`,
+with chains completing at frame 67. The instrumented strategy verifier
+recorded 109,416 normal rows across its replay passes, with zero calls
+to rotated cuboid clipping, exact normal fallback or exact friction.
+That fixture does not exercise the cost identified by this signal.
+
+The full Release and ReleaseLean suites passed 8,399 and 8,328 cases,
+respectively. One additional exact restitution regression passed in each
+configuration. The combined raw coverage in each configuration reached
+54,019 lines, 22,086 branches and 5,634 methods with zero uncovered points.
+
+Endpoint-level counts in the centered heavy-bottom control attributed all
+5,568 failures to the inverse-inertia transform. The offset control had
+2,880 rejected transforms and 768 rejected torque crosses, with some
+rows rejecting both endpoints. Next, measure those fallback triggers at
+representative support-island density and evaluate the exact normal cost
+there. Preserve the exact fallback wherever a compact intermediate loses a
+contribution.
+
+## Experimental Signals
+
+| Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-033 — 1,024-actor 3D partition cost and first-wake spike](#grv-benchmark-033) | Capacity-sensitive. Sustained cost profiled, first-wake allocation owner open. | An equivalent workload exceeds the host's reserved budget or the first-use burst recurs in a target scene |
+| [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental. Synthetic step costs measured, representative frequency open. | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
+| GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
 
 ### GRV-Benchmark-024 — Curved-Contact Workload Frequency And Step Cost
 

@@ -9,6 +9,26 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class ExactContactResponseKernelNormalTests
 {
     [Fact]
+    public void AccumulatedNormal_ShouldBounceWhenFrozenImpactSpeedExceedsFixedRange()
+    {
+        ExactLever3D lever = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        var first = new ExactContactResponseOperand3D(lever, Vector3d.Right * Fixed64.Two,
+            Vector3d.Zero, Vector3d.Left, Fixed64.One, Fixed3x3.Zero);
+        var second = new ExactContactResponseOperand3D(lever, Vector3d.Zero,
+            Vector3d.Zero, Vector3d.Right, Fixed64.One, Fixed3x3.Zero);
+        var impact = new ContactResponseSnapshot(null, null,
+            Vector3d.Right * Fixed64.MaxValue, Vector3d.Zero,
+            Vector3d.Left * Fixed64.MaxValue, Vector3d.Zero);
+
+        Assert.True(ExactContactResponseKernel.TryGetAccumulatedNormalResponse(
+            first, second, Vector3d.Right, Fixed64.MinIncrement, Fixed64.One, Fixed64.Zero,
+            Fixed64.One, Fixed64.One, out ExactNormalResponse3D response, impact));
+        Fixed64 expectedDelta = Fixed64.One + Fixed64.Half;
+        Assert.Equal(Vector3d.Left * expectedDelta, response.FirstLinearVelocityDelta);
+        Assert.Equal(Vector3d.Right * expectedDelta, response.SecondLinearVelocityDelta);
+    }
+
+    [Fact]
     public void NormalResponse_ShouldMatchRepresentableLinearImpulse()
     {
         ExactLever3D firstLever = CreateLever(Vector3d.Up, Vector3d.Zero);
