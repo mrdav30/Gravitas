@@ -90,6 +90,13 @@ internal readonly partial struct ExactLever3D
         out Signed832 numerator,
         out Signed832 denominator)
     {
+        if (transform == Fixed3x3.Zero)
+        {
+            numerator = default;
+            denominator = Signed832.ExtendValue(Signed192.One);
+            return;
+        }
+
         GetCrossProductNumerators(
             lever.XNumerator,
             lever.YNumerator,
@@ -99,49 +106,24 @@ internal readonly partial struct ExactLever3D
             out Signed704 crossY,
             out Signed704 crossZ);
 
-        numerator = GetQuadraticTerm(
-            crossX, crossX, transform.M11);
-        numerator = WideArithmetic.AddSigned832(
-            numerator,
-            GetQuadraticTerm(crossX, crossY, transform.M21));
-        numerator = WideArithmetic.AddSigned832(
-            numerator,
-            GetQuadraticTerm(crossX, crossZ, transform.M31));
-        numerator = WideArithmetic.AddSigned832(
-            numerator,
-            GetQuadraticTerm(crossY, crossX, transform.M12));
-        numerator = WideArithmetic.AddSigned832(
-            numerator,
-            GetQuadraticTerm(crossY, crossY, transform.M22));
-        numerator = WideArithmetic.AddSigned832(
-            numerator,
-            GetQuadraticTerm(crossY, crossZ, transform.M32));
-        numerator = WideArithmetic.AddSigned832(
-            numerator,
-            GetQuadraticTerm(crossZ, crossX, transform.M13));
-        numerator = WideArithmetic.AddSigned832(
-            numerator,
-            GetQuadraticTerm(crossZ, crossY, transform.M23));
-        numerator = WideArithmetic.AddSigned832(
-            numerator,
-            GetQuadraticTerm(crossZ, crossZ, transform.M33));
+        numerator = GetQuadraticTerm(crossX, crossX, Signed192.Raw(transform.M11));
+        numerator = WideArithmetic.AddSigned832(numerator,
+            GetQuadraticTerm(crossY, crossY, Signed192.Raw(transform.M22)));
+        numerator = WideArithmetic.AddSigned832(numerator,
+            GetQuadraticTerm(crossZ, crossZ, Signed192.Raw(transform.M33)));
+        // Pair the off-diagonal coefficients at full width before multiplying.
+        numerator = WideArithmetic.AddSigned832(numerator, GetQuadraticTerm(crossX, crossY,
+            WideArithmetic.AddSigned192(Signed192.Raw(transform.M12), Signed192.Raw(transform.M21))));
+        numerator = WideArithmetic.AddSigned832(numerator, GetQuadraticTerm(crossX, crossZ,
+            WideArithmetic.AddSigned192(Signed192.Raw(transform.M13), Signed192.Raw(transform.M31))));
+        numerator = WideArithmetic.AddSigned832(numerator, GetQuadraticTerm(crossY, crossZ,
+            WideArithmetic.AddSigned192(Signed192.Raw(transform.M23), Signed192.Raw(transform.M32))));
 
         denominator = WideArithmetic.MultiplySigned576ToSigned832(
             lever.Denominator,
             lever.Denominator);
-        // A raw quadratic result carries four Q32.32 denominator factors.
-        denominator = WideArithmetic.MultiplySigned832(
-            denominator,
-            Signed192.One);
-        denominator = WideArithmetic.MultiplySigned832(
-            denominator,
-            Signed192.One);
-        denominator = WideArithmetic.MultiplySigned832(
-            denominator,
-            Signed192.One);
-        denominator = WideArithmetic.MultiplySigned832(
-            denominator,
-            Signed192.One);
+        // Four Q32.32 scale factors form the single integer factor 2^128.
+        denominator = WideArithmetic.MultiplySigned832(denominator, new Signed192(1UL, 0UL, 0UL));
     }
 
     internal static bool TryGetTransformedScaledCrossProduct(
@@ -487,14 +469,14 @@ internal readonly partial struct ExactLever3D
     private static Signed832 GetQuadraticTerm(
         Signed704 left,
         Signed704 right,
-        Fixed64 coefficient)
+        Signed192 coefficient)
     {
-        if (left.IsZero | right.IsZero | coefficient == Fixed64.Zero)
+        if (left.IsZero | right.IsZero | coefficient.IsZero)
             return default;
 
         return WideArithmetic.MultiplySigned704ToSigned832(
             left,
             right,
-            Signed192.Raw(coefficient));
+            coefficient);
     }
 }

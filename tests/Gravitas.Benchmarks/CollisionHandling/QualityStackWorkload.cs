@@ -14,9 +14,10 @@ using static Gravitas.Benchmarks.StrategyWorkload;
 
 namespace Gravitas.Benchmarks;
 
-internal static class QualityStackWorkload
+internal static partial class QualityStackWorkload
 {
     private const int Frames = 256;
+    private const int WarmupFrames = 64;
     private static readonly Fixed64 Gravity = Fixed64.FromFraction(49, 5);
     private static readonly Fixed64 TiltRadians = FixedMath.DegToRad((Fixed64)15);
     private static readonly Fixed64 ResidualBound = Fixed64.FromFraction(1, 16);
@@ -96,16 +97,8 @@ internal static class QualityStackWorkload
     {
         using GravitasWorldContext context = planar
             ? BenchmarkPhysicsScene.CreatePlanarContext(new Vector2d(-16, -8), new Vector2d(16, 16), cellSize: 4)
-            : BenchmarkEnvironment.PrepareOwnedContext();
-        context.Settings.RuntimeMode = planar ? PhysicsRuntimeMode.TwoD : PhysicsRuntimeMode.ThreeD;
-        if (!planar)
-            Require(context.World.TryAddGrid(new GridConfiguration(new Vector3d(-16, -8, -16), new Vector3d(16, 16, 16),
-                topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)4, (Fixed64)4, (Fixed64)4)), out _),
-                0, "unable to create the spatial quality grid");
-        Configure(context);
-        context.Environment.Gravity = Gravity;
-        context.Environment.AirDensity = Fixed64.Zero;
-        context.Environment.DampingFactor = Fixed64.Zero;
+            : CreateSpatialContext();
+        ConfigureQualityContext(context);
         Scene scene = planar ? Planar(context, load.Upper, tilted) : Spatial(context, load, tilted, measure);
         var trace = new ChronicleHashWriter();
         trace.WriteSection("quality-stack-v1", 1);
@@ -120,12 +113,11 @@ internal static class QualityStackWorkload
         Fixed64 peakSolver = Fixed64.Zero, peakResidual = Fixed64.Zero, peakDrift = Fixed64.Zero, peakAngle = Fixed64.Zero;
         Fixed64 lowest = initial.LowestHeight;
         int changes = 0, sleeps = 0, wakes = 0, peakNeighbors = 0;
-        const int warmupFrames = 64;
         long totalTicks = 0, totalBytes = 0, maxBytes = 0;
         int activeSupports = 0, freshSupportRows = 0;
         for (int frame = 1; frame <= Frames; frame++)
         {
-            bool record = measure && frame > warmupFrames;
+            bool record = measure && frame > WarmupFrames;
             long startBytes = record ? GC.GetAllocatedBytesForCurrentThread() : 0;
             long startTicks = record ? Stopwatch.GetTimestamp() : 0;
             context.Simulate();
@@ -167,13 +159,31 @@ internal static class QualityStackWorkload
 
         if (measure)
         {
-            const int measuredFrames = Frames - warmupFrames;
+            const int measuredFrames = Frames - WarmupFrames;
             Require(activeSupports == measuredFrames, Frames, "warm timing window lost a support interface");
             Console.WriteLine(FormattableString.Invariant(
                 $"frames {measuredFrames}, active supports {activeSupports}, fresh support rows {freshSupportRows}, bytes {totalBytes}, max bytes {maxBytes}, mean us {totalTicks * 1_000_000d / Stopwatch.Frequency / measuredFrames:F3}"));
         }
         return new Result(context.ComputeReplayHash(), trace.ToHash(), row, peakSolver, peakResidual, peakDrift, peakAngle,
             lowest, changes, sleeps, wakes, peakNeighbors, initial.Potential, initial.Energy);
+    }
+
+    private static GravitasWorldContext CreateSpatialContext()
+    {
+        GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.ThreeD;
+        Require(context.World.TryAddGrid(new GridConfiguration(new Vector3d(-16, -8, -16), new Vector3d(16, 16, 16),
+            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)4, (Fixed64)4, (Fixed64)4)), out _),
+            0, "unable to create the spatial quality grid");
+        return context;
+    }
+
+    private static void ConfigureQualityContext(GravitasWorldContext context)
+    {
+        Configure(context);
+        context.Environment.Gravity = Gravity;
+        context.Environment.AirDensity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
     }
 
     private static void WriteFrame(string id, int frame, Reading row) => Console.WriteLine(FormattableString.Invariant(
@@ -271,9 +281,7 @@ internal static class QualityStackWorkload
         var colliders = new LSCollider[count + 1];
         var bodies = new SolidBody[count];
         var inertia = new Fixed3x3[count];
-        var floor = new LSCuboidCollider(ColliderShapeDefinition.Cuboid(new Vector3d(16, 1, 16), Material));
-        floor.InitializeWithNoBody(new BenchmarkMatterAgent(context, new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero)));
-        colliders[0] = floor;
+        colliders[0] = CreateFloor(context);
         FixedQuaternion initialRotation = tilted
             ? FixedQuaternion.FromAxisAngle(Vector3d.Forward, TiltRadians)
             : FixedQuaternion.Identity;
@@ -283,16 +291,9 @@ internal static class QualityStackWorkload
             var position = new Vector3d(start.X, start.Y, Fixed64.Zero);
             LSCollider collider = tilted
                 ? new LSCapsuleCollider(ColliderShapeDefinition.Capsule(Fixed64.Half, (Fixed64)2, Material))
-                : new LSCuboidCollider(ColliderShapeDefinition.Cuboid(new Vector3d(2, 1, 2), Material));
-            var body = new SolidBody(new BenchmarkMatterAgent(context, position), collider)
-            {
-                Mass = (Fixed64)(i == 0 ? load.Lower : load.Upper),
-                LinearDragCoefficient = Fixed64.Zero,
-                SleepEnabled = !measure
-            };
-            body.UseManualGrounding();
-            body.Initialize(position, initialRotation);
-            Require(body.CanTranslate && body.CanRotate, 0, "spatial stack body must move and rotate freely");
+                : CreateStackCuboid();
+            SolidBody body = CreateSpatialBody(context, collider, position, initialRotation,
+                i == 0 ? load.Lower : load.Upper, sleep: !measure);
             inertia[i] = collider.CalculateInertiaTensor(body.Mass, body.LocalCenterOfMassOffset);
             bodies[i] = body;
             colliders[i + 1] = collider;
@@ -313,6 +314,31 @@ internal static class QualityStackWorkload
                 new Vector2d(center.X - Start(i, tilted, load.Aligned).X, center.Z).Magnitude,
                 FixedQuaternion.Angle(initialRotation, body.Rotation), body.IsSleeping);
         }, frame => SpatialContacts(probes, frame, readResidual: !measure));
+    }
+
+    private static LSCuboidCollider CreateFloor(GravitasWorldContext context)
+    {
+        var floor = new LSCuboidCollider(ColliderShapeDefinition.Cuboid(new Vector3d(16, 1, 16), Material));
+        floor.InitializeWithNoBody(new BenchmarkMatterAgent(context, new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero)));
+        return floor;
+    }
+
+    private static LSCuboidCollider CreateStackCuboid() =>
+        new(ColliderShapeDefinition.Cuboid(new Vector3d(2, 1, 2), Material));
+
+    private static SolidBody CreateSpatialBody(GravitasWorldContext context, LSCollider collider,
+        Vector3d position, FixedQuaternion rotation, int mass, bool sleep)
+    {
+        var body = new SolidBody(new BenchmarkMatterAgent(context, position), collider)
+        {
+            Mass = (Fixed64)mass,
+            LinearDragCoefficient = Fixed64.Zero,
+            SleepEnabled = sleep
+        };
+        body.UseManualGrounding();
+        body.Initialize(position, rotation);
+        Require(body.CanTranslate && body.CanRotate, 0, "spatial stack body must move and rotate freely");
+        return body;
     }
 
     private static Scene Planar(GravitasWorldContext context, int ratio, bool tilted)

@@ -86,7 +86,7 @@ public sealed partial class GravitasPhysicsService
             if (compare != 0)
                 return compare;
 
-            compare = left.Kind.CompareTo(right.Kind);
+            compare = ((byte)left.Kind).CompareTo((byte)right.Kind);
             return compare != 0 ? compare : left.JointId.CompareTo(right.JointId);
         }
     }

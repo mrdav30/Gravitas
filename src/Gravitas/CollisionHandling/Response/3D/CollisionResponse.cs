@@ -759,13 +759,12 @@ public static partial class CollisionResponse
     {
         ManifoldContact manifoldContact =
             pair.Manifold.GetGroup(contact.GroupIndex)[contact.PointIndex];
-        ContactAnchor zero = ContactAnchor.FromWorldPoint(Vector3d.Zero);
         exactA = contact.A.Body == null
-            ? zero.GetLeverFrom(zero)
+            ? ExactLever3D.Zero
             : manifoldContact.AnchorA.GetLeverFrom(new ContactAnchor(responsePositionA,
                 contact.A.Body.Rotation, contact.A.Body.LocalCenterOfMassOffset));
         exactB = contact.B.Body == null
-            ? zero.GetLeverFrom(zero)
+            ? ExactLever3D.Zero
             : manifoldContact.AnchorB.GetLeverFrom(new ContactAnchor(responsePositionB,
                 contact.B.Body.Rotation, contact.B.Body.LocalCenterOfMassOffset));
     }

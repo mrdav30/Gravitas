@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-035`.
+  `GRV-Benchmark-036`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -71,9 +71,8 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 **Discovered** 2026-11-09 during the GRV-Issue-151 verification.
 **Owner** Gravitas 3D cuboid contact generation and discrete island response.
-**Status** Active. Stage attribution is complete for the matched stacks.
-The heavy-bottom controls and the cost at representative scene density
-remain open.
+**Status** Active. Exact response cost is lower at stack density. The
+16-stack heavy-bottom workload still exceeds the 60 Hz interval.
 
 Use the `verify-quality-stack-support` fixture in Release at 60 Hz and six
 iterations. For timing, disable sleep in both variants, warm 64 steps, and
@@ -161,10 +160,96 @@ configuration. The combined raw coverage in each configuration reached
 Endpoint-level counts in the centered heavy-bottom control attributed all
 5,568 failures to the inverse-inertia transform. The offset control had
 2,880 rejected transforms and 768 rejected torque crosses, with some
-rows rejecting both endpoints. Next, measure those fallback triggers at
-representative support-island density and evaluate the exact normal cost
-there. Preserve the exact fallback wherever a compact intermediate loses a
-contribution.
+rows rejecting both endpoints.
+
+#### Sustained support at scene density
+
+Run `measure-quality-stack-density` for complete physics step timing and
+`measure-quality-stack-density verify` for a per-frame replay digest that
+includes solver caches. Use the same benchmark-only changes with
+`dff545e8` as the runtime baseline. This synthetic, support-heavy fixture
+places four or sixteen independent two-body stacks on a shared 16×16-unit
+floor. The four-stack lattice has 8-unit spacing and the sixteen-stack
+lattice has 4-unit spacing. The heavy-bottom cases alternate centered and
+offset 100 / 1 mass loads. The second sixteen-stack case starts at 15°
+yaw and repeats 100 / 1 centered, 100 / 1 offset, 1 / 100 centered, and
+1 / 1 offset loads. All cases run in pure 3D at 60 Hz with six iterations
+and sleep disabled, warming frames 1–64 and measuring frames 65–256.
+
+The baseline stage capture attributed 41% of the dense heavy-bottom step
+to exact normal fallback, with 84,807 fallback calls across 147,432
+normal rows. The mixed-load case spent 28% of the step in 32,636
+fallbacks across 142,296 normal rows. Clipping accounted for 2–4% of these
+steps. Both scenes sustained all 32 rotated support interfaces throughout
+the timing window.
+
+The solver now reuses common products across the exact normal velocity
+components, groups terms that share an effective-mass factor, and uses an
+exact zero lever for bodyless endpoints. The 3D island constraint sort
+compares the byte-backed kind directly to avoid enum boxing. These
+changes preserve contact admission and nearest-even rounding.
+In the follow-up stage probe, exact normal fallback still ran 84,807
+times in the dense heavy-bottom case. Its share of instrumented step
+time fell from 40.9% to 36.3%, with the largest reductions inside
+effective-mass and linear-delta calculation.
+
+Three Windows x64 Release launches per revision ran in
+`A B B A A B` order on .NET SDK 10.0.302 and runtime 10.0.10 with
+released dependencies. The table reports medians of launch percentiles
+and launch overrun counts against the 16.67 ms interval.
+
+| Workload | Step p50, ms | Step p95, ms | Overruns / 192 | Fresh rows in window |
+| --- | ---: | ---: | ---: | ---: |
+| 4 heavy-bottom stacks | 7.154 → 6.632 | 8.386 → 7.831 | 0 → 0 | 6,134 |
+| 16 heavy-bottom stacks | 32.346 → 29.975 | 36.640 → 33.955 | 192 → 192 | 24,572 |
+| 16 mixed-load stacks | 17.473 → 16.378 | 21.064 → 19.923 | 159 → 61 | 23,716 |
+
+The 16-stack heavy-bottom case fell from 9,216 B to 0 B over the warm
+window. The 16-stack mixed-load case fell from 75,248 B to 66,032 B.
+The 9,216 B difference was 48 B per step from the constraint sort.
+Four stacks allocated 0 B in both builds. The mixed-load scene's
+remaining allocations are tracked under [GRV-Benchmark-035](#grv-benchmark-035).
+
+The three scene traces, including solver caches, matched the baseline
+in Release and ReleaseLean. Both configurations agreed on the warm
+allocation totals. The original support and quality CSVs were
+byte-identical, and both 1,024-actor strategy traces and work counts
+matched. Release passed 8,401 tests and ReleaseLean passed 8,330. Each
+covered 53,953 lines, 22,088 branches and 5,635 methods with zero
+uncovered points.
+
+In table order the digests are `ca6a24a2e0b45eef72d47f6cff5319e3`,
+`470a322fba9007a7607b3f810bb017be`, and
+`20cc20e1f1a705542a6c3d871c1d7109`.
+The dense heavy-bottom case still exceeded the interval on all 192
+steps. Use that case and the mixed-load control together for follow-up.
+The all-heavy case stresses fallback frequency, while the mixed-load
+case shows the budget sensitivity when only half the stacks are heavy-bottom.
+
+<a id="grv-benchmark-035"></a>
+
+### GRV-Benchmark-035 — Warm Pair Growth In Rotated Cuboid Stacks
+
+**Discovered** 2026-11-09 during the
+[GRV-Benchmark-034 density capture](#grv-benchmark-034).
+**Owner** Gravitas 3D partition refresh and collision-pair acquisition.
+**Status** Active. Repeatable warm growth on two frames in the sixteen-stack
+mixed-load case.
+
+Run `measure-quality-stack-density` with released packages. The mixed-load
+case allocated 66,032 B across the 192 warm steps after removing constraint
+sort boxing. The `dff545e8` baseline probe placed the excess above its
+48 B per-step sort cost on frames 235 and 236. On that baseline,
+`CreatePair` accounted for 55,040 B across 20 calls, within 58,368 B in
+collision distribution. Partition preparation and corrected position
+publication accounted for another 1,224 B and 6,440 B. Exact normal and
+friction response allocated 0 B in the stage probe.
+
+All 20 acquisitions were on frame 236 with pooling enabled and the
+3D pair cache empty. The keys linked actors from separate stacks, including
+`1/5`, `1/13`, and `26/29`. Check whether those candidate pairs can be
+rejected before acquiring state. Compare with the same trajectories and
+support rows before changing pair admission or reservation policy.
 
 ## Experimental Signals
 

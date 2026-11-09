@@ -373,28 +373,17 @@ internal static partial class ExactContactResponseKernel
             secondNumeratorMagnitude,
             secondDenominatorMagnitude);
 
+        // Add the angular terms first, then combine with the linear ratio.
+        Span<ulong> angularDenominator = stackalloc ulong[MaxResponseWords];
+        Span<ulong> angularNumerator = stackalloc ulong[MaxResponseWords];
         Span<ulong> temporary = stackalloc ulong[MaxResponseWords];
-        Multiply3(
-            linearDenominatorMagnitude,
-            firstDenominatorMagnitude,
-            secondDenominatorMagnitude,
-            resultDenominator);
-        Multiply3(
-            linearNumeratorMagnitude,
-            firstDenominatorMagnitude,
-            secondDenominatorMagnitude,
-            resultNumerator);
-        Multiply3(
-            firstNumeratorMagnitude,
-            linearDenominatorMagnitude,
-            secondDenominatorMagnitude,
-            temporary);
-        WideArithmetic.AddMagnitudeInto(temporary, resultNumerator);
-        Multiply3(
-            secondNumeratorMagnitude,
-            linearDenominatorMagnitude,
-            firstDenominatorMagnitude,
-            temporary);
+        WideArithmetic.MultiplyMagnitudes(firstDenominatorMagnitude, secondDenominatorMagnitude, angularDenominator);
+        WideArithmetic.MultiplyMagnitudes(firstNumeratorMagnitude, secondDenominatorMagnitude, angularNumerator);
+        WideArithmetic.MultiplyMagnitudes(secondNumeratorMagnitude, firstDenominatorMagnitude, temporary);
+        WideArithmetic.AddMagnitudeInto(temporary, angularNumerator);
+        WideArithmetic.MultiplyMagnitudes(linearDenominatorMagnitude, angularDenominator, resultDenominator);
+        WideArithmetic.MultiplyMagnitudes(linearNumeratorMagnitude, angularDenominator, resultNumerator);
+        WideArithmetic.MultiplyMagnitudes(linearDenominatorMagnitude, angularNumerator, temporary);
         WideArithmetic.AddMagnitudeInto(temporary, resultNumerator);
     }
 
@@ -601,25 +590,30 @@ internal static partial class ExactContactResponseKernel
             return true;
         }
 
+        // Share the mass product and Q32.32 scale factors across all axes.
+        Span<ulong> inverseMassMagnitude = stackalloc ulong[3];
+        Span<ulong> scaledNumerator = stackalloc ulong[MaxResponseWords];
+        Span<ulong> denominator = stackalloc ulong[MaxResponseWords];
+        SetMagnitude(inverseMass, inverseMassMagnitude);
+        WideArithmetic.MultiplyMagnitudes(impulseNumerator, inverseMassMagnitude, scaledNumerator);
+        ReadOnlySpan<ulong> fixedScaleSquared = stackalloc ulong[] { 0UL, 1UL };
+        WideArithmetic.MultiplyMagnitudes(impulseDenominator, fixedScaleSquared, denominator);
         bool xResolved = TryGetLinearComponent(
             impulseAxis.X,
-            inverseMass,
-            impulseNumerator,
-            impulseDenominator,
+            scaledNumerator,
+            denominator,
             impulseSign,
             out Fixed64 x);
         bool yResolved = TryGetLinearComponent(
             impulseAxis.Y,
-            inverseMass,
-            impulseNumerator,
-            impulseDenominator,
+            scaledNumerator,
+            denominator,
             impulseSign,
             out Fixed64 y);
         bool zResolved = TryGetLinearComponent(
             impulseAxis.Z,
-            inverseMass,
-            impulseNumerator,
-            impulseDenominator,
+            scaledNumerator,
+            denominator,
             impulseSign,
             out Fixed64 z);
         result = xResolved & yResolved & zResolved
@@ -630,9 +624,8 @@ internal static partial class ExactContactResponseKernel
 
     private static bool TryGetLinearComponent(
         Fixed64 axis,
-        Fixed64 inverseMass,
-        ReadOnlySpan<ulong> impulseNumerator,
-        ReadOnlySpan<ulong> impulseDenominator,
+        ReadOnlySpan<ulong> scaledNumerator,
+        ReadOnlySpan<ulong> denominator,
         int impulseSign,
         out Fixed64 result)
     {
@@ -642,30 +635,10 @@ internal static partial class ExactContactResponseKernel
             return true;
         }
 
-        Span<ulong> axisMagnitude =
-            stackalloc ulong[MaxResponseWords];
-        Span<ulong> inverseMassMagnitude =
-            stackalloc ulong[MaxResponseWords];
-        Span<ulong> fixedScale =
-            stackalloc ulong[MaxResponseWords];
-        Span<ulong> numerator =
-            stackalloc ulong[MaxResponseWords];
-        Span<ulong> denominator =
-            stackalloc ulong[MaxResponseWords];
+        Span<ulong> axisMagnitude = stackalloc ulong[3];
+        Span<ulong> numerator = stackalloc ulong[MaxResponseWords];
         SetMagnitude(axis, axisMagnitude);
-        SetMagnitude(inverseMass, inverseMassMagnitude);
-        fixedScale.Clear();
-        fixedScale[0] = (ulong)FixedMath.ONE_L;
-        Multiply3(
-            axisMagnitude,
-            inverseMassMagnitude,
-            impulseNumerator,
-            numerator);
-        Multiply3(
-            impulseDenominator,
-            fixedScale,
-            fixedScale,
-            denominator);
+        WideArithmetic.MultiplyMagnitudes(axisMagnitude, scaledNumerator, numerator);
         return Fixed64.TryGetSignedRawRatio(
             numerator,
             denominator,
@@ -702,25 +675,27 @@ internal static partial class ExactContactResponseKernel
             WideArithmetic.MultiplySigned576ToSigned704(
                 lever.Denominator,
                 fixedScaleSquared);
+        Span<ulong> transformedDenominatorMagnitude = stackalloc ulong[11];
+        Span<ulong> denominator = stackalloc ulong[MaxResponseWords];
+        SetMagnitude(transformedDenominator, transformedDenominatorMagnitude);
+        ReadOnlySpan<ulong> fixedScale = stackalloc ulong[] { (ulong)FixedMath.ONE_L };
+        Multiply3(transformedDenominatorMagnitude, impulseDenominator, fixedScale, denominator);
         bool xResolved = TryGetAngularComponent(
             transformedX,
-            transformedDenominator,
             impulseNumerator,
-            impulseDenominator,
+            denominator,
             impulseSign,
             out Fixed64 x);
         bool yResolved = TryGetAngularComponent(
             transformedY,
-            transformedDenominator,
             impulseNumerator,
-            impulseDenominator,
+            denominator,
             impulseSign,
             out Fixed64 y);
         bool zResolved = TryGetAngularComponent(
             transformedZ,
-            transformedDenominator,
             impulseNumerator,
-            impulseDenominator,
+            denominator,
             impulseSign,
             out Fixed64 z);
         result = xResolved & yResolved & zResolved
@@ -731,9 +706,8 @@ internal static partial class ExactContactResponseKernel
 
     private static bool TryGetAngularComponent(
         Signed832 transformed,
-        Signed704 transformedDenominator,
         ReadOnlySpan<ulong> impulseNumerator,
-        ReadOnlySpan<ulong> impulseDenominator,
+        ReadOnlySpan<ulong> denominator,
         int impulseSign,
         out Fixed64 result)
     {
@@ -743,29 +717,10 @@ internal static partial class ExactContactResponseKernel
             return true;
         }
 
-        Span<ulong> transformedMagnitude =
-            stackalloc ulong[MaxResponseWords];
-        Span<ulong> transformedDenominatorMagnitude =
-            stackalloc ulong[MaxResponseWords];
-        Span<ulong> fixedScale =
-            stackalloc ulong[MaxResponseWords];
-        Span<ulong> numerator =
-            stackalloc ulong[MaxResponseWords];
-        Span<ulong> denominator =
-            stackalloc ulong[MaxResponseWords];
+        Span<ulong> transformedMagnitude = stackalloc ulong[13];
+        Span<ulong> numerator = stackalloc ulong[MaxResponseWords];
         SetMagnitude(transformed, transformedMagnitude);
-        SetMagnitude(transformedDenominator, transformedDenominatorMagnitude);
-        fixedScale.Clear();
-        fixedScale[0] = (ulong)FixedMath.ONE_L;
-        WideArithmetic.MultiplyMagnitudes(
-            transformedMagnitude,
-            impulseNumerator,
-            numerator);
-        Multiply3(
-            transformedDenominatorMagnitude,
-            impulseDenominator,
-            fixedScale,
-            denominator);
+        WideArithmetic.MultiplyMagnitudes(transformedMagnitude, impulseNumerator, numerator);
         return Fixed64.TryGetSignedRawRatio(
             numerator,
             denominator,

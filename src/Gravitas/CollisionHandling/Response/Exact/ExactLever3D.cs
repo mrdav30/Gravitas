@@ -16,6 +16,9 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal readonly partial struct ExactLever3D
 {
+    internal static readonly ExactLever3D Zero =
+        new(default, default, default, Signed576.ExtendValue(Signed192.Raw(Fixed64.MinIncrement)));
+
     private ExactLever3D(
         Signed576 xNumerator,
         Signed576 yNumerator,

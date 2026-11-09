@@ -71,6 +71,30 @@ public sealed class ExactContactResponseKernelNormalTests
     }
 
     [Fact]
+    public void NormalResponse_ShouldKeepWideOffDiagonalTermsThroughCancellation()
+    {
+        Fixed64 diagonal = Fixed64.MaxValue;
+        Fixed64 offDiagonal = diagonal - Fixed64.Half;
+        var inverseInertia = new Fixed3x3(
+            Fixed64.One, Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, diagonal, offDiagonal,
+            Fixed64.Zero, offDiagonal, diagonal);
+        var first = new ExactContactResponseOperand3D(
+            CreateLever(Vector3d.One, Vector3d.Zero), Vector3d.Right * Fixed64.Two,
+            Vector3d.Zero, Vector3d.Left, Fixed64.One, inverseInertia);
+        var second = new ExactContactResponseOperand3D(CreateLever(Vector3d.Zero, Vector3d.Zero), Vector3d.Zero,
+            Vector3d.Zero, Vector3d.Zero, Fixed64.Zero, Fixed3x3.Zero);
+
+        // The torque's Y and Z components have opposite signs. Each cancels
+        // the other axis's contribution down to half, giving angular mass 1.
+        Assert.True(ExactContactResponseKernel.TryGetNormalResponse(
+            first, second, Vector3d.Right, Fixed64.Zero, Fixed64.Zero, out ExactNormalResponse3D response));
+        Assert.Equal(Vector3d.Left, response.FirstLinearVelocityDelta);
+        Assert.Equal(new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Half),
+            response.FirstAngularVelocityDelta);
+    }
+
+    [Fact]
     public void NormalResponse_ShouldRetainUnrepresentablePointSpeedAndEffectiveMass()
     {
         ExactLever3D firstLever = CreateFullDomainLever();
