@@ -36,10 +36,11 @@ instead of burying it in notes.
     platform/profile lanes, and upstream develop CI alignment is complete. The
     workload and quality plans follow.
   - [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
-    follows complete stepping and a shared trace format. One strategy scene
-    supplies activity stages, a comparable 3D case, per-frame tails and churn
-    memory evidence; an MMO-zone variant follows only when it adds distinct
-    actor-policy evidence. This is the execution scope for experimental #024.
+    has verified the evolving strategy workloads at both actor tiers in 2D
+    and 3D, captured baseline frame distributions, and profiled the crowded
+    1,024-actor 3D stage. Matched configuration comparisons and churn soak
+    remain. An MMO-zone variant follows only when it adds distinct actor-policy
+    evidence. This is the execution scope for experimental #024.
   - [`Long-Duration Physics Quality And Tuning`](2026-10-06-long-duration-physics-quality-and-tuning-plan.md)
     follows initial workload evidence. Reuse existing stack/chain/ragdoll tests
     and telemetry to measure drift, penetration, energy behavior, sleep/wake and

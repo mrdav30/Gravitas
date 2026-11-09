@@ -25,15 +25,21 @@ internal static class Program
 
         string command = args[0];
 
-        if (string.Equals(command, "verify-strategy-2d", StringComparison.OrdinalIgnoreCase))
+        bool spatialStrategy = string.Equals(command, "verify-strategy-3d", StringComparison.OrdinalIgnoreCase);
+        if (spatialStrategy || string.Equals(command, "verify-strategy-2d", StringComparison.OrdinalIgnoreCase))
         {
-            if (args.Length == 1)
-                return Strategy2DWorkload.Verify(256);
-            if (args.Length == 2 && args[1] == "1024")
-                return Strategy2DWorkload.Verify(1024);
-
-            Console.Error.WriteLine("Usage: verify-strategy-2d [1024]");
-            return 1;
+            int actorCount = args.Length switch
+            {
+                1 => StrategyWorkload.ActorsPerRegion,
+                2 when args[1] == "1024" => 1024,
+                _ => 0
+            };
+            if (actorCount == 0)
+            {
+                Console.Error.WriteLine($"Usage: {command} [1024]");
+                return 1;
+            }
+            return spatialStrategy ? Strategy3DWorkload.Verify(actorCount) : Strategy2DWorkload.Verify(actorCount);
         }
 
         if ((string.Equals(command, "list", StringComparison.OrdinalIgnoreCase) ||
@@ -157,6 +163,7 @@ internal static class Program
         Console.WriteLine("  dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all --list flat");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-2d [1024]");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-3d [1024]");
         Console.WriteLine();
         Console.WriteLine("Leading arguments that do not start with '-' are treated as benchmark selections.");
         Console.WriteLine("Remaining arguments are forwarded to BenchmarkDotNet.");

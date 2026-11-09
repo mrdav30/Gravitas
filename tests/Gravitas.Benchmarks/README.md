@@ -202,17 +202,36 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll ver
 This command is separate from the base test suite and BenchmarkDotNet
 selections, including `all`. The default tier uses one 256-actor region. The
 1,024-actor tier runs the same schedule in four translated regions of one
-world. Each tier runs twice in fresh contexts, validates the scheduled work,
-and compares each frame's authoritative hash, ordered query observations and
-work counts. A mismatch fails the command and reports the first divergent
-frame. The printed trace identifies the full sequence of verified observations.
+world. Two untimed replays in fresh contexts compare each frame's
+authoritative hash, ordered query observations and work counts. A third
+replay measures each frame while checking all query results and the terminal
+observation. It skips the inter-frame state and pair scans.
 
-The second replay samples only `Simulate` and `LateSimulate` after eight quiet
-warmup frames. It reports elapsed time, current-thread managed allocation
-totals and the number of sampled physics steps exceeding the 60 Hz interval.
-The sparse and crowded samples include first-use work in a fresh context.
-These measurements are physics-step smoke samples. Host tick headroom
-requires a complete scenario-frame capture.
+After eight quiet warmup frames, the verifier reports median, p95, p99, maximum
+and 60 Hz overruns for two windows. The physics step covers `Simulate` and
+`LateSimulate`. The scenario frame also covers commands, churn and scheduled
+queries. Frame-level replay validation and output run outside both windows.
+Sparse and crowded samples include first-use work in the fresh context.
+
+Set `GRAVITAS_STRATEGY_FRAME_CSV=1` to append one CSV row per sampled frame.
+Timing and current-thread physics-step bytes come from the measured replay.
+The awake, pair, chain-contact, TOI and query-frame columns come from the
+matching frame of the untimed replay.
+
+### Opt-in evolving 3D strategy workload
+
+```bash
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-3d
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-3d 1024
+```
+
+The 256-actor 3D verifier uses the same X/Z footprint, command schedule and
+replay checks as the 2D baseline. It adds gravity, sphere-floor contacts and
+elevated projectile lanes. It reports touching pairs dispatched each step,
+including cached contacts, as a separate metric from the 2D candidate count.
+The 1,024-actor tier runs four copies in one world, with one floor and two
+obstacles per region. It preserves the local spacing and command schedule.
+This command runs separately from the base tests and BenchmarkDotNet selections.
 
 ### Pure-2D circle contact simulation
 
