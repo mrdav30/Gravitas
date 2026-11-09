@@ -246,8 +246,9 @@ inter-box position correction as inverse-mass weighting placed almost all
 of the separation on the lower box. The lower box still received net
 upward correction in both cases, but integrated downward by more. This
 establishes an early velocity support deficit and shows how correction is
-distributed. The cause of the weak velocity response within the contact
-solve remains open.
+distributed. The floor-row trace below isolates the initial mechanism and
+tracks the remaining runtime work under
+[GRV-Issue-151](issue-tracker.md#grv-issue-151).
 
 Release and ReleaseLean produced identical traces and measurements. Each
 of the eight cases matched both instrumented repeats exactly, including
@@ -258,6 +259,66 @@ terminal replay with observation disabled. Ignored
 `artifacts/physics-quality-phase1/support-response-probe` contains the
 probe patch, raw captures, and per-frame reduction. The maintained change
 is this investigation record.
+
+#### Frame 7 Floor Contact And The Mass Swap
+
+At `7d350b2f`, a disposable extension of the response probe traced frame 7
+in all eight support cases. Read the actual solver lever, normal, contact
+point speed before and after each normal and friction pass, effective-mass
+terms, and accumulated normal impulse from `CollisionResponse.CalculateImpulse`.
+For the floor pair, transform all eight lower-box corners at the admitted
+rotation, translate by the corrected body position, and sample each corner's
+vertical speed from `v + ω × r` immediately after the floor visit. The floor
+top is at Y = 0 and all four bottom corners project inside its X/Z bounds.
+
+The centered 1/100 and 100/1 runs chose the same single floor row. Its normal
+was +Y, depth was 0.017399 units, and the lower-box lever was approximately
+`(0.999511, −0.501975, 0.999500)`. The first pre-solve point speed was
+−0.416945 units/s in both runs to six decimal places. The normal solve took
+that speed to zero. The angular term contributed 4.795251 of the 5.795251
+inverse effective mass for the light lower box. With lower mass 100 the
+denominator scaled down to 0.057953 and the first normal impulse scaled up
+100-fold, giving the lower boxes the same initial vertical velocity change.
+The floor friction contributed zero direct vertical velocity change, but
+changed the point speed through angular response.
+
+| Floor pass | 1/100 point speed before normal (units/s) | 1/100 accumulated normal impulse (mass·units/s) | 100/1 point speed before normal (units/s) | 100/1 accumulated normal impulse (mass·units/s) |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | −0.416945 | 0.071946 | −0.416945 | 7.194589 |
+| 2 | +0.358931 | 0.010011 | −0.043724 | 7.949064 |
+| 3 | +0.188343 | 0.000000 | +0.004684 | 7.868232 |
+| 6 | +0.171068 | 0.000000 | −0.000088 | 7.858762 |
+
+The first inter-box normal impulse was about 0.12646 mass·units/s in both
+cases. It reduced the light lower box's vertical speed by 0.12646 units/s
+and the heavy lower box's by 0.001265 units/s. In the centered 1/100 case,
+rotation made the sampled floor corner separate by pass 2 while the lower
+COM still moved downward. By pass 3 the unilateral solve had removed the
+floor impulse. At that point, all four bottom corners still penetrated the
+floor after correction. The selected corner moved upward at 0.136012 units/s,
+and the other three moved downward at 1.075515, 0.469850, and 0.469654
+units/s. The 1/64-offset 1/100 case retained a small net floor impulse on
+frame 7. Complete removal is specific to the centered trace.
+
+The oriented cuboid path supplies one support witness after any nonidentity
+rotation. The trace shows an uncovered, closing part of the floor contact
+patch while the sampled row behaves as a unilateral constraint should. A
+disposable floor-only experiment added penetrating bottom corners under a
+near-horizontal face, using the same SAT admission and existing response.
+It kept the lower COM above zero in both 1/100 alignments, with minimum
+heights of 0.052501 units offset and 0.071714 centered. Direct upper-floor
+overlap still began on frame 28 in both, one frame earlier than baseline.
+This isolates the value of additional floor contacts while leaving the
+support chain failure open. The experiment only covers this floor setup.
+
+Each read-only trace matched its independent repeat exactly for 12 solver
+row visits and 48 corner samples per case. Release and ReleaseLean matched
+bit for bit, and stripping the probe records reproduced the clean support
+output with all replay hashes and published frame samples. The floor-only
+experiment also replayed within each configuration and matched across them.
+Its probes and experiment are under ignored
+`artifacts/physics-quality-phase1/issue-151-probe`. The maintained runtime
+is unchanged. Phase 1 can resume with the open issue linked here.
 
 ## Phase 2: Duration And Continuation
 
