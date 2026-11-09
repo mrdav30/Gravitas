@@ -1,7 +1,7 @@
 # Evolving Game Capacity And Soak Plan
 
 **Date:** 2026-10-06  
-**Status:** Phases 1–3 complete. Representative curved-contact frequency remains open under #024. The soak reproduced a separately tracked 2D lifetime defect. Product guidance remains pending.  
+**Status:** Completed 2026-11-09. Phases 1–3 verified and host guidance added.  
 **Owner:** Gravitas benchmark workloads; lower-stack changes only when profiles
 justify them.
 
@@ -14,19 +14,19 @@ worth measuring. These are declared synthetic workloads, not proof of game-wide
 player counts or observed production contact frequency.
 
 This plan consumes experimental
-[GRV-Benchmark-024](benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost),
+[GRV-Benchmark-024](../benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost),
 including expensive candidates that lose or reject. It does not reopen closed
 query-cost signals. Artifact publishing infrastructure remains owned by the
-[existing publishing plan](2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md);
+[existing publishing plan](../2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md);
 an external service or performance CI gate is not a prerequisite for local
 evidence.
 
 ## Reuse And Measurement Contract
 
 Start with existing
-[`BenchmarkPhysicsScene`](../../tests/Gravitas.Benchmarks/Support/BenchmarkPhysicsScene.cs),
-[`CircleContactSimulationBenchmarks`](../../tests/Gravitas.Benchmarks/Physics2D/CircleContactSimulationBenchmarks.cs),
-[`SimulationAllocationBenchmarks`](../../tests/Gravitas.Benchmarks/Core/SimulationAllocationBenchmarks.cs),
+[`BenchmarkPhysicsScene`](../../../tests/Gravitas.Benchmarks/Support/BenchmarkPhysicsScene.cs),
+[`CircleContactSimulationBenchmarks`](../../../tests/Gravitas.Benchmarks/Physics2D/CircleContactSimulationBenchmarks.cs),
+[`SimulationAllocationBenchmarks`](../../../tests/Gravitas.Benchmarks/Core/SimulationAllocationBenchmarks.cs),
 constraint benchmarks and replay fixtures. Add only the support needed for
 ordered evolving commands; do not build a general scene framework, navigation
 system, networking layer or new public instrumentation API.
@@ -69,8 +69,8 @@ phase transitions and verified work counts in 2D and comparable 3D.
 
 ### 256-Actor 2D Checkpoint
 
-Run the [opt-in verifier](../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-2d-strategy-workload).
-[`strategy-2d-256-v1`](../../tests/Gravitas.Benchmarks/Physics2D/Strategy2DWorkload.cs)
+Run the [opt-in verifier](../../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-2d-strategy-workload).
+[`strategy-2d-256-v1`](../../../tests/Gravitas.Benchmarks/Physics2D/Strategy2DWorkload.cs)
 uses an explicit fixed-point layout and a frame-indexed command sequence with
 no random inputs. The scenario runs at 60 Hz with 8-unit rectangular cells,
 unit-mass radius-one actors, manual grounding with no ground support, zero
@@ -148,7 +148,7 @@ later frame and soak captures to assess tick headroom and sustained behavior.
 
 ### 256-Actor 3D Checkpoint
 
-[`verify-strategy-3d`](../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-3d-strategy-workload)
+[`verify-strategy-3d`](../../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-3d-strategy-workload)
 runs `strategy-3d-256-v1`. It preserves the X/Z positions, stage boundaries,
 churn, and query cadence of the 256-actor 2D workload. The 3D grid has 8-unit
 X/Z cells and 4-unit Y cells. Unit-mass radius-one spheres begin at Y=1 over
@@ -270,7 +270,7 @@ All four observation digests matched their Phase 1 baselines.
 Build the benchmark project with
 `dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0 -p:UseLocalLsfStack=false`.
 Set `$env:GRAVITAS_STRATEGY_FRAME_CSV = '1'` in PowerShell and run the four
-[verifier commands](../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-2d-strategy-workload).
+[verifier commands](../../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-2d-strategy-workload).
 Keep separate stdout logs per process. Local raw captures and binary hashes
 are under ignored `artifacts/strategy-phase2-clean`.
 
@@ -458,7 +458,7 @@ The separate CPU profiles above show where crowded physics spent its time.
 ### Synthetic Curved-Contact Step Envelopes
 
 Run the opt-in
-[`verify-curved-workload`](../../tests/Gravitas.Benchmarks/README.md#opt-in-curved-contact-step-envelopes)
+[`verify-curved-workload`](../../../tests/Gravitas.Benchmarks/README.md#opt-in-curved-contact-step-envelopes)
 on the same Windows x64 host and released dependency versions as the baseline.
 The clean timing runs used Release `net10.0` on Gravitas `91382799` with
 the benchmark changes in this plan. Each of the 16 cases reuses one checked
@@ -621,7 +621,7 @@ tracked defect. A clean warmed allocation counter alone cannot close this phase.
 ### Soak Protocol
 
 Use the package-backed Release build and the same host as Phase 2. The
-[`soak-strategy-2d` and `soak-strategy-3d` commands](../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-strategy-soak)
+[`soak-strategy-2d` and `soak-strategy-3d` commands](../../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-strategy-soak)
 reuse the original strategy scene and commands in one owned context.
 Run 2D and 3D at both actor tiers and compare 8-unit and 16-unit X/Z cells
 at 1,024 actors in 3D with Y fixed at 4. The ordered command cycle is
@@ -753,7 +753,7 @@ retention. The grounding snapshot held the retired body, collider and
 host agent after 1,024 empty steps. Clearing that scratch buffer released
 all three in three fresh processes. The no-populated-step control released
 all three without intervention. The finding is separately tracked as
-[GRV-Issue-149](issue-tracker.md#grv-issue-149). The probe establishes an
+[GRV-Issue-149](../issue-tracker.md#grv-issue-149). The probe establishes an
 actor reference root and leaves the byte share of each heap owner open.
 
 Disposal brought managed memory near the pre-context process baseline.
@@ -785,18 +785,36 @@ recorded digests. Default BenchmarkDotNet discovery excludes the soak.
 
 ## Completion And Product Guidance
 
-- [ ] Publish scenario/command identities, exact settings,
+- [x] Record scenario/command identities, exact settings,
       hardware/runtime/source metadata, timings with uncertainty, memory trends
       and instrumentation limits.
-- [ ] Capture an MMO-zone variant only when its actor/activity/query policy adds
-      distinct evidence. Measure physics scope without claiming networking,
-      persistence, AI or total server capacity.
-- [ ] Preserve deterministic results, allocation guarantees and exact 100%
-      reachable line/branch/method coverage in Release/Lean for any changed
-      library. Use inherited and MSBuild `UseLocalLsfStack=true` for unreleased
-      sibling validation; released packages remain a release gate.
-- [ ] Feed measured setting tradeoffs into evergreen user guidance, with
-      hardware and workload boundaries. Promote confirmed bugs/performance
-      concerns into the appropriate tracker; do not add speculative regressions.
-- [ ] Archive completed evidence and this plan in `done/`, updating #024 and the
-      overview only for the scopes actually measured.
+- [x] Defer the MMO-zone variant until a distinct actor/activity/query policy
+      warrants another capture. The current physics measurements cover the
+      declared strategy scene.
+- [x] Verify released-package replay and warm allocations for the measured
+      workloads and the separately tracked lifetime fixes.
+- [x] Publish the measured setting tradeoffs and host acceptance method in
+      [Workload And Tuning](../../api/guides/WORKLOAD_TUNING.md).
+- [x] Archive the plan and preserve the open benchmark follow-ups in their
+      owning backlog.
+
+The 2D and 3D lifetime findings were resolved as
+[#149](../issue-tracker.md#grv-issue-149) and [#150](../issue-tracker.md#grv-issue-150).
+Their package-backed Release and ReleaseLean validation preserved the
+strategy traces and warm allocation baselines. The retained-memory and timing
+tables above describe the measured revisions, including the pre-fix heap
+probes. The guidance closeout changes documentation only.
+
+Keep 8-unit X/Z cells as the 1,024-actor 3D reference. Evaluate 16 units
+against the host's first-use, warmed, and memory budgets. The profile evidence
+and cold wake spike continue under
+[#033](../benchmark-signal-hardening-backlog.md#grv-benchmark-033).
+Representative curved-contact frequency continues under
+[#024](../benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost).
+The unclassified 2D-256 outliers came from one process and did not recur in
+the warmed soak. Revisit their fresh-context phase if they repeat under
+matched host conditions.
+
+Host capacity still depends on the application's tick reserve and workload.
+Solver iteration, grounding, and frame-rate quality curves belong to the
+[Long-Duration Physics Quality And Tuning plan](../2026-10-06-long-duration-physics-quality-and-tuning-plan.md).

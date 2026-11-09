@@ -109,6 +109,8 @@ for the updated imports and guard names.
   — build and step your first world.
 - [Guides](https://mrdav30.github.io/Gravitas/guides/Home.html) — understand
   host integration, dimensions, collisions, queries, replay, and diagnostics.
+- [Workload and Tuning](docs/api/guides/WORKLOAD_TUNING.md) — set a host tick
+  budget and compare first-use and warmed workload costs.
 - [API Reference](https://mrdav30.github.io/Gravitas/api/Gravitas.html) — browse
   public namespaces, types, and members.
 - [Coverage Report](https://mrdav30.github.io/Gravitas/coverage/) — inspect the

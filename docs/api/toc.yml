@@ -12,6 +12,8 @@ items:
         items:
           - name: Host Integration
             href: guides/HOST_INTEGRATION.md
+          - name: Workload and Tuning
+            href: guides/WORKLOAD_TUNING.md
           - name: Runtime Architecture
             href: guides/RUNTIME_ARCHITECTURE.md
           - name: 2D, 3D, and Runtime Modes

@@ -792,6 +792,9 @@ those two poses when continuous collision is enabled. The first static-style
 blocker clips the kinematic pose and writes the clipped transform back to the
 host binding.
 
+For scenario budgets, partition comparisons, and long-session measurements,
+see [Workload And Tuning](WORKLOAD_TUNING.md).
+
 ## Queries And Grounding
 
 2D, 3D, and mixed queries are explicit context services:

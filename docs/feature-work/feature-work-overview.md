@@ -33,19 +33,8 @@ instead of burying it in notes.
     strengthen complete-loop replay evidence, characterize an evolving strategy
     scene, then publish long-duration physical quality versus configuration
     cost. Full-lifecycle replay conformance is complete across the eight native
-    platform/profile lanes, and upstream develop CI alignment is complete. The
-    workload and quality plans follow.
-  - [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
-    has verified the evolving strategy workloads at both actor tiers in 2D
-    and 3D, captured baseline frame distributions, and profiled the crowded
-    1,024-actor 3D stage. Phase 2 measured the X/Z cell-size tradeoff, local
-    60 Hz headroom and synthetic curved-contact step costs. Representative
-    scene frequency remains open under experimental #024. Phase 3 reproduced
-    warmed tails and managed heap plateaus under churn. The 16-unit cells lowered
-    warmed crowded p99 while retaining more heap than the 8-unit reference.
-    A 2D retirement reference root is tracked under [#149](issue-tracker.md#grv-issue-149).
-    Host guidance remains pending. An MMO-zone variant follows only when it
-    adds distinct actor-policy evidence.
+    platform/profile lanes, upstream develop CI alignment is complete, and
+    strategy capacity and soak guidance is available.
   - [`Long-Duration Physics Quality And Tuning`](2026-10-06-long-duration-physics-quality-and-tuning-plan.md)
     follows initial workload evidence. Reuse existing stack/chain/ragdoll tests
     and telemetry to measure drift, penetration, energy behavior, sleep/wake and
@@ -75,6 +64,13 @@ instead of burying it in notes.
     [representation gates](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#later-terrain-and-heightfield-gates).
 
 ## Recently Completed
+
+- [`Evolving Game Capacity And Soak`](done/2026-10-06-evolving-game-capacity-and-soak-plan.md)
+  - Verified two actor tiers in 2D and 3D, measured the X/Z cell-size
+    tradeoff and first-use latency, and reproduced warmed frame tails and
+    managed heap plateaus under churn. Published
+    [Workload And Tuning](../api/guides/WORKLOAD_TUNING.md). An MMO-zone
+    capture remains conditional on distinct actor-policy evidence.
 
 - [`Static Surface Continuity`](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md)
   - Context-owned mesh and filled-planar declarations preserve exact finite

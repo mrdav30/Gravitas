@@ -1,7 +1,7 @@
 # Long-Duration Physics Quality And Tuning Plan
 
 **Date:** 2026-10-06  
-**Status:** Proposed; queued after initial evolving-workload characterization.  
+**Status:** Proposed. The capacity and soak characterization is complete.  
 **Owner:** Gravitas contact/constraint quality and configuration guidance.
 
 ## Goal
@@ -23,7 +23,7 @@ deterministic joint metrics. Reuse
 [`Constraint3DStressTests`](../../tests/Gravitas.Tests/Constraints/Constraint3DStressTests.cs),
 the dimensional constraint tests, sleep tests and
 [`Constraint3DBenchmarks`](../../tests/Gravitas.Benchmarks/Core/Constraint3DBenchmarks.cs).
-The [capacity/soak plan](2026-10-06-evolving-game-capacity-and-soak-plan.md)
+The [capacity/soak plan](done/2026-10-06-evolving-game-capacity-and-soak-plan.md)
 owns frame-time/memory collection; share its measurement contract rather than
 add a second runner or generic physics-quality framework.
 

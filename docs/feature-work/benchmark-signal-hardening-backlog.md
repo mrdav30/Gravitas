@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-033`.
+  `GRV-Benchmark-034`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -72,6 +72,7 @@ evidence gaps.
 
 | Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-033 — 1,024-actor 3D partition cost and first-wake spike](#grv-benchmark-033) | Capacity-sensitive. Sustained cost profiled, first-wake allocation owner open. | An equivalent workload exceeds the host's reserved budget or the first-use burst recurs in a target scene |
 | [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental. Synthetic step costs measured, representative frequency open. | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
 | GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
 
@@ -97,7 +98,7 @@ sweeps measured dispatch, isolation, admission, and selection. The oblique
 stadium gap isolated roots on all 128 sampled frames with zero contacts.
 Revisit with a representative scene or trace that measures local density,
 pose frequency and budget contribution.
-[Evolving Game Capacity And Soak](2026-10-06-evolving-game-capacity-and-soak-plan.md#synthetic-curved-contact-step-envelopes)
+[Evolving Game Capacity And Soak](done/2026-10-06-evolving-game-capacity-and-soak-plan.md#synthetic-curved-contact-step-envelopes)
 
 **Additional bounded evidence (2026-10-15):** The supported-geometry closeout's
 single-sphere, flat-mesh traversal measured `162.980 / 157.305 / 170.034 us`
@@ -156,34 +157,14 @@ query rejects contact. Neither rarity nor common occurrence is established by
 the current evidence. Multiplying isolated query time by a hypothetical count is
 illustrative, not measured world capacity.
 
-**Next experiment:** Reuse the existing contact fixtures and world-step
-benchmark support to characterize deterministic moving scenes before changing
-the solver:
-
-1. Establish the geometric envelope with reproducible pose/orientation sweeps
-   around the rim, including ordinary contacts and separated near-rim
-   candidates. Then run explicit upright-agent, tilted/tumbling, rim-sliding and
-   dense-contact scenarios across shape dimensions and local density. Synthetic
-   sweep frequency must remain separate from observed host frequency; publish
-   scene assumptions. Include cone/triangle and cylinder/triangle mesh contacts,
-   varying facet orientation, cone tilt and relative position as well as
-   slab/capsule poses.
-2. In benchmark-only support, distinguish dispatched pair queries, expensive
-   root-path entries, admitted curved candidates and final winning features.
-   Reuse existing hooks where sufficient. Count repeated work across frames as
-   well as unique pairs; a final contact label alone is insufficient
-   attribution.
-3. Measure complete `Simulate` plus `LateSimulate` steps over sustained frames:
-   mean, p95/p99 and maximum observed time, warmed allocations, candidate counts
-   and expensive-path rate. Profile stages separately from clean timing runs;
-   keep counters and wall-clock timing outside authoritative simulation state.
-   Assess explicit host tick budgets with headroom for the rest of the host.
-4. Retain cone/triangle and cylinder/triangle mesh cases as well as
-   capsule/cylinder and mixed circle/stadium-slab cases with their distinct root
-   policies. Pure 2D workloads provide a dimensional control, not an assumed
-   consumer of the 3D oblique solver. Use fixed initial state/input, repeatable
-   seeds, contact preflight and replay checks; verify instrumentation preserves
-   answers. Use `UseLocalLsfStack=true` throughout coordinated runs.
+**Next experiment:** Start with a representative deterministic scene or host
+trace whose moving shapes enter these paths. Reuse the verified
+`verify-curved-workload` sweeps as geometry controls. Measure distinct
+upright and tilted or rim-contact populations at known local densities.
+In an untimed replay count unique pairs and repeat dispatches, root-path
+entries, admitted candidates, and winners or rejections. Compare the trace
+with clean complete-step tails and the host's reserved budget. Preserve the
+synthetic sweep results as a separate measure of cost when a pose occurs.
 
 **Decision gate:** Publish a capacity characterization or written no-change
 decision if the expensive path has a small measured contribution in the target
@@ -194,6 +175,48 @@ line/branch/method coverage for any implementation changes. Do not add
 approximate collision, speculative caches, public instrumentation or merged root
 solvers merely because the isolated worst fixture is expensive. #018 through
 #021 remain closed.
+
+<a id="grv-benchmark-033"></a>
+
+### GRV-Benchmark-033 — 1,024-Actor 3D Partition Cost And First-Wake Spike
+
+**Discovered 2026-11-08.** Capacity-sensitive experimental signal from the
+1,024-actor 3D strategy scene on Windows x64, Core i7-9700K and .NET 10
+Release with released LSF packages. Gravitas owns partition preparation and
+corrected-pose publication. The GridForge typed voxel lookup is a measured
+callee. The first-wake allocation owner remains open.
+
+Build the package-backed Release benchmark and set
+`GRAVITAS_STRATEGY_FRAME_CSV=1`. Run `verify-strategy-3d 1024 8` and
+`verify-strategy-3d 1024 16` in alternating fresh processes, then run
+`soak-strategy-3d 1024 8` and `soak-strategy-3d 1024 16` as warmed controls.
+Keep Y at 4 and verify each setting's replay, floor support, projectile
+stops and connected chains.
+
+- **Crowded steps.** At X/Z 8, partition preparation and corrected-pose
+  publication accounted for about half of sampled crowded CPU time in two
+  profiles. Over frames 66–96, their combined sampled CPU weight fell from
+  239–253 ms at X/Z 8 to 113–130 ms at X/Z 16, while collision distribution
+  and touching-pair work increased. Separate counter runs recorded zero new
+  monitor contentions. The warmed crowded scenario p99 was 15.96 ms at 8
+  and 12.66 ms at 16.
+- **First wake.** All six fresh-context frame-65 bursts at X/Z 16 exceeded
+  16.67 ms, taking 21.23–34.68 ms and allocating about 5.48 MB in physics.
+  X/Z 8 took 10.82–11.68 ms and allocated about 2.02 MB. The warmed control
+  fit all 160 measured wakes per setting, with median physics allocations
+  of 0 bytes at 8 and 2,400 bytes at 16. The sampled first-wake window had
+  too few observations to attribute the allocation spike.
+
+**Next isolation:** If a target scene needs more headroom, count covered
+voxels, typed lookups, actual membership changes, and pair visits during
+the sustained crowded window. Separately capture allocation stacks for
+frame 65 across repeated fresh contexts, using the warmed cycle as a
+control. Replay and physical outcomes must agree before comparing a change.
+Use the affected host's budget to decide whether either result warrants
+runtime work.
+[Overrun attribution](done/2026-10-06-evolving-game-capacity-and-soak-plan.md#1024-actor-3d-overrun-attribution),
+[cell-size comparison](done/2026-10-06-evolving-game-capacity-and-soak-plan.md#matched-1024-actor-3d-xz-cell-sizes),
+[soak results](done/2026-10-06-evolving-game-capacity-and-soak-plan.md#warmed-frame-tails)
 
 ### GRV-Benchmark-014 — Exact Triangle-Pair Contacts Regress Dense Concave-Mesh Throughput
 

@@ -29,6 +29,7 @@ Already know what you need? Jump to a topic below.
 | ----------------------------------------------- | --------------------------------------------------------------------------- |
 | [Runtime Architecture](RUNTIME_ARCHITECTURE.md) | Context-owned services, frame phases, registration, and state ownership     |
 | [Host Integration](HOST_INTEGRATION.md)         | Host adapters, bodies, colliders, settings, constraints, and teardown       |
+| [Workload And Tuning](WORKLOAD_TUNING.md)        | Tick budgets, representative workload captures, and settings tradeoffs    |
 | [2D, 3D, And Runtime Modes](DIMENSIONS.md)      | Pure 2D, pure 3D, `Both`, mixed embedding, and dimensional queries          |
 | [Serialization And Replay](SERIALIZATION.md)    | Chronicler state transfer, shell ownership, continuation, and replay hashes |
 

@@ -284,7 +284,7 @@ After a 16-frame warmup, a third run measures 128 frames with diagnostics
 disabled. It reports `Simulate + LateSimulate`, the scenario window including
 pose reset, and managed bytes allocated on the stepping thread. These
 synthetic envelopes measure the cost of exercising particular geometry.
-See the [Phase 2 evidence](../../docs/feature-work/2026-10-06-evolving-game-capacity-and-soak-plan.md#synthetic-curved-contact-step-envelopes)
+See the [Phase 2 evidence](../../docs/feature-work/done/2026-10-06-evolving-game-capacity-and-soak-plan.md#synthetic-curved-contact-step-envelopes)
 for measured root work, tails and workload boundaries.
 
 ### Pure-2D circle contact simulation
