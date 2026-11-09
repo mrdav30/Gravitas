@@ -268,6 +268,26 @@ of the same configuration and the checkpoint hash across heap probes.
 capture (1–4,096 cycles). Both commands are separate from base tests and
 BenchmarkDotNet discovery.
 
+### Opt-in physics quality stacks
+
+```powershell
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0 -p:UseLocalLsfStack=false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stacks
+```
+
+Runs freely simulated 2D and 3D two-body stacks at upper-to-lower mass ratios
+of 1:1, 10:1, and 100:1, plus a tilted capsule in each dimension. Each case
+compares two 256-frame observations and the terminal state of an
+observation-free run. It reports retained solver depth, post-step overlap,
+support topology, COM drift, angular motion, manifold ID changes, sleep/wake
+transitions, and mechanical energy. The quality bounds are reported
+separately from replay and fixture validity.
+
+Set `GRAVITAS_QUALITY_FRAME_CSV=1` for per-frame observations. This
+verifier is separate from base tests and BenchmarkDotNet selections.
+The [Phase 1 checkpoint](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#free-stack-and-tilted-capsule-checkpoint)
+records the setup, bounds, and measured results.
+
 ### Opt-in curved-contact step envelopes
 
 ```bash
