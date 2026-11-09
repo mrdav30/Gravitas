@@ -84,7 +84,10 @@ public sealed partial class GravitasPhysicsService
 
         pair.Deactivate();
         if (_context.Settings.PoolingEnabled && !pair.IsNotificationInProgress)
+        {
+            pair.ReleaseEndpointsForPooling();
             _cachedCollisionPairs.Push(pair);
+        }
     }
 
     internal void RemovePairReferences(CollisionPair pair)
@@ -183,7 +186,7 @@ public sealed partial class GravitasPhysicsService
         finally
         {
             if (deactivationStart == 0)
-                pending.FastClear();
+                pending.Clear();
         }
     }
 
@@ -271,7 +274,7 @@ public sealed partial class GravitasPhysicsService
             }
 
             if (snapshotStart == 0)
-                _activeCollisionPairSnapshot.FastClear();
+                _activeCollisionPairSnapshot.Clear();
         }
     }
 

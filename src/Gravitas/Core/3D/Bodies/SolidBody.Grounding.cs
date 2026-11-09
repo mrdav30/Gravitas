@@ -355,7 +355,16 @@ public partial class SolidBody
             ? ResolveGroundProbeRadius()
             : Fixed64.Zero;
         Vector3d end = origin + Vector3d.Down * dis;
-        bool foundGround = TryFindGroundHit(mode, radius, origin, dis, out Physics3DHit hit);
+        Physics3DHit hit;
+        bool foundGround;
+        try
+        {
+            foundGround = TryFindGroundHit(mode, radius, origin, dis, out hit);
+        }
+        finally
+        {
+            _groundProbeHits.Clear();
+        }
         Context.Diagnostics.EmitGroundProbe(this, mode, origin, end, radius, foundGround, hit);
 
         if (!foundGround)

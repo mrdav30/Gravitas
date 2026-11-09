@@ -191,8 +191,17 @@ public sealed partial class GravitasPhysicsService
     private void RunDiscreteCollisionStep()
     {
         _discreteResponsePairs.FastClear();
-        _context.Collisions.CheckAndDistributeCollisions();
-        SolveDiscreteResponsePairs();
+        try
+        {
+            _context.Collisions.CheckAndDistributeCollisions();
+            SolveDiscreteResponsePairs();
+        }
+        finally
+        {
+            _discreteResponsePairs.Clear();
+            _discreteIslandNodes.Clear();
+            _discreteIslandConstraints.Clear();
+        }
         _context.Collisions.RetireExpiredRetainedPartitions();
     }
 

@@ -20,6 +20,7 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Owns deterministic 3D pair lifecycle, culling, contact, and notification state.
 /// </summary>
+/// <remarks>The service releases the collider endpoints when it returns a retired pair to the pool.</remarks>
 /// <content>Owns contact groups, cached impulses and discrete response lifecycle.</content>
 public partial class CollisionPair
 {
@@ -134,6 +135,13 @@ public partial class CollisionPair
     internal ContactResponseSnapshot ResponseSnapshot;
 
     internal CollisionPair(LSCollider c1, LSCollider c2) => Initialize(c1, c2);
+
+    internal void ReleaseEndpointsForPooling()
+    {
+        // A pending retirement token may still refer to this shell before it is reused.
+        _lifetimeVersion++;
+        ColliderA = ColliderB = null!;
+    }
 
     /// <summary>
     /// Initializes the CollisionPair with the given colliders.

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -11,6 +12,45 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class CollisionPairLifecycleHardeningTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FullStep_ReleasesRetiredContactIslandActorWhileContextRemainsLive(bool poolingEnabled)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        GravitasWorldContext context = scenario.Context;
+        context.Settings.PoolingEnabled = poolingEnabled;
+        WeakReference[] retired = StepAndRetireIslandActor(scenario);
+
+        for (int i = 0; i < 1024; i++)
+            Step(context);
+        Assert.Equal(0, context.Physics.BodyCount);
+        Assert.Equal(2, context.Physics.ColliderCount);
+        Assert.Equal(0, context.Collisions.ActivePartitionCount);
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        Assert.All(retired, target => Assert.False(target.IsAlive));
+        GC.KeepAlive(context);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference[] StepAndRetireIslandActor(PhysicsScenarioBuilder scenario)
+    {
+        var actor = scenario.CreateSphere(Vector3d.Zero);
+        actor.Body.UseManualGrounding();
+        Fixed64 offset = Fixed64.FromFraction(3, 4);
+        var left = scenario.CreateSphere(new Vector3d(-offset, Fixed64.Zero, Fixed64.Zero), immovable: true);
+        var right = scenario.CreateSphere(new Vector3d(offset, Fixed64.Zero, Fixed64.Zero), immovable: true);
+        Step(scenario.Context);
+        Assert.True(GetPair(actor.Collider, left.Collider).Manifold.HasContact);
+        Assert.True(GetPair(actor.Collider, right.Collider).Manifold.HasContact);
+        actor.Body.Deactivate();
+        return [new WeakReference(actor.Body), new WeakReference(actor.Collider), new WeakReference(actor.Body.Agent)];
+    }
+
     [Fact]
     public void Simulate_WhenEnterCallbackCreatesRecursivePair_ShouldNotReuseNotifyingShell()
     {
@@ -187,6 +227,21 @@ public sealed class CollisionPairLifecycleHardeningTests
         scenario.Context.Physics.CompleteLateSimulatePhysicsStep();
 
         pair.Active.Should().BeFalse();
+    }
+
+    [Fact]
+    public void DeactivateCollider_WhenPairWasDirectlyDeactivated_ShouldRemoveBothRegistrations()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var first = scenario.CreateSphere(Vector3d.Zero);
+        var second = scenario.CreateSphere(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        CollisionPair pair = scenario.Context.Physics.GetCollisionPair(first.Collider.Id, second.Collider.Id)!;
+        pair.Deactivate();
+
+        first.Body.Deactivate();
+
+        Assert.Equal(0, pair.ColliderA.CollisionPairCount);
+        Assert.Equal(0, pair.ColliderB.CollisionPairHolderCount);
     }
 
     [Fact]
@@ -869,14 +924,16 @@ public sealed class CollisionPairLifecycleHardeningTests
         colliderAExits.Should().Be(1);
         colliderBExits.Should().Be(1);
 
+        LSCollider colliderA = pair.ColliderA;
+        LSCollider colliderB = pair.ColliderB;
         Action cleanup = () => scenario.Context.Physics.FullDeactivateCollisionPair(pair);
 
         cleanup.Should().NotThrow();
         colliderAExits.Should().Be(1);
         colliderBExits.Should().Be(1);
         pair.Active.Should().BeFalse();
-        pair.ColliderA.CollisionPairCount.Should().Be(0);
-        pair.ColliderB.CollisionPairHolderCount.Should().Be(0);
+        colliderA.CollisionPairCount.Should().Be(0);
+        colliderB.CollisionPairHolderCount.Should().Be(0);
     }
 
     [Fact]
