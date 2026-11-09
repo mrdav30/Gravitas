@@ -25,7 +25,7 @@ internal static class StrategyWorkload
     internal const int ProjectileSpeed = 900;
     internal static readonly Fixed64 WallX = Fixed64.FromFraction(31, 4);
 
-    private const int FrameCount = 3 * StageFrames;
+    internal const int FrameCount = 3 * StageFrames;
     private const int QuietWarmupFrames = 8;
     private const int QueryCadence = 8;
 
@@ -81,44 +81,61 @@ internal static class StrategyWorkload
 
     internal static Observation[] Capture<TRegion>(GravitasWorldContext context, TRegion[] regions,
         Action<TRegion, int> applyCommands, Action<TRegion> runQueries, QueryRegion<TRegion> observeQueries,
-        Func<ChronicleHash?, int, Observation> observeWork, Span<FrameTiming> samples)
+        Func<ChronicleHash?, int, Observation> observeWork, Span<FrameTiming> samples,
+        StrategySoak soak, Action<TRegion> retire)
     {
+        if (soak != null)
+        {
+            soak.Capture(context, regions, applyCommands, runQueries, observeQueries, observeWork, retire);
+            return Array.Empty<Observation>();
+        }
+
         var trace = new Observation[FrameCount];
         for (int frame = 1; frame <= FrameCount; frame++)
         {
             bool sample = !samples.IsEmpty && frame > QuietWarmupFrames;
-            bool queryFrame = frame % QueryCadence == 0;
-            long frameStart = sample ? Stopwatch.GetTimestamp() : 0;
-            foreach (TRegion region in regions)
-                applyCommands(region, frame);
-            long bytesBefore = sample ? GC.GetAllocatedBytesForCurrentThread() : 0;
-            long stepStart = sample ? Stopwatch.GetTimestamp() : 0;
-            context.Simulate();
-            context.LateSimulate();
-            long stepTicks = sample ? Stopwatch.GetTimestamp() - stepStart : 0;
-            long stepBytes = sample ? GC.GetAllocatedBytesForCurrentThread() - bytesBefore : 0;
-            if (queryFrame)
-                foreach (TRegion region in regions)
-                    runQueries(region);
+            ChronicleHash? queryHash = Step(context, regions, applyCommands, runQueries, observeQueries,
+                frame, frame, sample, measureScenarioBytes: false, out FrameTiming timing);
             if (sample)
-                samples[frame - 1] = new FrameTiming(stepTicks, Stopwatch.GetTimestamp() - frameStart, stepBytes);
+                samples[frame - 1] = timing;
 
-            Require(context.FrameCount == frame && context.LateSimulateToken == frame,
-                frame, "the complete host step did not advance both clocks");
-            ChronicleHash? queryHash = null;
-            if (queryFrame)
-            {
-                var query = new ChronicleHashWriter();
-                foreach (TRegion region in regions)
-                    observeQueries(region, frame, ref query);
-                queryHash = query.ToHash();
-            }
             // The spatial replay hash probes every collider pair and can disturb the next timed step.
             trace[frame - 1] = samples.IsEmpty || frame == FrameCount
                 ? observeWork(queryHash, frame)
                 : default(Observation) with { Queries = queryHash };
         }
         return trace;
+    }
+
+    internal static ChronicleHash? Step<TRegion>(GravitasWorldContext context, TRegion[] regions,
+        Action<TRegion, int> applyCommands, Action<TRegion> runQueries, QueryRegion<TRegion> observeQueries,
+        int frame, int phase, bool sample, bool measureScenarioBytes, out FrameTiming timing)
+    {
+        bool queryFrame = phase % QueryCadence == 0;
+        long scenarioBefore = measureScenarioBytes ? GC.GetAllocatedBytesForCurrentThread() : 0;
+        long frameStart = sample ? Stopwatch.GetTimestamp() : 0;
+        foreach (TRegion region in regions)
+            applyCommands(region, phase);
+        long bytesBefore = sample ? GC.GetAllocatedBytesForCurrentThread() : 0;
+        long stepStart = sample ? Stopwatch.GetTimestamp() : 0;
+        context.Simulate();
+        context.LateSimulate();
+        long stepTicks = sample ? Stopwatch.GetTimestamp() - stepStart : 0;
+        long stepBytes = sample ? GC.GetAllocatedBytesForCurrentThread() - bytesBefore : 0;
+        if (queryFrame)
+            foreach (TRegion region in regions)
+                runQueries(region);
+        timing = sample ? new FrameTiming(stepTicks, Stopwatch.GetTimestamp() - frameStart, stepBytes,
+            measureScenarioBytes ? GC.GetAllocatedBytesForCurrentThread() - scenarioBefore : 0) : default;
+
+        Require(context.FrameCount == frame && context.LateSimulateToken == frame,
+            frame, "the complete host step did not advance both clocks");
+        if (!queryFrame)
+            return null;
+        var query = new ChronicleHashWriter();
+        foreach (TRegion region in regions)
+            observeQueries(region, frame, ref query);
+        return query.ToHash();
     }
 
     internal static void Configure(GravitasWorldContext context)
@@ -193,7 +210,7 @@ internal static class StrategyWorkload
         Console.WriteLine($"  Physics step managed bytes total: {samples.Sum(row => row.StepBytes)}");
     }
 
-    private static void WriteWindow(string window, long[] ticks)
+    internal static void WriteWindow(string window, long[] ticks)
     {
         double p50 = Milliseconds(ticks[(ticks.Length - 1) / 2] + ticks[ticks.Length / 2]) / 2;
         double p95 = Milliseconds(ticks[(ticks.Length * 95 + 99) / 100 - 1]);
@@ -215,7 +232,7 @@ internal static class StrategyWorkload
         }
     }
 
-    private static double Milliseconds(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;
+    internal static double Milliseconds(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;
 
     internal static void Require(bool condition, int frame, string problem)
     {
@@ -229,9 +246,16 @@ internal static class StrategyWorkload
         public readonly SwiftList<THit> Overlap = new(capacity: 4);
         public int RayCount;
         public int OverlapCount;
+
+        public void Clear()
+        {
+            Ray.Clear(clearRetainedReferences: true);
+            Overlap.Clear(clearRetainedReferences: true);
+            RayCount = OverlapCount = 0;
+        }
     }
 
-    internal readonly record struct FrameTiming(long StepTicks, long FrameTicks, long StepBytes);
+    internal readonly record struct FrameTiming(long StepTicks, long FrameTicks, long StepBytes, long FrameBytes);
 
     internal readonly record struct Observation(ChronicleHash State, ChronicleHash? Queries, int Registered,
         int Awake, int Pairs, int ChainContacts, int LargestChain, int ToiIterations);

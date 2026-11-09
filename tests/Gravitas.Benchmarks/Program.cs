@@ -29,8 +29,10 @@ internal static class Program
         if (string.Equals(command, "verify-curved-workload", StringComparison.OrdinalIgnoreCase))
             return CurvedContactWorkload.Verify(args);
 
-        bool spatialStrategy = string.Equals(command, "verify-strategy-3d", StringComparison.OrdinalIgnoreCase);
-        if (spatialStrategy || string.Equals(command, "verify-strategy-2d", StringComparison.OrdinalIgnoreCase))
+        bool spatialSoak = string.Equals(command, "soak-strategy-3d", StringComparison.OrdinalIgnoreCase);
+        bool planarSoak = string.Equals(command, "soak-strategy-2d", StringComparison.OrdinalIgnoreCase);
+        bool spatialStrategy = spatialSoak || string.Equals(command, "verify-strategy-3d", StringComparison.OrdinalIgnoreCase);
+        if (spatialStrategy || planarSoak || string.Equals(command, "verify-strategy-2d", StringComparison.OrdinalIgnoreCase))
         {
             int actorCount = args.Length switch
             {
@@ -47,7 +49,8 @@ internal static class Program
                 return 1;
             }
             int cellSize = args.Length == 3 ? int.Parse(args[2], CultureInfo.InvariantCulture) : 8;
-            return spatialStrategy ? Strategy3DWorkload.Verify(actorCount, cellSize) : Strategy2DWorkload.Verify(actorCount);
+            return spatialStrategy ? Strategy3DWorkload.Verify(actorCount, cellSize, spatialSoak)
+                : Strategy2DWorkload.Verify(actorCount, planarSoak);
         }
 
         if ((string.Equals(command, "list", StringComparison.OrdinalIgnoreCase) ||
@@ -172,6 +175,8 @@ internal static class Program
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all --list flat");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-2d [1024]");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-3d [1024 [4|8|16]]");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll soak-strategy-2d [1024]");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll soak-strategy-3d [1024 [4|8|16]]");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-curved-workload [case]");
         Console.WriteLine();
         Console.WriteLine("Leading arguments that do not start with '-' are treated as benchmark selections.");

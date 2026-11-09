@@ -1,7 +1,7 @@
 # Evolving Game Capacity And Soak Plan
 
 **Date:** 2026-10-06  
-**Status:** Phases 1 and 2 complete. Representative curved-contact frequency remains open under #024. Phase 3 churn soak is next.  
+**Status:** Phases 1–3 complete. Representative curved-contact frequency remains open under #024. The soak reproduced a separately tracked 2D lifetime defect. Product guidance remains pending.  
 **Owner:** Gravitas benchmark workloads; lower-stack changes only when profiles
 justify them.
 
@@ -594,29 +594,194 @@ Phase 3 for sustained tails and retained memory.
 
 ## Phase 3: Long-Session Latency And Memory
 
-- [ ] Use the same scene and ordered commands for sustained movement/churn,
+- [x] Use the same scene and ordered commands for sustained movement/churn,
       collision bursts, wake cascades and quieter recovery periods. Initial
       local capture: at least 10,000 measured frames after explicit warmup; add
       a longer soak when retained-state trends remain unclear. Keep ordinary CI
       smoke short.
-- [ ] Report per-frame median, p95, p99, maximum, sample count and burst
+- [x] Report per-frame median, p95, p99, maximum, sample count and burst
       location; distinguish physics-step from scenario-frame times.
       BenchmarkDotNet batch statistics are not substitutes for gameplay-frame
       tails.
-- [ ] Record startup allocation/peak memory, warmed steady-state allocations,
+- [x] Record startup allocation/peak memory, warmed steady-state allocations,
       churn allocations, GC activity and live runtime/pool/partition counts.
       Separate expected spawn/capacity growth from unexpected steady-state work.
-- [ ] Compare retained managed memory after repeated equal-envelope churn and
+- [x] Compare retained managed memory after repeated equal-envelope churn and
       sufficient retirement/cooldown, then after context disposal. Track process
       working set separately; it is not a managed leak oracle. Any forced-GC
       retained-heap probes run outside timed frames in a separately labeled
       pass.
-- [ ] Explain bounded high-water retention versus continuing growth; test
+- [x] Explain bounded high-water retention versus continuing growth; test
       lifecycle ownership if a repeatable leak is found. Do not require an
       artificial zero-allocation startup or OS working-set return to baseline.
 
 Exit: repeatable frame tails and memory plateaus or a reproduced, independently
 tracked defect. A clean warmed allocation counter alone cannot close this phase.
+
+### Soak Protocol
+
+Use the package-backed Release build and the same host as Phase 2. The
+[`soak-strategy-2d` and `soak-strategy-3d` commands](../../tests/Gravitas.Benchmarks/README.md#opt-in-evolving-strategy-soak)
+reuse the original strategy scene and commands in one owned context.
+Run 2D and 3D at both actor tiers and compare 8-unit and 16-unit X/Z cells
+at 1,024 actors in 3D with Y fixed at 4. The ordered command cycle is
+`strategy-{dimension}-{actors}[-xz16]-soak-v1`. Frames 1–96 repeat the
+original quiet, sparse and crowded sequence. On frame 97 the 24 encounter
+actors and eight scouts in each region reset to their authored poses and
+sleep. Frames 98–128 give a quiet recovery. The query cadence remains one
+ordered ray and overlap per region every eight frames. The existing
+projectile retirement, fire and replacement schedule runs every cycle.
+Use four complete warmup cycles (512 frames) and 80 measured cycles
+(10,240 frames) per fresh process.
+
+Use two timing runs in forward and reverse configuration order. Set
+`GRAVITAS_STRATEGY_FRAME_CSV=1` and keep stdout from each fresh process
+separately. The physics window covers `Simulate + LateSimulate`. The
+scenario window also includes commands, rearm, scheduled queries and the
+physics allocation reads. Clock guards, query checks and hashes, the
+terminal state hash, metric reduction and output are outside timed
+windows. Per-frame allocations cover the stepping thread. Process-wide
+collection deltas cover only the measured interval.
+
+Use two separate fresh processes per configuration with
+`GRAVITAS_STRATEGY_SOAK_HEAP=1`. In each cycle validate registration and
+floor support at the selected milestones, the sparse wake and movement,
+the CCD stops, and all encounter chains on phase frame 67. Compare
+ordered query and terminal state digests across timing and heap runs.
+Compare full state and work checkpoint digests between the heap runs.
+Hashing every frame would add an all-pairs registry scan. The soak hashes
+full state at selected checkpoints in the untimed run and once at the end
+of each timed run.
+
+Force full GC only in the heap probes. Sample before context creation,
+after warmup and every 20 measured cycles at the same post-recovery phase.
+After the last cycle clear the probe's replay snapshot and caller query
+buffers, retire all dynamic bodies, and step another 1,024 quiet frames.
+That exceeds the default 320-frame empty partition lifetime and leaves
+time for the retirement sweep. The static scene stays registered until
+disposal. Sample after the context and actor arrays leave scope. Report
+active and retained partition payloads separately from the detached
+partition pool. Retained payloads can include occupied partitions.
+Working set and process peak working set are recorded independently of
+managed heap. Raw logs, host metadata and binary hashes are under ignored
+`artifacts/strategy-phase3`.
+
+### Warmed Frame Tails
+
+The Phase 3 benchmark changes on Gravitas `c820b8ee` used Windows x64
+build 26300 on a Core i7-9700K, SDK 10.0.302 and runtime 10.0.10.
+The build resolved Chronicler 1.0.0, FixedMathSharp 8.0.0,
+SwiftCollections 8.0.0 and GridForge 10.0.0. Values below pool the
+two timing launches per setting, 20,480 measured frames each, with
+median / nearest-rank p95 / p99 / maximum in milliseconds.
+
+| Configuration | Physics step | Scenario frame | 60 Hz misses, physics / scenario |
+| --- | --- | --- | ---: |
+| 2D 256 | 0.197 / 0.761 / 1.060 / 4.038 | 0.211 / 0.858 / 1.084 / 4.085 | 0 / 0 |
+| 2D 1,024 | 0.877 / 3.258 / 3.653 / 7.456 | 0.958 / 3.396 / 3.806 / 8.709 | 0 / 0 |
+| 3D 256 | 1.370 / 3.590 / 3.728 / 7.230 | 1.415 / 3.600 / 3.745 / 7.230 | 0 / 0 |
+| 3D 1,024, X/Z 8 | 6.229 / 15.316 / 15.587 / 24.105 | 6.282 / 15.380 / 15.646 / 24.105 | 8 / 9 |
+| 3D 1,024, X/Z 16 | 5.293 / 11.858 / 12.215 / 28.483 | 5.338 / 11.919 / 12.280 / 28.484 | 3 / 3 |
+
+Compare the crowded stage independently of the recovery and quiet samples.
+Each row below has 5,120 crowded samples and 160 phase-65 wake bursts.
+Six and three crowded scenario misses occurred at 8 units in the two
+launches. Two occurred at 16 units in launch one and zero in launch two,
+which had one sparse miss.
+
+| X/Z edge | Crowded scenario frame | Phase 65 scenario frame | Worst scenario frame (launch / cycle / phase) |
+| ---: | --- | --- | --- |
+| 8 | 15.182 / 15.609 / 15.958 / 24.105 | 12.929 / 13.478 / 15.103 / 15.572 | 1 / 48 / 74 |
+| 16 | 11.700 / 12.218 / 12.664 / 28.484 | 9.440 / 10.056 / 10.566 / 11.041 | 1 / 24 / 83 |
+
+The 16-unit setting improved crowded p99 in both warmed launches, with
+per-launch p99s of 12.71 and 12.66 ms versus 15.98 and 15.96 ms at 8 units.
+Every measured wake burst fit the interval in both settings. Phase 2's
+fresh-context wake bursts at 16 units still exceeded it in all six runs.
+The soak establishes a warmed setting tradeoff. Keep 8 as the reference
+and carry both startup and warmed costs into guidance for this scene.
+
+### Allocation And Collection Activity
+
+Startup allocation is the stepping-thread delta from before context setup to
+initial scene registration, excluding the preallocated frame sample buffer.
+It includes small measurement and output overhead. Process peak working
+set includes the runtime and process setup. These ranges are from the two
+clean timing launches.
+
+| Configuration | Startup / warmup allocated (MiB) | Peak working set at startup / measured end (MiB) | Measured GC counts, gen0 / gen1 / gen2 per launch |
+| --- | ---: | ---: | ---: |
+| 2D 256 | 2.48 / 0.41 | 35.79–35.98 / 54.21–54.45 | 0 / 0 / 0 |
+| 2D 1,024 | 8.65 / 1.59 | 44.29–44.33 / 67.21–67.45 | 2 / 1 / 0 |
+| 3D 256 | 11.24 / 1.93 | 47.56–47.79 / 68.55–68.89 | 1 / 0 / 0 |
+| 3D 1,024, X/Z 8 | 41.47 / 7.84 | 85.68–86.41 / 107.36–107.57 | 7 / 2 / 1 |
+| 3D 1,024, X/Z 16 | 34.88 / 17.17 | 69.14–69.24 / 110.96–111.14 | 8 / 2 / 1 |
+
+The projectile spawn on phase 44 and normal replacement on phase 65 account
+for most scenario allocation. At 1,024 in 3D, those commands and steps cost
+about 0.49 MiB per cycle together at either cell size. The warmed physics
+step on phase 65 had median 0 bytes at 8 units and 2,400 bytes at 16, down
+from about 2.02 MB and 5.48 MB respectively in the fresh-context cell-size
+comparison. Quiet and recovery allocation and the smaller residual crowded
+allocation are separately identifiable in the CSV. A collection count for
+the whole interval cannot identify an individual frame's cause.
+
+### Retained Managed Memory
+
+The forced-collection probes sample the same recovery boundary after each
+20-cycle block. Heap sizes below are process managed totals in MiB. The
+partition figures are active / retained / pooled. The retired rows keep
+two planar obstacles or three spatial statics per region registered. All
+dynamic bodies and active dynamic partitions are gone.
+
+| Configuration | Managed heap at cycle 80 / retired / disposed (MiB) | Partitions at cycle 80 | Partitions after retirement |
+| --- | ---: | ---: | ---: |
+| 2D 256 | 2.96 / 2.96 / 0.36 | 240 / 246 / 0 | 0 / 6 / 240 |
+| 2D 1,024 | 9.85 / 9.85 / 0.36 | 960 / 984 / 0 | 0 / 24 / 960 |
+| 3D 256 | 12.17 / 6.18 / 0.36 | 975 / 1,896 / 0 | 0 / 1,893 / 3 |
+| 3D 1,024, X/Z 8 | 45.13 / 19.87 / 0.36 | 3,900 / 7,287 / 0 | 0 / 7,275 / 12 |
+| 3D 1,024, X/Z 16 | 48.02 / 25.14 / 0.36 | 1,248 / 1,935 / 0 | 0 / 1,923 / 12 |
+
+All five envelopes plateaued. In each of the ten heap runs the difference
+between the highest and lowest checkpoint from cycles 20–80 was at most
+192 bytes, with identical partition counts. The 16-unit 3D setting uses
+fewer payloads and retained about 2.9 MiB more managed heap
+in the active scene than 8 units. The 3D heap fell after dynamic retirement.
+In 2D, the dynamic partitions moved into the pool and the heap stayed
+nearly level. A one-actor diagnostic isolated another owner of that
+retention. The grounding snapshot held the retired body, collider and
+host agent after 1,024 empty steps. Clearing that scratch buffer released
+all three in three fresh processes. The no-populated-step control released
+all three without intervention. The finding is separately tracked as
+[GRV-Issue-149](issue-tracker.md#grv-issue-149). The probe establishes an
+actor reference root and leaves the byte share of each heap owner open.
+
+Disposal brought managed memory near the pre-context process baseline.
+Working set remained above its startup level. These results characterize
+bounded high-water retention over this workload and duration. A longer
+run is warranted if a different envelope exhibits continuing growth.
+
+### Phase 3 Replay Evidence
+
+Replay digests cover 10,752 frames including warmup. Heap passes also
+compare 588 per-launch checkpoints, taken at phase frames 1, 33, 44, 64,
+65, 67 and 128. Those checks exercise the stage changes, floor support,
+projectile stops and connected chains. Each timing and heap run verifies
+the ordered query results throughout the schedule.
+
+| Configuration | Ordered queries | Terminal state | Heap checkpoint digest |
+| --- | --- | --- | --- |
+| 2D 256 | `0122df9fc4f2fc943f27ba040296a566` | `a8f43241ca42775712e00d8edeec02f4` | `fc34516a812f91a966959f9d604baf47` |
+| 2D 1,024 | `9d180902d02eac4b0f62aefae135de96` | `e9259fb482b81b1acf3e30b2dd6e6516` | `d354a57e7ef19ce3f3ba20070960977e` |
+| 3D 256 | `752138d308f91e8f2108bda3c3b632a8` | `ddc7d29b0a0075f893ad019053347100` | `642f0c900722d4643aacbfb0b8e821e0` |
+| 3D 1,024, X/Z 8 | `d2462dee7488e6bfe2cb4502a852b5dd` | `389b5f9598e1614058e35c7540ece669` | `c519249fd878115c76e8e0240d230fd5` |
+| 3D 1,024, X/Z 16 | `80159a87b1d3c32eb8fda881e0c9e642` | `5dc7ec311c06b1c2735cf77b2df088cb` | `7c20409df39dc9eedb63fd65d0e90c55` |
+
+The package-backed Release and ReleaseLean builds passed. One measured
+cycle after warmup reproduced the Release smoke replay and checkpoint
+digests in Lean for all five settings. The original four strategy traces,
+the 16-unit comparison trace and all 16 curved envelopes kept their
+recorded digests. Default BenchmarkDotNet discovery excludes the soak.
 
 ## Completion And Product Guidance
 

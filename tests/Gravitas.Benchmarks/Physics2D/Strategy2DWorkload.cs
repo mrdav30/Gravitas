@@ -14,14 +14,16 @@ internal static class Strategy2DWorkload
 {
     private static readonly Vector2d ProjectileImpulse = new(ProjectileSpeed, 0);
 
-    internal static int Verify(int actorCount)
+    internal static int Verify(int actorCount, bool soak)
     {
         int regionCount = actorCount / ActorsPerRegion;
+        if (soak)
+            return StrategySoak.Run($"strategy-2d-{actorCount}-soak-v1", capture => Run(regionCount, default, capture));
         return StrategyWorkload.Verify($"strategy-2d-{actorCount}-v1", regionCount, "candidates",
             samples => Run(regionCount, samples));
     }
 
-    private static Observation[] Run(int regionCount, Span<FrameTiming> samples)
+    private static Observation[] Run(int regionCount, Span<FrameTiming> samples, StrategySoak soak = null)
     {
         int extent = regionCount == 1 ? 0 : RegionStride;
         using GravitasWorldContext context =
@@ -34,7 +36,12 @@ internal static class Strategy2DWorkload
 
         return Capture(context, regions, (region, frame) => ApplyCommands(context, region, frame),
             region => RunQueries(context, region), ObserveQueries,
-            (queries, frame) => ObserveWork(context, regions, queries, frame), samples);
+            (queries, frame) => ObserveWork(context, regions, queries, frame), samples, soak,
+            soak == null ? null : region =>
+            {
+                region.Hits.Clear();
+                RetireActors(region.Actors, 0, checked((int)context.FrameCount));
+            });
     }
 
     private static Region CreateRegion(GravitasWorldContext context, Vector2d origin)
@@ -60,14 +67,7 @@ internal static class Strategy2DWorkload
                 break;
             case RetireActorsFrame:
             case RetireProjectilesFrame:
-                for (int slot = FirstProjectileSlot; slot < actors.Length; slot++)
-                {
-                    SolidBody2D retired = actors[slot];
-                    retired.Deactivate();
-                    if (retired.Active || retired.Collider.Id >= 0)
-                        Require(false, frame, $"slot {slot} remained registered");
-                    actors[slot] = null;
-                }
+                RetireActors(actors, FirstProjectileSlot, frame);
                 break;
             case FireFrame:
                 for (int slot = FirstProjectileSlot; slot < actors.Length; slot++)
@@ -87,6 +87,25 @@ internal static class Strategy2DWorkload
                 for (int slot = 0; slot < EncounterActors; slot++)
                     actors[slot].AddLinearImpulse(new Vector2d(EncounterImpulseX(slot), 0));
                 break;
+            case StrategySoak.RecoveryStart:
+                for (int slot = 0; slot < EncounterActors + SparseActors; slot++)
+                {
+                    actors[slot].ResetPosition(region.Origin + ActorPosition(slot));
+                    actors[slot].Sleep();
+                }
+                break;
+        }
+    }
+
+    private static void RetireActors(SolidBody2D[] actors, int firstSlot, int frame)
+    {
+        for (int slot = firstSlot; slot < actors.Length; slot++)
+        {
+            SolidBody2D retired = actors[slot];
+            retired.Deactivate();
+            if (retired.Active || retired.Collider.Id >= 0)
+                Require(false, frame, $"slot {slot} remained registered");
+            actors[slot] = null;
         }
     }
 
@@ -214,7 +233,7 @@ internal static class Strategy2DWorkload
             LSCollider2D b = second.Collider;
             bool hasPair = a.TryGetCollisionPair(b.Id, out CollisionPair2D pair)
                 || b.TryGetCollisionPair(a.Id, out pair);
-            return hasPair && pair.IsColliding && pair.Manifold.Count > 0;
+            return hasPair && pair.LastFrame == first.Context.FrameCount && pair.IsColliding && pair.Manifold.Count > 0;
         });
         return (registered, awake, chain.Contacts, chain.Largest, toiIterations);
     }

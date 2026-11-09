@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-149`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-150`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -55,7 +55,40 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-No active issues.
+<a id="grv-issue-149"></a>
+
+#### GRV-Issue-149 — 2D grounding snapshot retains retired actor graphs
+
+**Discovered 2026-11-08. Priority medium.** Reproduced in package-backed
+Release `net10.0` on Gravitas `c820b8ee` during the
+[Phase 3 churn soak](2026-10-06-evolving-game-capacity-and-soak-plan.md#retained-managed-memory).
+The affected owner is
+[`GravitasPhysics2DService.RefreshGroundingFromDiscreteResponse`](../../src/Gravitas/Core/2D/Services/GravitasPhysics2DService.Grounding.cs).
+Its outer snapshot cleanup uses `FastClear()`, leaving body and collider
+references in the backing array. A smaller subsequent population can leave
+the unused tail intact. [#144](#grv-issue-144) fixed the reset boundary.
+
+Reproduce with an owned pure-2D context at 60 Hz and a planar grid spanning
+X/Z ±16 with 8-unit cells. In a non-inlined helper, register one unit-mass,
+unit-radius circle at the origin with zero gravity scale and manual grounding.
+Complete `Simulate + LateSimulate` once, deactivate the body, and return only
+weak references to the body, collider and host agent. Complete 1,024 empty
+steps with the context kept alive. Confirm zero registered bodies, colliders
+and active partitions. Force a full collection, wait for finalizers, then
+collect again. No queries, replay hashing or other colliders are needed.
+
+Three fresh processes retained all three targets after the populated step.
+The control that skipped that step collected all three. In the populated
+case, invoking `Clear(clearRetainedReferences: true)` on the private
+`_groundingBodySnapshot` in the disposable diagnostic released all three
+after the next collection. This isolates a live-context reference root.
+The observed soak heap plateau shows bounded retention under that envelope.
+
+Add a focused public-lifecycle regression in the owning runtime suite and
+release snapshot references when their observation lifetime ends. Verify
+reentrant snapshot safety, deterministic replay, and warm allocation and
+step cost. The disposable probe is under ignored
+`artifacts/strategy-phase3/retirement-probe`.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 

@@ -19,17 +19,19 @@ internal static class Strategy3DWorkload
     private static readonly PhysicsLayerMask QueryMask = PhysicsLayerMask.FromLayer(0);
     private static readonly Fixed64 FloorTolerance = Fixed64.FromFraction(1, 16);
 
-    internal static int Verify(int actorCount, int cellSize)
+    internal static int Verify(int actorCount, int cellSize, bool soak)
     {
         int regionCount = actorCount / ActorsPerRegion;
         string workloadId = $"strategy-3d-{actorCount}";
         if (cellSize != 8)
             workloadId += $"-xz{cellSize}";
+        if (soak)
+            return StrategySoak.Run($"{workloadId}-soak-v1", capture => Run(regionCount, cellSize, default, capture));
         return StrategyWorkload.Verify($"{workloadId}-v1", regionCount, "touching pairs",
             samples => Run(regionCount, cellSize, samples));
     }
 
-    private static Observation[] Run(int regionCount, int cellSize, Span<FrameTiming> samples)
+    private static Observation[] Run(int regionCount, int cellSize, Span<FrameTiming> samples, StrategySoak soak = null)
     {
         using GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext();
         context.Settings.RuntimeMode = PhysicsRuntimeMode.ThreeD;
@@ -51,7 +53,12 @@ internal static class Strategy3DWorkload
 
         return Capture(context, regions, (region, frame) => ApplyCommands(context, region, frame),
             region => RunQueries(context, region), ObserveQueries,
-            (queries, frame) => ObserveWork(context, regions, queries, frame), samples);
+            (queries, frame) => ObserveWork(context, regions, queries, frame), samples, soak,
+            soak == null ? null : region =>
+            {
+                region.Hits.Clear();
+                RetireActors(region.Actors, 0, checked((int)context.FrameCount));
+            });
     }
 
     private static Region CreateRegion(GravitasWorldContext context, Vector3d origin)
@@ -78,14 +85,7 @@ internal static class Strategy3DWorkload
                 break;
             case RetireActorsFrame:
             case RetireProjectilesFrame:
-                for (int slot = FirstProjectileSlot; slot < actors.Length; slot++)
-                {
-                    SolidBody retired = actors[slot];
-                    retired.Deactivate();
-                    if (retired.Active || retired.Collider.Id >= 0)
-                        Require(false, frame, $"slot {slot} remained registered");
-                    actors[slot] = null;
-                }
+                RetireActors(actors, FirstProjectileSlot, frame);
                 break;
             case FireFrame:
                 for (int slot = FirstProjectileSlot; slot < actors.Length; slot++)
@@ -106,15 +106,39 @@ internal static class Strategy3DWorkload
                 for (int slot = 0; slot < EncounterActors; slot++)
                     actors[slot].AddLinearImpulse(new Vector3d(EncounterImpulseX(slot), 0, 0));
                 break;
+            case StrategySoak.RecoveryStart:
+                for (int slot = 0; slot < EncounterActors + SparseActors; slot++)
+                {
+                    actors[slot].ResetPosition(SpawnPosition(region.Origin, slot), FixedQuaternion.Identity);
+                    actors[slot].Sleep();
+                }
+                break;
+        }
+    }
+
+    private static void RetireActors(SolidBody[] actors, int firstSlot, int frame)
+    {
+        for (int slot = firstSlot; slot < actors.Length; slot++)
+        {
+            SolidBody retired = actors[slot];
+            retired.Deactivate();
+            if (retired.Active || retired.Collider.Id >= 0)
+                Require(false, frame, $"slot {slot} remained registered");
+            actors[slot] = null;
         }
     }
 
     private static SolidBody SpawnActor(GravitasWorldContext context, Vector3d origin, int slot)
     {
-        Vector2d position = ActorPosition(slot);
-        SolidBody body = Sphere(context, origin + new Vector3d(position.X, Fixed64.One, position.Y), Fixed64.One);
+        SolidBody body = Sphere(context, SpawnPosition(origin, slot), Fixed64.One);
         body.Sleep();
         return body;
+    }
+
+    private static Vector3d SpawnPosition(Vector3d origin, int slot)
+    {
+        Vector2d position = ActorPosition(slot);
+        return origin + new Vector3d(position.X, Fixed64.One, position.Y);
     }
 
     private static SolidBody Sphere(GravitasWorldContext context, Vector3d position, Fixed64 radius) =>
@@ -191,7 +215,7 @@ internal static class Strategy3DWorkload
         int toiIterations = 0;
         foreach (Region region in regions)
         {
-            var work = ObserveRegion(region, frame);
+            var work = ObserveRegion(region, frame, context.FrameCount);
             registered += work.Registered;
             awake += work.Awake;
             touchingPairs += work.TouchingPairs;
@@ -209,14 +233,14 @@ internal static class Strategy3DWorkload
     }
 
     private static (int Registered, int Awake, int TouchingPairs, int ChainContacts, int LargestChain, int ToiIterations)
-        ObserveRegion(Region region, int frame)
+        ObserveRegion(Region region, int frame, long absoluteFrame)
     {
         SolidBody[] actors = region.Actors;
         int registered = 0;
         int awake = 0;
         int toiIterations = 0;
-        int touchingPairs = CountTouching(region.Floor, frame) + CountTouching(region.Wall, frame)
-            + CountTouching(region.Obstacle, frame);
+        int touchingPairs = CountTouching(region.Floor, absoluteFrame) + CountTouching(region.Wall, absoluteFrame)
+            + CountTouching(region.Obstacle, absoluteFrame);
         for (int slot = 0; slot < actors.Length; slot++)
         {
             SolidBody actor = actors[slot];
@@ -229,7 +253,7 @@ internal static class Strategy3DWorkload
                 awake++;
             toiIterations += actor.LastContinuousCollisionToiIterationCount;
             Require(!actor.LastContinuousCollisionToiIterationLimitReached, frame, "projectile exceeded its TOI budget");
-            touchingPairs += CountTouching(actor.Collider, frame);
+            touchingPairs += CountTouching(actor.Collider, absoluteFrame);
             bool projectile = slot >= FirstProjectileSlot && frame is >= FireFrame and < RetireProjectilesFrame;
             if (!projectile)
                 Require((actor.Position3d.Y - Fixed64.One).Abs() <= FloorTolerance, frame, "a floor actor left its support band");
@@ -240,7 +264,7 @@ internal static class Strategy3DWorkload
             for (int slot = EncounterActors; slot < EncounterActors + SparseActors; slot++)
             {
                 SolidBody scout = actors[slot];
-                Require(scout.Position3d.Z > region.Origin.Z + (Fixed64)9 && IsTouching(scout.Collider, region.Floor, frame),
+                Require(scout.Position3d.Z > region.Origin.Z + (Fixed64)9 && IsTouching(scout.Collider, region.Floor, absoluteFrame),
                     frame, $"sparse actor {slot} did not move along the floor");
             }
         if (frame == FireFrame)
@@ -262,7 +286,7 @@ internal static class Strategy3DWorkload
     }
 
     // Each pair is stored on only one collider. Holder references are excluded.
-    private static int CountTouching(LSCollider collider, int frame)
+    private static int CountTouching(LSCollider collider, long frame)
     {
         int count = 0;
         if (collider.CollisionPairs is { } pairs)

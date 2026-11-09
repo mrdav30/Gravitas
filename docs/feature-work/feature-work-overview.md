@@ -40,9 +40,12 @@ instead of burying it in notes.
     and 3D, captured baseline frame distributions, and profiled the crowded
     1,024-actor 3D stage. Phase 2 measured the X/Z cell-size tradeoff, local
     60 Hz headroom and synthetic curved-contact step costs. Representative
-    scene frequency remains open under experimental #024. Phase 3 follows with
-    churn soak for sustained tails and memory. An MMO-zone variant follows
-    only when it adds distinct actor-policy evidence.
+    scene frequency remains open under experimental #024. Phase 3 reproduced
+    warmed tails and managed heap plateaus under churn. The 16-unit cells lowered
+    warmed crowded p99 while retaining more heap than the 8-unit reference.
+    A 2D retirement reference root is tracked under [#149](issue-tracker.md#grv-issue-149).
+    Host guidance remains pending. An MMO-zone variant follows only when it
+    adds distinct actor-policy evidence.
   - [`Long-Duration Physics Quality And Tuning`](2026-10-06-long-duration-physics-quality-and-tuning-plan.md)
     follows initial workload evidence. Reuse existing stack/chain/ragdoll tests
     and telemetry to measure drift, penetration, energy behavior, sleep/wake and

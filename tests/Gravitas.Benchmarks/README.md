@@ -239,6 +239,35 @@ The verifier checks replay, floor support, projectile stops and connected
 encounter chains for each configuration. The alternate cell sizes have
 their own trace IDs.
 
+### Opt-in evolving strategy soak
+
+```powershell
+$dll = 'tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll'
+$env:GRAVITAS_STRATEGY_SOAK_HEAP = '0'
+$env:GRAVITAS_STRATEGY_FRAME_CSV = '1'
+dotnet $dll soak-strategy-2d 1024
+dotnet $dll soak-strategy-3d 1024 8
+dotnet $dll soak-strategy-3d 1024 16
+```
+
+Omit the actor count for the 256-actor tier. Each launch keeps one context
+alive for four warmup cycles and 80 measured cycles (10,240 frames).
+Each 128-frame cycle runs the verified quiet, sparse and crowded sequence,
+then rearms the moving actors and observes a quieter recovery. The output
+includes step and scenario-frame tails, allocation counts, GC activity
+and process working set. CSV output includes absolute frame, measured
+cycle, cycle phase and both timing and allocation windows.
+
+Run the same command in a separate fresh process with
+`GRAVITAS_STRATEGY_SOAK_HEAP=1` for the untimed retained-heap probe. It
+checks physical milestones in each cycle and forces collection at matching
+recovery checkpoints, after actor retirement and cooldown, and after context
+disposal. Compare the ordered query and terminal replay hashes across runs
+of the same configuration and the checkpoint hash across heap probes.
+`GRAVITAS_STRATEGY_SOAK_CYCLES` can shorten a smoke run or extend the
+capture (1–4,096 cycles). Both commands are separate from base tests and
+BenchmarkDotNet discovery.
+
 ### Opt-in curved-contact step envelopes
 
 ```bash
