@@ -108,7 +108,7 @@ public sealed partial class GravitasPhysics2DService
         {
             if (pairSnapshotStart == 0)
             {
-                _groundingPairSnapshot.FastClear();
+                _groundingPairSnapshot.Clear();
             }
             else
             {
@@ -118,7 +118,7 @@ public sealed partial class GravitasPhysics2DService
 
             if (snapshotStart == 0)
             {
-                _groundingBodySnapshot.FastClear();
+                _groundingBodySnapshot.Clear();
             }
             else
             {

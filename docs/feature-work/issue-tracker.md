@@ -55,40 +55,7 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-<a id="grv-issue-149"></a>
-
-#### GRV-Issue-149 — 2D grounding snapshot retains retired actor graphs
-
-**Discovered 2026-11-08. Priority medium.** Reproduced in package-backed
-Release `net10.0` on Gravitas `c820b8ee` during the
-[Phase 3 churn soak](2026-10-06-evolving-game-capacity-and-soak-plan.md#retained-managed-memory).
-The affected owner is
-[`GravitasPhysics2DService.RefreshGroundingFromDiscreteResponse`](../../src/Gravitas/Core/2D/Services/GravitasPhysics2DService.Grounding.cs).
-Its outer snapshot cleanup uses `FastClear()`, leaving body and collider
-references in the backing array. A smaller subsequent population can leave
-the unused tail intact. [#144](#grv-issue-144) fixed the reset boundary.
-
-Reproduce with an owned pure-2D context at 60 Hz and a planar grid spanning
-X/Z ±16 with 8-unit cells. In a non-inlined helper, register one unit-mass,
-unit-radius circle at the origin with zero gravity scale and manual grounding.
-Complete `Simulate + LateSimulate` once, deactivate the body, and return only
-weak references to the body, collider and host agent. Complete 1,024 empty
-steps with the context kept alive. Confirm zero registered bodies, colliders
-and active partitions. Force a full collection, wait for finalizers, then
-collect again. No queries, replay hashing or other colliders are needed.
-
-Three fresh processes retained all three targets after the populated step.
-The control that skipped that step collected all three. In the populated
-case, invoking `Clear(clearRetainedReferences: true)` on the private
-`_groundingBodySnapshot` in the disposable diagnostic released all three
-after the next collection. This isolates a live-context reference root.
-The observed soak heap plateau shows bounded retention under that envelope.
-
-Add a focused public-lifecycle regression in the owning runtime suite and
-release snapshot references when their observation lifetime ends. Verify
-reentrant snapshot safety, deterministic replay, and warm allocation and
-step cost. The disposable probe is under ignored
-`artifacts/strategy-phase3/retirement-probe`.
+No active issues.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
@@ -105,6 +72,7 @@ validation, tradeoffs and links to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                                                                                         | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="grv-issue-149"></a>GRV-Issue-149 | 2026-11-09 | Fixed: Clear the occupied body and pair snapshot slots after the outer 2D grounding refresh. Reusable capacity and nested callback ranges are preserved. | [Live-context regression](../../tests/Gravitas.Tests/Physics2D/SolidBody2DGroundingTests.cs), [soak finding](2026-10-06-evolving-game-capacity-and-soak-plan.md#retained-managed-memory). The retired body, collider and agent are collectible after 1,024 empty steps. Both 2D strategy traces and the 1,024-actor soak replay and per-frame allocations match their baselines. The 64- and 1,024-pair warm step probes allocated 0 B before and after, with overlapping timing ranges across three launches per variant. |
 | <a id="grv-issue-125---isolated-native-access-violation-during-mesh-inertia-benchmarking"></a><a id="grv-issue-125"></a>GRV-Issue-125                                                           | 2026-10-30      | Investigation closed, not reproduced: Retained the existing raw-output mitigation; bounded frozen/current inertia and separate CLR-host replays pass. Historical native causes remain unproved.                                                                                                                                                                 | [Closeout](done/2026-10-30-benchmark-host-and-native-crash-closeout.md#grv-issue-125)                                                                                                                                                                                                                                                            |
 | <a id="grv-issue-111---local-stack-benchmark-hosts-can-omit-fixedmathsharp-compile-references"></a><a id="grv-issue-111"></a>GRV-Issue-111                                                      | 2026-10-30      | Fixed: Canonical project discovery and exact local dependency references preserve stock validation and CLI choices. Enabled diagnostics optimization in its declared Lean configuration; source/package launcher probes and real Release/Lean jobs pass.                                                                                                        | [Closeout](done/2026-10-30-benchmark-host-and-native-crash-closeout.md#grv-issue-111)                                                                                                                                                                                                                                                            |
 | <a id="grv-issue-148---closed-convex-mesh-containment-is-missed-for-mixed-circle-and-capsule-slabs"></a><a id="grv-issue-148"></a>GRV-Issue-148                                                 | 2026-10-30      | Fixed: Select exact whole-hull contact for contained mixed circles and complete capsule slabs, preserving finite witnesses, materials, compound identity, query/CCD admission and existing planar mobility.                                                                                                                                                     | [Closeout](done/2026-10-30-mixed-curved-slab-containment-closeout.md), [host-step and witness regressions](../../tests/Gravitas.Tests/CollisionHandling/ConvexMeshCurvedSlabContainmentTests.cs)                                                                                                                                                 |

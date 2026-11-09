@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -704,6 +705,36 @@ public sealed partial class SolidBody2DGroundingTests
         long allocatedBytes = MeasureAllocatedBytes(body.CheckGround);
 
         allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void FullStep_ReleasesRetiredActorGraphWhileContextRemainsLive()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 60);
+        WeakReference[] retired = StepAndRetireCircle(context);
+
+        for (int i = 0; i < 1024; i++)
+            Step(context);
+        Assert.Equal(0, context.Physics2D.BodyCount);
+        Assert.Equal(0, context.Physics2D.ColliderCount);
+        Assert.Equal(0, context.Collisions2D.ActivePartitionCount);
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        Assert.All(retired, target => Assert.False(target.IsAlive));
+        GC.KeepAlive(context);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference[] StepAndRetireCircle(GravitasWorldContext context)
+    {
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        body.UseManualGrounding();
+        Step(context);
+        body.Deactivate();
+        return [new WeakReference(body), new WeakReference(body.Collider), new WeakReference(body.Agent)];
     }
 
     private static GravitasWorldContext CreateContext(int frameRate = 4) =>
