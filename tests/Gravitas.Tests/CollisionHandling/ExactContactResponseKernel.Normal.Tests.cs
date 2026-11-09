@@ -9,6 +9,20 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class ExactContactResponseKernelNormalTests
 {
     [Fact]
+    public void SharedFrameLever_ShouldRotateTheFullLocalDifference()
+    {
+        var rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.One, Fixed64.Zero, Fixed64.One).Normalized;
+        Vector3d origin = Vector3d.Up * Fixed64.MaxValue;
+        var point = new FixedPointAnchor(origin, rotation, Vector3d.Right * Fixed64.MaxValue, Vector3d.Up);
+        var center = new FixedPointAnchor(origin, rotation, Vector3d.Left * Fixed64.MaxValue, Vector3d.Up);
+        ExactLever3D lever = ExactLever3D.Create(point, center);
+
+        Assert.True(ExactLever3D.TryGetTransformedScaledCrossProduct(lever, Vector3d.Up,
+            Fixed3x3.Identity, Fixed64.Half, Fixed64.One, Fixed64.One, out Vector3d delta));
+        Assert.Equal(Vector3d.Right * Fixed64.MaxValue, delta);
+    }
+
+    [Fact]
     public void AccumulatedNormal_ShouldBounceWhenFrozenImpactSpeedExceedsFixedRange()
     {
         ExactLever3D lever = CreateLever(Vector3d.Zero, Vector3d.Zero);

@@ -490,15 +490,11 @@ links back to these measurements.
 | Release | 8,393 | 54,012 / 54,012 | 22,080 / 22,080 | 5,634 / 5,634 |
 | ReleaseLean | 8,322 | 54,010 / 54,010 | 22,080 / 22,080 | 5,633 / 5,633 |
 
-The measured cost of sustained cuboid support is the active
 [GRV-Benchmark-034](benchmark-signal-hardening-backlog.md#grv-benchmark-034)
-follow-up before expanding the Phase 1 workloads to chains and ragdolls.
-Preserve the corrected stack's replay and support bounds when comparing
-response cost. The
-[density capture](benchmark-signal-hardening-backlog.md#sustained-support-at-scene-density)
-extends the support check to 32 interfaces and confirms that the heavy-bottom
-control remains over the 60 Hz interval after the exact-response improvement.
-Phase 3 will compare solver settings across the wider workload set.
+closed after reducing the exact response cost of sustained cuboid support.
+The [density closeout](done/2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure)
+preserves the four-, eight-, and sixteen-stack replay and budget evidence.
+Phase 1 can continue with chains and ragdolls.
 
 ## Phase 2: Duration And Continuation
 
@@ -528,6 +524,8 @@ repair their owning layer before calling an affected configuration acceptable.
 - [ ] Compare current default solver settings with a lower/higher iteration
       setting, initially 2/6/12 iterations where supported. Add tuning
       dimensions only when a fixture identifies a meaningful sensitivity.
+      Include the awake heavy-bottom density cases and retain the #151
+      support bounds when assessing lower iteration counts.
 - [ ] Report quality and measured complete-step time together at each setting,
       including awake population, contact/island counts and relevant CCD work.
       Changing frame rate requires equal simulated duration, not equal frame

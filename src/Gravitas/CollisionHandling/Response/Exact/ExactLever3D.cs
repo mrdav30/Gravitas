@@ -43,6 +43,22 @@ internal readonly partial struct ExactLever3D
         in FixedPointAnchor point,
         in FixedPointAnchor center)
     {
+        // Shared frame and additive terms cancel before exact rotation.
+        if (point.Origin == center.Origin
+            && point.Rotation == center.Rotation
+            && point.LocalDisplacement == center.LocalDisplacement
+            && point.LocalTranslation == center.LocalTranslation
+            && point.ExactLocalTerm.Equals(center.ExactLocalTerm))
+        {
+            var basis = new WideRationalBasis3d(point.Rotation);
+            WideAxis3 offset = WideRigidProjection.TransformLocalAxis(basis,
+                WideArithmetic.SubtractSigned192(Signed192.Raw(point.LocalPoint.X), Signed192.Raw(center.LocalPoint.X)),
+                WideArithmetic.SubtractSigned192(Signed192.Raw(point.LocalPoint.Y), Signed192.Raw(center.LocalPoint.Y)),
+                WideArithmetic.SubtractSigned192(Signed192.Raw(point.LocalPoint.Z), Signed192.Raw(center.LocalPoint.Z)));
+            return new ExactLever3D(Signed576.ExtendValue(offset.X), Signed576.ExtendValue(offset.Y),
+                Signed576.ExtendValue(offset.Z), Signed576.ExtendValue(basis.Denominator));
+        }
+
         WidePointAnchor3d.GetExactRelativeOffsetRatio(
             point.Origin,
             point.Rotation,

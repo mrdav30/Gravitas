@@ -13,6 +13,7 @@ internal static partial class QualityStackWorkload
     internal static int RunDensity(bool verify)
     {
         RunDensityCase(4, mixedLoads: false, verify);
+        RunDensityCase(8, mixedLoads: false, verify);
         RunDensityCase(16, mixedLoads: false, verify);
         RunDensityCase(16, mixedLoads: true, verify);
         return 0;
@@ -31,13 +32,13 @@ internal static partial class QualityStackWorkload
             ? FixedQuaternion.FromAxisAngle(Vector3d.Up, TiltRadians)
             : FixedQuaternion.Identity;
         int columns = count == 4 ? 2 : 4;
-        int pitch = 16 / columns;
-        int origin = (pitch - 16) / 2;
+        int pitchX = 16 / columns;
+        int pitchZ = 16 / (count / columns);
         for (int i = 0; i < count; i++)
         {
             StackLoad load = loads[i % (mixedLoads ? loads.Length : 2)];
-            Fixed64 x = (Fixed64)(origin + i % columns * pitch);
-            Fixed64 z = (Fixed64)(origin + i / columns * pitch);
+            Fixed64 x = (Fixed64)((pitchX - 16) / 2 + i % columns * pitchX);
+            Fixed64 z = (Fixed64)((pitchZ - 16) / 2 + i / columns * pitchZ);
             Vector2d bottom = Start(0, tilted: false, load.Aligned);
             Vector2d top = Start(1, tilted: false, load.Aligned);
             lower[i] = CreateStackCuboid();

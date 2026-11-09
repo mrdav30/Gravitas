@@ -16,6 +16,7 @@ queue, experimental signals and compact
 
 | Signal                                                                                                                                                                 | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-034 — Rotated Cuboid Support Step Cost](#grv-benchmark-034) | Closed | 2026-11-09 | Shared-frame exact lever reduction lowers complete-step cost. Dense awake support remains a documented solver-budget limit. |
 | [GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost](#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost)                                             | Closed | 2026-11-01 | Ordinary whole-mesh convex patch/prism contacts reuse native SAT/witness/reduction owners; full-step, physical and compatibility evidence follows.                                                                                                                                              |
 | [GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost](#grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost)                             | Closed | 2026-11-01 | Exact unit-basis planar sampling removes redundant decomposition while preserving transform freshness and fixed-point rounding; matched host/refresh controls and limits follow.                                                                                                                |
 | [GRV-Benchmark-029 — Dense mesh sweeps](#grv-benchmark-029--dense-mesh-sweep-cost-after-exact-contact-hardening)                                                       | Closed | 2026-10-31 | Certified patch/carrier sweeps and query-local duplicate reuse reduce query costs by 96.6–99.9% at 2,048 triangles and zero warm allocation; finite geometry and small-control limits are explicit.                                                                                             |
@@ -46,6 +47,225 @@ queue, experimental signals and compact
 | GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                                                                                                       | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
 | GRV-Benchmark-003 — 3D full-runtime CCD allocation                                                                                                                     | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
 | GRV-Benchmark-004 — Grounding raycast probe allocation                                                                                                                 | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+<a id="grv-benchmark-034"></a>
+
+### GRV-Benchmark-034 — Rotated Cuboid Support Step Cost
+
+**Discovered** 2026-11-09 during the GRV-Issue-151 verification.
+**Owner** Gravitas 3D cuboid contact generation and discrete island response.
+**Closed** 2026-11-09. Focused exact-response work is complete. The
+sixteen-stack heavy-bottom case remains a solver-budget stress case.
+
+Use the `verify-quality-stack-support` fixture in Release at 60 Hz and six
+iterations. For timing, disable sleep in both variants, warm 64 steps, and
+measure `Simulate` plus `LateSimulate` on frames 65–256. Run the fixture
+against stock `4b0d83af` and the issue fix with released packages. Three
+separate launches per variant produced medians of 1.412 → 1.533 ms for
+offset 100:1 and 0.466 → 0.955 ms for centered 100:1. The heavy-bottom
+centered control measured 0.413 → 1.995 ms despite staying on sequential
+response. All measured cases had active supports throughout the warm
+window and 0 B of per-thread step allocation. The stock and corrected
+scenes exercise different trajectories. In the separate replay capture,
+the two support interfaces averaged two fresh rows per warm frame on
+stock and 7.16–8.00 on the candidate, depending on the case.
+[GRV-Issue-151 evidence](../2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-151-implementation)
+
+In the 2026-11-09 attribution capture, disposable timing scopes recorded
+inclusive elapsed time inside the same eight warm workloads. Scope
+`DoCuboidsCheck` and its `TryBuildCuboidFaceContacts` child, the island's
+`TrySeedSupportedIslandNormals`, and the per-iteration
+`CollisionResponse.CalculateImpulse` and its exact-response children.
+Count compact failures by stage before the normal fallback. The
+percentages describe the instrumented runs. Use uninstrumented launches
+for throughput comparisons.
+
+| Stage | Share of warm step time | Observation |
+| --- | ---: | --- |
+| Cuboid detection | 5–13% | Finite face clipping accounted for 3–7% of the step. |
+| Contact-row response | 66–89% | Includes contact preparation, warm starts, normal and friction work. |
+| Coupled normal seed | 6% in both top-heavy stacks | The mass-swapped and equal-mass controls stayed sequential. |
+| Exact normal fallback | 34% offset, 49% centered in the heavy-bottom controls | 3,264 and 5,568 fallback calls out of 9,216 normal rows, respectively. All followed compact angular-delta rejection. |
+| Exact friction velocity deltas | 15% offset, 14% centered in the top-heavy stacks | 48 and 24 calls, respectively. The radical rounding search was expensive even at this frequency. |
+
+Keep the finite witnesses, solver order and iteration count. The first
+optimization bounds exact Coulomb rounding by the magnitudes of its
+terms, skips incoming point velocity when restitution is zero, and skips
+normal angular delta products for zero inverse inertia.
+
+Reproduce the equivalent-work timing with
+`measure-quality-stack-support` in the benchmark launcher. Copy the
+benchmark-only CLI and fixture changes onto `898dd811` for the corrected
+baseline. Both builds use the same released packages. The command disables
+sleep, checks both interfaces on each measured frame, and emits warm
+allocation counts, fresh support rows and the terminal replay hash. Use
+`verify-quality-stack-support` separately to compare per-frame replay,
+manifold rows and geometric support with normal sleep settings.
+
+On Windows x64 with .NET SDK 10.0.302 and runtime 10.0.10, five independent
+Release launches per revision ran in `A B B A A B B A A B` order. Times
+are medians of launch means in milliseconds. Both support interfaces were
+active in all 192 measured steps per case. Fresh row totals and sleep-disabled
+terminal hashes matched in every launch, with 0 B of managed allocation
+on the stepping thread.
+
+| Lower / upper mass | Alignment | Baseline ms | Candidate ms | Change | Fresh support rows |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 / 100 | Offset | 1.607 | 1.391 | −13.4% | 1,418 |
+| 1 / 100 | Centered | 0.963 | 0.879 | −8.7% | 1,376 |
+| 100 / 1 | Offset | 1.677 | 1.733 | +3.3% | 1,536 |
+| 100 / 1 | Centered | 1.988 | 1.933 | −2.8% | 1,536 |
+| 100 / 100 | Offset | 0.908 | 0.949 | +4.5% | 1,522 |
+| 100 / 100 | Centered | 0.812 | 0.816 | +0.5% | 1,527 |
+| 1 / 1 | Offset | 0.888 | 0.887 | −0.2% | 1,524 |
+| 1 / 1 | Centered | 0.869 | 0.849 | −2.2% | 1,531 |
+
+The top-heavy timing ranges separated across the five launches in each
+variant. The heavy-bottom controls and the offset heavy equal-mass
+control had overlapping launch ranges. Both heavy-bottom stacks remain
+expensive. The no-sleep top-heavy terminal hashes were
+`22a417806fe362272fc563376f09243b` offset and
+`9d4805f5d6ddde5238ada6a466fc7519` centered. In Release and ReleaseLean,
+the support and quality frame CSVs were byte-identical between builds.
+ReleaseLean also matched the warm support counts and terminal hashes
+with 0 B allocated. In both configurations, the 1,024-actor 3D strategy
+verifier matched its 96-frame trace `d5e9d21184fbb529b3b3b83e86f2b6b1`,
+with chains completing at frame 67. The instrumented strategy verifier
+recorded 109,416 normal rows across its replay passes, with zero calls
+to rotated cuboid clipping, exact normal fallback or exact friction.
+That fixture does not exercise the cost identified by this signal.
+
+The full Release and ReleaseLean suites passed 8,399 and 8,328 cases,
+respectively. One additional exact restitution regression passed in each
+configuration. The combined raw coverage in each configuration reached
+54,019 lines, 22,086 branches and 5,634 methods with zero uncovered points.
+
+Endpoint-level counts in the centered heavy-bottom control attributed all
+5,568 failures to the inverse-inertia transform. The offset control had
+2,880 rejected transforms and 768 rejected torque crosses, with some
+rows rejecting both endpoints.
+
+#### Sustained support at scene density
+
+Run `measure-quality-stack-density` for complete physics step timing and
+`measure-quality-stack-density verify` for a per-frame replay digest that
+includes solver caches. Use the same benchmark-only changes with
+`dff545e8` as the runtime baseline. This synthetic, support-heavy fixture
+places four or sixteen independent two-body stacks on a shared 16×16-unit
+floor. The four-stack lattice has 8-unit spacing and the sixteen-stack
+lattice has 4-unit spacing. The heavy-bottom cases alternate centered and
+offset 100 / 1 mass loads. The second sixteen-stack case starts at 15°
+yaw and repeats 100 / 1 centered, 100 / 1 offset, 1 / 100 centered, and
+1 / 1 offset loads. All cases run in pure 3D at 60 Hz with six iterations
+and sleep disabled, warming frames 1–64 and measuring frames 65–256.
+
+The baseline stage capture attributed 41% of the dense heavy-bottom step
+to exact normal fallback, with 84,807 fallback calls across 147,432
+normal rows. The mixed-load case spent 28% of the step in 32,636
+fallbacks across 142,296 normal rows. Clipping accounted for 2–4% of these
+steps. Both scenes sustained all 32 rotated support interfaces throughout
+the timing window.
+
+The solver now reuses common products across the exact normal velocity
+components, groups terms that share an effective-mass factor, and uses an
+exact zero lever for bodyless endpoints. The 3D island constraint sort
+compares the byte-backed kind directly to avoid enum boxing. These
+changes preserve contact admission and nearest-even rounding.
+In the follow-up stage probe, exact normal fallback still ran 84,807
+times in the dense heavy-bottom case. Its share of instrumented step
+time fell from 40.9% to 36.3%, with the largest reductions inside
+effective-mass and linear-delta calculation.
+
+Three Windows x64 Release launches per revision ran in
+`A B B A A B` order on .NET SDK 10.0.302 and runtime 10.0.10 with
+released dependencies. The table reports medians of launch percentiles
+and launch overrun counts against the 16.67 ms interval.
+
+| Workload | Step p50, ms | Step p95, ms | Overruns / 192 | Fresh rows in window |
+| --- | ---: | ---: | ---: | ---: |
+| 4 heavy-bottom stacks | 7.154 → 6.632 | 8.386 → 7.831 | 0 → 0 | 6,134 |
+| 16 heavy-bottom stacks | 32.346 → 29.975 | 36.640 → 33.955 | 192 → 192 | 24,572 |
+| 16 mixed-load stacks | 17.473 → 16.378 | 21.064 → 19.923 | 159 → 61 | 23,716 |
+
+The 16-stack heavy-bottom case fell from 9,216 B to 0 B over the warm
+window. The 16-stack mixed-load case fell from 75,248 B to 66,032 B.
+The 9,216 B difference was 48 B per step from the constraint sort.
+Four stacks allocated 0 B in both builds. The mixed-load scene's
+remaining allocations are tracked under [GRV-Benchmark-035](../benchmark-signal-hardening-backlog.md#grv-benchmark-035).
+
+The three scene traces, including solver caches, matched the baseline
+in Release and ReleaseLean. Both configurations agreed on the warm
+allocation totals. The original support and quality CSVs were
+byte-identical, and both 1,024-actor strategy traces and work counts
+matched. Release passed 8,401 tests and ReleaseLean passed 8,330. Each
+covered 53,953 lines, 22,088 branches and 5,635 methods with zero
+uncovered points.
+
+In table order the digests are `ca6a24a2e0b45eef72d47f6cff5319e3`,
+`470a322fba9007a7607b3f810bb017be`, and
+`20cc20e1f1a705542a6c3d871c1d7109`.
+The dense heavy-bottom case still exceeded the interval on all 192
+steps. The all-heavy case stresses fallback frequency. The mixed-load case
+shows the budget sensitivity when only half the stacks are heavy-bottom.
+
+#### Shared-frame lever reduction and closure
+
+The final pass subtracts local points before rotation when two anchors
+share the exact origin, rotation and other additive terms. The
+subtraction uses a signed wide value, so opposite ends of the scalar
+range remain valid. The solver reuses FixedMathSharp's exact rigid
+projection and carries one rotation denominator into response. Other
+anchor pairs keep the general relative-offset calculation. A focused
+regression rotates a local difference wider than Q32.32 and verifies its
+final representable angular delta. The change needs no solver cache or
+adjustment to the contact rows, iteration count, or rounding.
+
+The dense heavy-bottom stage probe counted 209,226 uses of the shared
+frame. Exact lever construction fell from 9.5% to 2.4% of instrumented
+step time. The normal fallback count held at 84,807 calls, with its
+inclusive share falling from 36.3% to 31.6%. The remaining cost includes
+the full set of normal and friction rows across all six sweeps.
+
+Use the current `measure-quality-stack-density [verify]` fixture on
+both builds. For the baseline, apply only the fixture's eight-stack
+addition to `5bde8ef2`. The new 4-by-2 lattice keeps 4-unit X spacing
+and 8-unit Z spacing. The original four- and sixteen-stack positions
+are unchanged. Three fresh Release launches per build ran in
+`A B B A A B` order on the same Windows x64 SDK and runtime as the
+earlier density capture. Values are medians of per-launch statistics.
+
+| Workload | Step p50, ms | Step p95, ms | Overruns / 192 |
+| --- | ---: | ---: | ---: |
+| 4 heavy-bottom stacks | 6.720 → 5.899 | 8.085 → 7.425 | 0 → 0 |
+| 8 heavy-bottom stacks | 17.889 → 15.089 | 19.592 → 15.780 | 151 → 2 |
+| 16 heavy-bottom stacks | 29.743 → 24.810 | 34.177 → 29.179 | 192 → 192 |
+| 16 mixed-load stacks | 16.696 → 15.372 | 20.049 → 18.492 | 99 → 44 |
+
+The heavy-bottom p50 launch ranges separated in all three cases.
+Eight-stack candidate runs had 0, 2, and 18 overruns. The mixed-load
+timings overlapped and one candidate launch reached 43.030 ms p95.
+Use those results as a host-specific budget check for sustained awake
+contacts. Four stacks stayed within the full interval on this host.
+Eight left little headroom for the rest of the host frame. Sixteen
+heavy-bottom stacks remained over budget on every measured step.
+
+Release and ReleaseLean matched all four per-frame replay digests,
+including solver caches, and the live support work counts. The
+eight-stack trace was `6c28992a09deb949a6788b99645ae868` with 12,286
+fresh rows. All three
+heavy-bottom cases allocated 0 B in the warm window. The mixed-load
+case matched the prior 66,032 B total tracked under
+[GRV-Benchmark-035](../benchmark-signal-hardening-backlog.md#grv-benchmark-035).
+The original stack CSVs and both 1,024-actor strategy traces matched.
+Release passed 8,402 tests and ReleaseLean passed 8,331, with zero
+uncovered lines, branches or methods in both configurations.
+
+Close the focused optimization with the finite support rows and exact
+fallback intact. Carry the remaining density limit into
+[Phase 3 solver tuning](../2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-3-quality-versus-cost).
+Reopen this signal for an equivalent-work regression or when a
+representative host workload exceeds its reserved physics budget at
+settings that meet its support and replay requirements.
 
 ### GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost
 
