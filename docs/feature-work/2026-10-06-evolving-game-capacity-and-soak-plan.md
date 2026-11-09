@@ -1,7 +1,7 @@
 # Evolving Game Capacity And Soak Plan
 
 **Date:** 2026-10-06  
-**Status:** Phase 1 verified. Phase 2 baseline captures and initial 1,024-actor 3D attribution are complete.  
+**Status:** Phases 1 and 2 complete. Representative curved-contact frequency remains open under #024. Phase 3 churn soak is next.  
 **Owner:** Gravitas benchmark workloads; lower-stack changes only when profiles
 justify them.
 
@@ -235,23 +235,23 @@ observation. These local overruns leave 60 Hz headroom unverified.
 - [x] Capture baseline physics-step and scenario-frame distributions for all
       four workloads on a documented host. Profile sparse and crowded stages
       separately for the 1,024-actor 3D tier.
-- [ ] Count active/awake population, broad/narrow-phase pairs, solver islands,
+- [x] Count active/awake population, broad/narrow-phase pairs, solver islands,
       contacts, query candidates and CCD work using available owners. Separate
       dispatched curved queries, root-path entries, admitted candidates and
       final winners when reliable attribution is available.
-- [ ] Reuse #024 pose sweeps for geometric envelopes and declare their synthetic
+- [x] Reuse #024 pose sweeps for geometric envelopes and declare their synthetic
       nature. Include tilted/tumbling cylinder/cone/triangle and capsule/slab
       candidates without implying they dominate an ordinary upright scene.
-- [ ] If current counters cannot identify internal root work, justify narrowly
+- [x] If current counters cannot identify internal root work, justify narrowly
       scoped measurement support and verify unchanged answers. Identify
       instrumented builds separately from clean timing binaries.
-- [ ] Vary one meaningful setting at a time around the baseline: cell size,
-      actor/collider policy, grounding, solver iterations and CCD. Require
-      quality checks alongside throughput; faster incorrect behavior is not a
-      viable preset.
-- [ ] Establish explicit host tick budgets and physics headroom before labeling
-      an actor tier accepted. Publish measured cost curves when no budget is
-      chosen; isolated query or batch means do not establish host capacity.
+- [x] Compare X/Z cell sizes with Y fixed and verify replay, floor support,
+      projectile stops, and connected chains alongside timings.
+- [x] Use the measured workload and quality evidence to select any further
+      one-setting comparisons in actor/collider policy, grounding, solver
+      iterations or CCD.
+- [x] Publish measured cost curves and time remaining in the 60 Hz interval.
+      Require a host-specific reserve before accepting an actor tier.
 
 Exit: a capacity characterization and a decision for #024: a documented small
 contribution, a measured optimization opportunity, or an explicit remaining
@@ -357,10 +357,240 @@ had zero crowded interval misses. They show that the monitor stack can be
 prominent without recorded contention. They do not attribute an individual
 baseline tail to lock waits or GC.
 
-Matched configuration and quality comparisons remain open. A cell-size
-comparison can test how refresh and pair distribution trade off while
-checking floor support, CCD stops, and connected-chain behavior. No runtime
-change was made from the sampled attribution.
+### Matched 1,024-Actor 3D X/Z Cell Sizes
+
+On the baseline Windows x64 host, build package-backed Release `net10.0`
+with the benchmark selector change on Gravitas `91382799`. Run
+`verify-strategy-3d 1024 4`, `verify-strategy-3d 1024 8` and
+`verify-strategy-3d 1024 16` with `GRAVITAS_STRATEGY_FRAME_CSV=1`. The
+rectangle bounds, Y edge of 4, region origins, commands and solver settings
+are identical. Run six blocks with cell sizes ordered (4, 8, 16),
+(16, 8, 4), (8, 16, 4), (4, 16, 8), (16, 4, 8), and (8, 4, 16).
+Each launch uses a fresh process and the same timing windows and warmup as
+the baseline. Raw CSV output, build hashes and host metadata are in ignored
+`artifacts/strategy-phase2-xz-cells`. Use the contemporaneous 8-unit control
+for the comparison.
+
+Each cell size verified all 96 replay frames across two fresh contexts in
+every process. Each configuration kept the ordinary spheres in their floor
+support band and verified all 32 scout floor contacts at frame 64. The eight
+projectiles reached their wall stops with zero wall-normal velocity. All four
+24-actor encounter chains completed at frame 67 with 92 simultaneous adjacent
+contacts. Ordered query observations also passed. Digests identify the
+configuration and include its observed work counts. ReleaseLean reproduced
+all three digests, and all four original verifier commands kept their
+recorded digests.
+
+| X/Z edge | Observation digest | Sparse / crowded touching pairs per launch |
+| ---: | --- | ---: |
+| 4 | `9f1d6eae83995bd4a3c730f379a2eadb` | 2,408 / 8,184 |
+| 8 | `d5e9d21184fbb529b3b3b83e86f2b6b1` | 3,944 / 9,720 |
+| 16 | `ef91be67d1a2dad2aa00ffb755e62ab4` | 6,126 / 12,856 |
+
+Values are pooled by cell size and stage, in milliseconds. Each timing
+cell gives median / p95 / p99 / maximum. There are 144 samples per quiet
+row and 192 per active row. Overruns use the full 16.67 ms interval.
+
+| X/Z edge | Stage | Physics step | Scenario frame | Over budget, physics / scenario |
+| ---: | --- | --- | --- | ---: |
+| 4 | Quiet | 5.11 / 5.76 / 6.30 / 6.48 | 5.11 / 5.76 / 6.30 / 6.48 | 0 / 0 |
+| 4 | Sparse | 12.71 / 14.27 / 14.64 / 14.82 | 12.73 / 14.41 / 15.66 / 15.83 | 0 / 0 |
+| 4 | Crowded | 34.76 / 35.52 / 36.30 / 36.52 | 34.78 / 35.58 / 36.30 / 36.53 | 192 / 192 |
+| 8 | Quiet | 3.24 / 3.72 / 3.83 / 3.92 | 3.25 / 3.73 / 3.83 / 3.92 | 0 / 0 |
+| 8 | Sparse | 6.40 / 7.57 / 7.91 / 8.01 | 6.47 / 7.73 / 8.15 / 8.33 | 0 / 0 |
+| 8 | Crowded | 15.38 / 16.17 / 16.73 / 18.63 | 15.44 / 16.17 / 16.73 / 18.63 | 2 / 2 |
+| 16 | Quiet | 2.83 / 3.62 / 4.46 / 4.61 | 2.84 / 3.63 / 4.46 / 4.69 | 0 / 0 |
+| 16 | Sparse | 5.67 / 7.07 / 8.53 / 8.97 | 5.69 / 7.07 / 8.53 / 9.02 | 0 / 0 |
+| 16 | Crowded | 12.22 / 13.62 / 34.34 / 53.71 | 12.27 / 13.63 / 34.68 / 54.04 | 7 / 7 |
+
+The 16-unit cells lowered the crowded scenario median by 2.63–3.38 ms in
+all six matched blocks. The frame-65 wake burst missed the interval in
+every 16-unit launch. It used 21.23–34.68 ms per scenario frame and allocated
+about 5.48 MB in physics, compared with 10.82–11.68 ms and 2.02 MB at 8.
+The additional 16-unit miss was frame 72 of the first process, which used
+54.04 ms with 48 physics bytes allocated. The 8-unit misses were frames
+73 and 81 in one launch. All observations are retained. The earlier
+8-unit baseline missed more often, which limits inference about absolute
+headroom from the new series.
+
+Two separate profile launches per size used the same EventPipe sampling
+method as the initial attribution, with distinct wrappers for frame 65 and
+frames 66–96. All four matched their configuration digest. Over frames
+66–96, partition preparation plus corrected-position publication fell from
+239–253 ms of inclusive sampled CPU weight at 8 units to 113–130 ms at 16.
+Collision distribution rose from 68–74 ms to 98–101 ms, alongside the higher
+touching-pair count. These are sampled CPU weights from 31 steps per launch.
+Each frame-65 wrapper contained only five sample intervals, which leaves the
+cause of its allocation and timing spike unresolved. The profile source and
+traces are under ignored `artifacts/strategy-phase2-xz-cells/profile`.
+
+Retain 8 as the reference for capacity comparisons. The 16-unit configuration
+is a useful contrasting case for the later churn soak because typical
+crowded frames are faster and the repeated wake burst is slower. The captures
+do not establish an additional setting comparison in actor policy, grounding,
+solver iterations or CCD. Keep those settings fixed for the soak and use
+physical-quality evidence to select any later tuning comparisons.
+
+### Reference 3D Work Counts
+
+Two untimed replays of the 1,024-actor, 8-unit reference matched the
+`d5e9d21184fbb529b3b3b83e86f2b6b1` digest and produced identical counts.
+Counts cover all 32 frames per stage, including the quiet frames omitted
+from timing. The broad count is the first partition visit of a pair in a
+frame, counted after the partition-version deduplication guard in
+`PhysicsPartition.ProcessPair`. The narrow count comes from
+`CollisionDetection.DoCollisionCheck(CollisionPair)`. Touching pairs include
+cached contacts. Island solves count entries into the island response path.
+Query candidates sum the service's reported candidate count after each
+scheduled ray or overlap.
+
+| Stage | Registered actors | Peak awake | Broad pair visits | Narrow dispatches | Touching pairs | Island solves | Queries / candidates | CCD TOI iterations |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Quiet | 1,024 | 0 | 0 | 0 | 0 | 0 | 32 / 16 | 0 |
+| Sparse | 1,016–1,024 | 40 | 27,680 | 1,216 | 3,944 | 1,128 | 32 / 16 | 8 |
+| Crowded | 1,024 | 128 | 54,340 | 6,904 | 9,720 | 1,336 | 32 / 16 | 0 |
+
+All stages had zero single-row fast-path solves and zero entries into the
+instrumented #024 curved paths. Crowded narrow dispatches grew 5.7× from
+sparse while query candidates stayed constant and projectile TOI work ended.
+The separate CPU profiles above show where crowded physics spent its time.
+
+### Synthetic Curved-Contact Step Envelopes
+
+Run the opt-in
+[`verify-curved-workload`](../../tests/Gravitas.Benchmarks/README.md#opt-in-curved-contact-step-envelopes)
+on the same Windows x64 host and released dependency versions as the baseline.
+The clean timing runs used Release `net10.0` on Gravitas `91382799` with
+the benchmark changes in this plan. Each of the 16 cases reuses one checked
+contact fixture with one dynamic capsule, cylinder or cone and one static
+target. The pure 3D cases use a triangle mesh or cylinder. Mixed cases use a
+circle or stadium slab. A 16-frame pose cycle uses nine distinct translations
+up to 1/4 unit from the authored pose. Tilted cases also sweep up to 4 degrees.
+The oblique stadium gap shifts the authored pose by `(0, 1/2, -1/2)` and
+slides along `(0, 1, -1)`. Each frame resets pose and motion. This controls
+the geometry presented to narrow phase across the sweep.
+
+Each launch uses two untimed 144-frame contexts to compare every state hash,
+diagnostic contact count and mixed-candidate count. The measured context
+checks terminal state and measures 128 steps after a 16-step warmup with
+diagnostics off. The physics window is `Simulate + LateSimulate`. The
+scenario window also includes the pose command and allocation measurement
+setup. Timing and validation run on the calling thread.
+
+#### Work Counts From A Separate Build
+
+The public diagnostics report emitted contacts. A disposable build counted
+earlier work in Gravitas at `91382799` and FixedMathSharp at release tag
+`v8.0.0` (`763efc57cea399cde375fe0ef4aa296c1eaa3cba`). Increment
+dispatch counters at the 3D pair dispatcher and mixed discrete manifold
+dispatcher. Count entries, isolation calls, returned roots, and roots
+passing feature filters in FixedMathSharp's `TriangleCylinderEdgeContacts`,
+`SegmentConeSurfaceCandidates.Rim`, and the `CylinderCapsuleEllipse` and
+`CapsuleSlabRim` parts of `WideConvexPrismRelations`. The stadium reciprocal
+isolation counts one batch across both charts and counts roots from each.
+For cone face work, separately count calls into
+`ConePlaneRayEvents.AccumulateCircles`, actual quadratic parameter solves,
+returned branches including conjugate reuse, and branches admitted by
+the circle feature. Record owner-level selections at result publication or
+rank reduction, as specified below. Reset counters after warmup and compare
+the two untimed replay totals. Use clean binaries for timing.
+
+The instrumented build reproduced all 16 clean trace digests and repeated
+each counter row exactly. Each row below has 128 narrow dispatches per replay.
+The selection columns count roots selected by the geometry owner before
+later contact manifold reduction.
+
+| Envelope | Root path entries | Isolation calls | Returned roots | Feature admitted | Selected contact / separation | Contact events |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Cylinder oblique | 128 | 1,920 | 1,144 | 632 | 120 / 0 | 128 |
+| Cylinder interior | 128 | 1,920 | 1,032 | 512 | 120 / 0 | 128 |
+| Cone oblique, boundary quartic | 128 | 512 | 512 | 128 | See cone ranks below | 128 |
+| Cone interior, boundary quartic | 72 | 288 | 576 | 0 | See cone ranks below | 72 |
+| Capsule/cylinder oblique | 128 | 128 | 128 | 128 | 128 / 0 | 128 |
+| Capsule/circle oblique | 128 | 128 | 128 | 128 | 128 / 0 | 128 |
+| Capsule/stadium oblique | 128 | 384 | 512 | 256 | 128 / 0 | 128 |
+| Capsule/stadium oblique gap | 128 | 384 | 512 | 256 | 0 / 128 | 0 |
+
+Cylinder cap, cone base, capsule side and straight gap controls had zero
+isolation calls and zero cone circle quadratic solves. Both cylinder rim
+envelopes had eight frames that isolated roots and emitted contacts without
+selecting a root contact. The oblique stadium gap isolated roots on all 128
+frames and emitted zero contacts.
+
+Cone oblique and interior each entered circle accumulation 512 times.
+Oblique made 4,368 quadratic parameter solves, returned 6,352 branches
+and admitted 1,248. Interior made 2,672 solves, returned 3,152 branches and
+admitted 552. `MeshConeFaceRegions.Samples` retained 120 and 72 curved
+circle-descriptor rows respectively. `MeshConeSurfaceBoundary` retained 32
+and zero co-minimal rim candidates at boundary ranking, before final
+manifold reduction. The interior case admitted no quartic roots even on
+the frames with a contact. Contact-event counts alone miss this work.
+
+#### Clean Frame Costs
+
+All six fresh Release processes and the ReleaseLean check matched the 16
+trace digests. The Release timing ranges below give the minimum and maximum
+of each launch's mean / p95 / p99 / maximum in milliseconds, using 128
+samples per case per launch. Overruns sum all six launches, using the
+16.67 ms interval. The clean Release and Lean runs each measured zero
+current-thread physics bytes in every case. Raw logs, binary hashes and
+instrumented source snapshots are under ignored `artifacts/strategy-phase2-curved`.
+
+| Envelope | Physics step | Scenario frame | Overruns, physics / scenario |
+| --- | --- | --- | ---: |
+| Cylinder cap | 0.555–0.842 / 0.625–1.603 / 0.851–6.279 / 0.895–6.460 | 0.617–1.054 / 0.701–3.756 / 0.910–6.606 / 1.008–7.877 | 0 / 0 |
+| Cylinder oblique | 1.330–3.337 / 1.571–4.434 / 2.199–7.567 / 2.632–9.251 | 1.374–3.415 / 1.609–4.515 / 2.245–7.621 / 2.676–9.329 | 0 / 0 |
+| Cylinder interior | 1.185–1.375 / 1.330–2.099 / 1.445–2.607 / 1.459–5.228 | 1.220–1.418 / 1.370–2.139 / 1.486–2.632 / 1.495–5.268 | 0 / 0 |
+| Cylinder gap | 0.043–0.059 / 0.050–0.071 / 0.060–0.126 / 0.061–0.791 | 0.055–0.079 / 0.062–0.093 / 0.079–0.166 / 0.082–0.811 | 0 / 0 |
+| Cone base | 0.213–0.355 / 0.263–0.583 / 0.340–1.818 / 0.341–1.983 | 0.237–0.413 / 0.308–0.655 / 0.401–1.854 / 0.461–2.019 | 0 / 0 |
+| Cone oblique | 1.980–4.731 / 3.694–17.954 / 3.837–20.264 / 3.888–27.986 | 2.036–4.843 / 3.751–18.024 / 3.897–20.337 / 3.948–28.057 | 8 / 8 |
+| Cone interior | 0.912–1.293 / 1.737–3.145 / 1.989–8.038 / 2.023–11.066 | 0.970–1.454 / 1.794–3.718 / 2.054–9.811 / 2.090–11.139 | 0 / 0 |
+| Cone gap | 0.028–0.068 / 0.029–0.186 / 0.035–0.713 / 0.036–0.842 | 0.046–0.093 / 0.047–0.208 / 0.052–0.733 / 0.054–0.864 | 0 / 0 |
+| Capsule/cylinder side | 0.036–0.182 / 0.042–0.090 / 0.046–6.446 / 0.060–11.586 | 0.047–0.195 / 0.055–0.103 / 0.062–6.457 / 0.073–11.598 | 0 / 0 |
+| Capsule/cylinder oblique | 0.809–1.128 / 0.902–1.713 / 1.024–4.790 / 1.529–24.073 | 0.834–1.162 / 0.925–1.739 / 1.045–4.819 / 1.553–24.099 | 1 / 1 |
+| Capsule/circle side | 0.061–0.063 / 0.066–0.077 / 0.072–0.128 / 0.074–0.164 | 0.077–0.081 / 0.084–0.113 / 0.089–0.155 / 0.102–0.181 | 0 / 0 |
+| Capsule/circle oblique | 0.707–1.792 / 0.781–7.197 / 1.163–10.568 / 1.525–47.469 | 0.741–1.854 / 0.848–7.234 / 1.195–10.606 / 1.558–47.511 | 1 / 1 |
+| Capsule/stadium side | 0.058–0.119 / 0.064–0.202 / 0.086–2.167 / 0.090–2.345 | 0.073–0.142 / 0.081–0.296 / 0.105–2.186 / 0.106–2.363 | 0 / 0 |
+| Capsule/stadium oblique | 0.630–1.207 / 0.699–4.072 / 0.757–6.793 / 0.768–9.769 | 0.665–1.256 / 0.744–4.107 / 0.793–6.832 / 0.846–9.805 | 0 / 0 |
+| Capsule/stadium oblique gap | 0.528–0.561 / 0.611–0.718 / 0.727–1.193 / 0.733–1.910 | 0.576–0.613 / 0.685–0.804 / 0.821–1.260 / 0.832–1.956 | 0 / 0 |
+| Capsule/stadium gap | 0.072–0.122 / 0.085–0.223 / 0.087–0.956 / 0.088–4.929 | 0.095–0.160 / 0.110–0.340 / 0.114–0.986 / 0.121–4.954 | 0 / 0 |
+
+All eight cone oblique overruns came from one process. Its scenario p95 was
+18.024 ms. The other five ranged from 3.751 to 4.408 ms. The two oblique
+capsule misses came from different processes and each occurred once. Keep
+these tails in the record. The launches identify expensive poses and
+reproducible work counts, while the cause of the run-to-run tails remains
+unresolved.
+
+### Observed Tick Headroom And Phase 2 Exit
+
+Use the larger of the sparse and crowded scenario percentiles and subtract
+it from 16.67 ms. Each percentile can come from a different stage. Negative
+values show the amount by which the observed percentile exceeded the
+interval. The table leaves any reserve for application systems to the host.
+
+| Capture | Scenario p95 / p99 (ms) | Time remaining at p95 / p99 (ms) | Active scenario overruns |
+| --- | ---: | ---: | ---: |
+| 2D 256 baseline | 4.73 / 31.81 | +11.94 / −15.14 | 3 / 320 |
+| 2D 1,024 baseline | 7.17 / 11.62 | +9.50 / +5.05 | 0 / 320 |
+| 3D 256 baseline | 7.36 / 12.60 | +9.31 / +4.07 | 0 / 320 |
+| 3D 1,024 baseline, X/Z 8 | 21.98 / 28.61 | −5.31 / −11.94 | 110 / 320 |
+| 3D 1,024 matched, X/Z 4 | 35.58 / 36.30 | −18.91 / −19.63 | 192 / 384 |
+| 3D 1,024 matched, X/Z 8 | 16.17 / 16.73 | +0.50 / −0.06 | 2 / 384 |
+| 3D 1,024 matched, X/Z 16 | 13.63 / 34.68 | +3.04 / −18.01 | 7 / 384 |
+
+The 1,024-actor 3D reference remains a stress tier. Its p99 exhausted the
+interval in both series, and the lower p95 at 16 units came with a larger
+wake-burst tail. Host acceptance still requires an application reserve and
+the longer churn capture.
+
+#024 remains experimental. The ordinary scene's overruns occur with zero
+work in the instrumented curved paths. The isolated sweeps establish that
+oblique contacts and rejections can consume meaningful step time when
+present. A representative scene or host trace must establish dispatch
+frequency, local density and contribution to its budget before choosing a
+geometry optimization. Carry the reference and the 16-unit contrast into
+Phase 3 for sustained tails and retained memory.
 
 ## Phase 3: Long-Session Latency And Memory
 

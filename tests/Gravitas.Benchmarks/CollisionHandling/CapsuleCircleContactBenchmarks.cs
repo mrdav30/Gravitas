@@ -90,4 +90,8 @@ public class CapsuleCircleContactBenchmarks
 
     [GlobalCleanup]
     public void Cleanup() => _context.Dispose();
+
+    internal CurvedContactWorkload.Fixture WorldFixture =>
+        new(_context, _capsule, _cylinderPair.ColliderA == _capsule ? _cylinderPair.ColliderB : _cylinderPair.ColliderA,
+            _circle);
 }

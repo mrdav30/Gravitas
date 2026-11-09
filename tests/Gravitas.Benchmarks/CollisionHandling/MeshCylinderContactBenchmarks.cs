@@ -117,4 +117,7 @@ public class MeshCylinderContactBenchmarks
 
     [GlobalCleanup]
     public void Cleanup() => _context.Dispose();
+
+    internal CurvedContactWorkload.Fixture WorldFixture =>
+        new(_context, _pair.ColliderA == _mesh ? _pair.ColliderB : _pair.ColliderA, _mesh, _circle);
 }

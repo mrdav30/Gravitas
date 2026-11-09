@@ -136,4 +136,6 @@ public class CapsuleSlabContactBenchmarks
 
     [GlobalCleanup]
     public void Cleanup() => _context.Dispose();
+
+    internal CurvedContactWorkload.Fixture WorldFixture => new(_context, _capsule, PlanarTarget: _slab);
 }

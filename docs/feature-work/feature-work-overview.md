@@ -38,9 +38,11 @@ instead of burying it in notes.
   - [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
     has verified the evolving strategy workloads at both actor tiers in 2D
     and 3D, captured baseline frame distributions, and profiled the crowded
-    1,024-actor 3D stage. Matched configuration comparisons and churn soak
-    remain. An MMO-zone variant follows only when it adds distinct actor-policy
-    evidence. This is the execution scope for experimental #024.
+    1,024-actor 3D stage. Phase 2 measured the X/Z cell-size tradeoff, local
+    60 Hz headroom and synthetic curved-contact step costs. Representative
+    scene frequency remains open under experimental #024. Phase 3 follows with
+    churn soak for sustained tails and memory. An MMO-zone variant follows
+    only when it adds distinct actor-policy evidence.
   - [`Long-Duration Physics Quality And Tuning`](2026-10-06-long-duration-physics-quality-and-tuning-plan.md)
     follows initial workload evidence. Reuse existing stack/chain/ragdoll tests
     and telemetry to measure drift, penetration, energy behavior, sleep/wake and

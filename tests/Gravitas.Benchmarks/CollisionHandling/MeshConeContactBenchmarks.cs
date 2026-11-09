@@ -128,4 +128,8 @@ public class MeshConeContactBenchmarks
 
     [GlobalCleanup]
     public void Cleanup() => _context.Dispose();
+
+    internal CurvedContactWorkload.Fixture WorldFixture => _pair.ColliderA is LSConeCollider
+        ? new(_context, _pair.ColliderA, _pair.ColliderB)
+        : new(_context, _pair.ColliderB, _pair.ColliderA);
 }

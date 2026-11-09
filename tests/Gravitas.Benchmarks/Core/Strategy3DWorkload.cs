@@ -19,14 +19,17 @@ internal static class Strategy3DWorkload
     private static readonly PhysicsLayerMask QueryMask = PhysicsLayerMask.FromLayer(0);
     private static readonly Fixed64 FloorTolerance = Fixed64.FromFraction(1, 16);
 
-    internal static int Verify(int actorCount)
+    internal static int Verify(int actorCount, int cellSize)
     {
         int regionCount = actorCount / ActorsPerRegion;
-        return StrategyWorkload.Verify($"strategy-3d-{actorCount}-v1", regionCount, "touching pairs",
-            samples => Run(regionCount, samples));
+        string workloadId = $"strategy-3d-{actorCount}";
+        if (cellSize != 8)
+            workloadId += $"-xz{cellSize}";
+        return StrategyWorkload.Verify($"{workloadId}-v1", regionCount, "touching pairs",
+            samples => Run(regionCount, cellSize, samples));
     }
 
-    private static Observation[] Run(int regionCount, Span<FrameTiming> samples)
+    private static Observation[] Run(int regionCount, int cellSize, Span<FrameTiming> samples)
     {
         using GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext();
         context.Settings.RuntimeMode = PhysicsRuntimeMode.ThreeD;
@@ -36,7 +39,7 @@ internal static class Strategy3DWorkload
         int extent = regionCount == 1 ? 0 : RegionStride;
         Require(context.World.TryAddGrid(new GridConfiguration(
             new Vector3d(-16, -4, -32), new Vector3d(176 + extent, 12, 160 + extent),
-            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)8, (Fixed64)4, (Fixed64)8)), out _),
+            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)cellSize, (Fixed64)4, (Fixed64)cellSize)), out _),
             0, "unable to create the spatial strategy grid");
 
         var regions = new Region[regionCount];

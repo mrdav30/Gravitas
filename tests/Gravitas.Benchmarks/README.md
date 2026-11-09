@@ -233,6 +233,31 @@ The 1,024-actor tier runs four copies in one world, with one floor and two
 obstacles per region. It preserves the local spacing and command schedule.
 This command runs separately from the base tests and BenchmarkDotNet selections.
 
+Pass `4`, `8` or `16` after `1024` to select the X/Z cell edge for a
+configuration comparison. The default X/Z edge is 8 and Y stays at 4.
+The verifier checks replay, floor support, projectile stops and connected
+encounter chains for each configuration. The alternate cell sizes have
+their own trace IDs.
+
+### Opt-in curved-contact step envelopes
+
+```bash
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0 -p:UseLocalLsfStack=false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-curved-workload
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-curved-workload capsule-stadium-oblique-gap
+```
+
+This command runs separately from base tests and BenchmarkDotNet selections.
+It reuses the checked curved-contact fixtures with one dynamic mover and
+one static target, then resets the mover through a fixed translation and
+optional tilt cycle. Two untimed runs verify state and work observations.
+After a 16-frame warmup, a third run measures 128 frames with diagnostics
+disabled. It reports `Simulate + LateSimulate`, the scenario window including
+pose reset, and managed bytes allocated on the stepping thread. These
+synthetic envelopes measure the cost of exercising particular geometry.
+See the [Phase 2 evidence](../../docs/feature-work/2026-10-06-evolving-game-capacity-and-soak-plan.md#synthetic-curved-contact-step-envelopes)
+for measured root work, tails and workload boundaries.
+
 ### Pure-2D circle contact simulation
 
 The `circle-contact-simulation` selection measures 64, 256 and 1024 independent

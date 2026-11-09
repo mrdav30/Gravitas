@@ -72,7 +72,7 @@ evidence gaps.
 
 | Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental; scene frequency and capacity unmeasured | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
+| [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental. Synthetic step costs measured, representative frequency open. | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
 | GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
 
 ### GRV-Benchmark-024 — Curved-Contact Workload Frequency And Step Cost
@@ -85,19 +85,19 @@ evidence gaps.
 and
 [GRV-Benchmark-021](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost)
 timings and stage profiles, including shared triangle/cylinder controls.
-**Status:** Experimental evidence gap; representative scene frequency and
-complete-step capacity have not been measured. This does not reopen these
-isolated-query investigations or establish a release-blocking regression.
+**Status:** Experimental evidence gap. Synthetic complete-step envelopes
+are measured. Representative scene frequency and its contribution to a host
+budget remain open.
 **Owner:** Gravitas benchmark workloads and stage attribution; FixedMathSharp
 only if workload evidence justifies further shared geometry optimization.
 
-**Planned execution scope:**
-[`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
-uses one evolving strategy scene, comparable 3D controls and shared frame/memory
-measurement support. It starts after complete replay stepping and a shared trace
-format. The plan owns implementation sequencing; this signal retains its
-measured cost context and decision gate. Neither scene capacity nor contact
-frequency is established merely by creating that plan.
+**Phase 2 evidence (2026-11-08):** The 1,024-actor 3D strategy reference
+performed zero work in the instrumented curved paths. The opt-in single-pair
+sweeps measured dispatch, isolation, admission, and selection. The oblique
+stadium gap isolated roots on all 128 sampled frames with zero contacts.
+Revisit with a representative scene or trace that measures local density,
+pose frequency and budget contribution.
+[Evolving Game Capacity And Soak](2026-10-06-evolving-game-capacity-and-soak-plan.md#synthetic-curved-contact-step-envelopes)
 
 **Additional bounded evidence (2026-10-15):** The supported-geometry closeout's
 single-sphere, flat-mesh traversal measured `162.980 / 157.305 / 170.034 us`

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using BenchmarkDotNet.Configs;
@@ -25,6 +26,9 @@ internal static class Program
 
         string command = args[0];
 
+        if (string.Equals(command, "verify-curved-workload", StringComparison.OrdinalIgnoreCase))
+            return CurvedContactWorkload.Verify(args);
+
         bool spatialStrategy = string.Equals(command, "verify-strategy-3d", StringComparison.OrdinalIgnoreCase);
         if (spatialStrategy || string.Equals(command, "verify-strategy-2d", StringComparison.OrdinalIgnoreCase))
         {
@@ -32,14 +36,18 @@ internal static class Program
             {
                 1 => StrategyWorkload.ActorsPerRegion,
                 2 when args[1] == "1024" => 1024,
+                3 when spatialStrategy && args[1] == "1024" && args[2] is "4" or "8" or "16" => 1024,
                 _ => 0
             };
             if (actorCount == 0)
             {
-                Console.Error.WriteLine($"Usage: {command} [1024]");
+                Console.Error.WriteLine(spatialStrategy
+                    ? $"Usage: {command} [1024 [4|8|16]]"
+                    : $"Usage: {command} [1024]");
                 return 1;
             }
-            return spatialStrategy ? Strategy3DWorkload.Verify(actorCount) : Strategy2DWorkload.Verify(actorCount);
+            int cellSize = args.Length == 3 ? int.Parse(args[2], CultureInfo.InvariantCulture) : 8;
+            return spatialStrategy ? Strategy3DWorkload.Verify(actorCount, cellSize) : Strategy2DWorkload.Verify(actorCount);
         }
 
         if ((string.Equals(command, "list", StringComparison.OrdinalIgnoreCase) ||
@@ -163,7 +171,8 @@ internal static class Program
         Console.WriteLine("  dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all --list flat");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-2d [1024]");
-        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-3d [1024]");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-strategy-3d [1024 [4|8|16]]");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-curved-workload [case]");
         Console.WriteLine();
         Console.WriteLine("Leading arguments that do not start with '-' are treated as benchmark selections.");
         Console.WriteLine("Remaining arguments are forwarded to BenchmarkDotNet.");
