@@ -55,33 +55,7 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-<a id="grv-issue-151"></a>
-
-#### GRV-Issue-151 — 3D cuboid stack loses support under a 100:1 top load
-
-Opened 2026-11-09. High priority before release for 3D rigid-body contact
-quality. Reproduced at `7d350b2f` with released LSF dependencies in Release and
-ReleaseLean. Build the benchmark project for `net10.0` with
-`UseLocalLsfStack=false`, then run `verify-quality-stack-support` with
-`GRAVITAS_QUALITY_FRAME_CSV=1`. The freely rotating 3D cuboids use 60 Hz,
-six discrete iterations, lower/upper masses of 1/100 and a bodyless floor.
-Both the centered case and the 1/64-unit offset case place the lower COM
-at or below the floor plane on frame 29. Both original contacts retain
-upward manifold rows. The same-total-mass 100/1 swap avoids that failure.
-
-The [frame 7 trace](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#frame-7-floor-contact-and-the-mass-swap)
-shows that the only sampled floor corner separates after inter-box response,
-while three other corners inside the floor keep closing. The centered 1/100
-case loses the accumulated floor impulse by pass 3. The 100/1 control
-retains support impulse. An experimental floor-only contact patch keeps the
-lower COM above the plane in both failing alignments, but the upper box
-still reaches the floor. The issue remains open.
-
-Next, evaluate finite multi-point contact coverage for the rotated cuboid
-pair at both interfaces. Require a frozen-pose contact regression and a full
-stack check that keeps the intended support chain without direct upper-floor
-contact. Check the same-total and equal-mass controls, replay in both build
-configurations, and warm allocations before accepting a runtime change.
+No active issues.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
@@ -98,6 +72,7 @@ validation, tradeoffs and links to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                                                                                         | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="grv-issue-151"></a>GRV-Issue-151 | 2026-11-09 | Fixed. Finite cuboid face witnesses and coupled support response preserve both interfaces under the 100:1 top load. | [Implementation and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-151-implementation) |
 | <a id="grv-issue-150"></a>GRV-Issue-150 | 2026-11-09 | Fixed. 3D pair shells release endpoints on return to the pool after separation notifications. The service clears pair snapshots and solver work lists after use, and grounding releases temporary query hits after selecting support. | [Live-context regression](../../tests/Gravitas.Tests/CollisionHandling/CollisionPairLifecycleHardeningTests.cs) fails on `c0b055e0` and passes with pooling on and off. The 1,024-actor 3D soak replay and all 10,240 frame allocation records match Phase 3. Warm mesh steps and 64-body ray and swept-sphere probes allocated 0 B before and after. |
 | <a id="grv-issue-149"></a>GRV-Issue-149 | 2026-11-09 | Fixed: Clear the occupied body and pair snapshot slots after the outer 2D grounding refresh. Reusable capacity and nested callback ranges are preserved. | [Live-context regression](../../tests/Gravitas.Tests/Physics2D/SolidBody2DGroundingTests.cs), [soak finding](done/2026-10-06-evolving-game-capacity-and-soak-plan.md#retained-managed-memory). The retired body, collider and agent are collectible after 1,024 empty steps. Both 2D strategy traces and the 1,024-actor soak replay and per-frame allocations match their baselines. The 64- and 1,024-pair warm step probes allocated 0 B before and after, with overlapping timing ranges across three launches per variant. |
 | <a id="grv-issue-125---isolated-native-access-violation-during-mesh-inertia-benchmarking"></a><a id="grv-issue-125"></a>GRV-Issue-125                                                           | 2026-10-30      | Investigation closed, not reproduced: Retained the existing raw-output mitigation; bounded frozen/current inertia and separate CLR-host replays pass. Historical native causes remain unproved.                                                                                                                                                                 | [Closeout](done/2026-10-30-benchmark-host-and-native-crash-closeout.md#grv-issue-125)                                                                                                                                                                                                                                                            |

@@ -366,12 +366,13 @@ public sealed partial class GravitasDiagnosticSink
             hit: hit && hasContact);
     }
 
-    internal void EmitResponseImpulse(CollisionPair pair, Vector3d impulse, Fixed64 normalVelocity)
+    internal void EmitResponseImpulse(CollisionPair pair, Vector3d impulse, Fixed64 normalVelocity,
+        ManifoldContact? sample = null)
     {
         if (!Enabled)
             return;
 
-        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        ManifoldContact contact = sample ?? pair.Manifold.PrimaryContact;
         bool hasPointA = contact.TryGetPointA(out Vector3d pointA);
         bool hasPointB = contact.TryGetPointB(out Vector3d pointB);
 

@@ -160,6 +160,14 @@ internal static class QualityStackWorkload
         Console.WriteLine($"  First frame (-1 absent) upward manifold rows at floor {firstFloor}, at both supports {firstStack}, floor/lower residual > 1/16 {deep}, floor/upper overlap {upperFloor}, lower COM at/below floor {crossing}");
         Console.WriteLine(FormattableString.Invariant(
             $"  Minimum lower COM {samples.Min(row => row.LowerHeight):F6}, frames at/below floor {samples.Count(row => row.LowerHeight <= Fixed64.Zero)}, peak floor/lower residual {samples.Max(row => row.FloorLower.Residual):F6}"));
+        Require(upperFloor < 0 && crossing < 0, Frames, $"{id} lost vertical support");
+        for (int frame = firstStack; frame <= Frames; frame++)
+        {
+            SupportSample row = samples[frame];
+            Require(row.FloorLower.Overlap && row.LowerUpper.Overlap
+                && row.FloorLower.Residual <= ResidualBound && row.LowerUpper.Residual <= ResidualBound,
+                frame, $"{id} lost a support interface or exceeded the 1/16-unit residual bound");
+        }
         if (!writeFrames)
             return;
 

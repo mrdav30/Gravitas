@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-034`.
+  `GRV-Benchmark-035`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -72,9 +72,37 @@ evidence gaps.
 
 | Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-034 — Rotated cuboid support step cost](#grv-benchmark-034) | Synthetic active step cost measured. Stage attribution and scene frequency are open. | Representative scenes establish the cost of sustained multi-point cuboid support islands. |
 | [GRV-Benchmark-033 — 1,024-actor 3D partition cost and first-wake spike](#grv-benchmark-033) | Capacity-sensitive. Sustained cost profiled, first-wake allocation owner open. | An equivalent workload exceeds the host's reserved budget or the first-use burst recurs in a target scene |
 | [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental. Synthetic step costs measured, representative frequency open. | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
 | GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
+
+<a id="grv-benchmark-034"></a>
+
+### GRV-Benchmark-034 — Rotated Cuboid Support Step Cost
+
+**Discovered** 2026-11-09 during the GRV-Issue-151 verification.
+**Owner** Gravitas 3D cuboid contact generation and discrete island response.
+**Status** Experimental. The complete-step probe establishes a small-scene
+cost and zero warm allocation. Representative frequency remains open.
+
+Use the `verify-quality-stack-support` fixture in Release at 60 Hz and six
+iterations. For timing, disable sleep in both variants, warm 64 steps, and
+measure `Simulate` plus `LateSimulate` on frames 65–256. Run the fixture
+against stock `4b0d83af` and the issue fix with released packages. Three
+separate launches per variant produced medians of 1.412 → 1.533 ms for
+offset 100:1 and 0.466 → 0.955 ms for centered 100:1. The heavy-bottom
+centered control measured 0.413 → 1.995 ms despite staying on sequential
+response. All measured cases had active supports throughout the warm
+window and 0 B of per-thread step allocation. The stock and corrected
+scenes exercise different trajectories. In the separate replay capture,
+the two support interfaces averaged two fresh rows per warm frame on
+stock and 7.16–8.00 on the candidate, depending on the case.
+[GRV-Issue-151 evidence](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-151-implementation)
+
+Next, separate oriented-face clipping, per-row friction and normal work,
+and the bounded island seed on representative supported cuboids. Revisit
+at scene scale if those paths materially consume a host's physics budget.
 
 ### GRV-Benchmark-024 — Curved-Contact Workload Frequency And Step Cost
 

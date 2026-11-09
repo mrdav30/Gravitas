@@ -3,6 +3,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Diagnostics;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using Xunit;
@@ -11,6 +12,299 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class DiscreteIslandSolverTests
 {
+    public enum SeedFallback { MissingSnapshot, Restitution, FrozenLoad, EqualMass, OtherShape }
+
+    [Fact]
+    public void HeavyLoadOnSupportedBody_ShouldResolveBothNormalVelocitiesTogether()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var floor = new LSCuboidCollider();
+        scenario.InitializeStaticCollider(floor, Vector3d.Zero);
+        var lower = scenario.CreateCuboid(Vector3d.Up, mass: Fixed64.One);
+        var upper = scenario.CreateCuboid(Vector3d.Up * (Fixed64)2, mass: (Fixed64)100);
+        PhysicsMaterial material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.Zero, Fixed64.Zero);
+        floor.Material = lower.Collider.Material = upper.Collider.Material = material;
+        CollisionPair support = scenario.CreatePair(floor, lower.Collider);
+        CollisionPair load = scenario.CreatePair(lower.Collider, upper.Collider);
+        support.Manifold.SetContact(Vector3d.Up * Fixed64.Half, Vector3d.Up * Fixed64.Half,
+            Fixed64.Zero, Vector3d.Up);
+        load.Manifold.SetContact(Vector3d.Up * Fixed64.FromFraction(3, 2),
+            Vector3d.Up * Fixed64.FromFraction(3, 2), Fixed64.Zero, Vector3d.Up);
+        upper.Body.AddLinearImpulse(Vector3d.Down * upper.Body.Mass);
+        scenario.Context.Diagnostics.Enable();
+        scenario.Context.Physics.QueueDiscreteResponsePair(load);
+        scenario.Context.Physics.QueueDiscreteResponsePair(support);
+
+        SolveQueuedResponses(scenario);
+
+        Fixed64 tolerance = Fixed64.FromFraction(1, 10000);
+        lower.Body.LinearVelocity.Y.Abs().Should().BeLessThan(tolerance);
+        upper.Body.LinearVelocity.Y.Abs().Should().BeLessThan(tolerance);
+        lower.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        upper.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+
+        int floorResponse = -1, loadResponse = -1, firstVelocity = int.MaxValue;
+        foreach (GravitasDiagnosticEvent item in scenario.Context.Diagnostics.Events)
+        {
+            if (item.TryAsResponseImpulse(out GravitasResponseImpulseDiagnosticView response)
+                && response.Impulse.Y > (Fixed64)99)
+            {
+                if (response.ColliderAId == floor.Id) floorResponse = item.Sequence;
+                if (response.ColliderAId == lower.Collider.Id) loadResponse = item.Sequence;
+            }
+            if (item.Kind == GravitasDiagnosticEventKind.LinearVelocityDelta)
+                firstVelocity = System.Math.Min(firstVelocity, item.Sequence);
+        }
+        floorResponse.Should().BeGreaterThanOrEqualTo(0).And.BeLessThan(firstVelocity);
+        loadResponse.Should().BeGreaterThanOrEqualTo(0).And.BeLessThan(firstVelocity);
+        scenario.Context.Diagnostics.Clear();
+        CollisionResponse.PrepareSolve(support);
+        CollisionResponse.PrepareSolve(load);
+        CollisionResponse.TrySeedSupportedIslandNormals(support, load, out _).Should().BeTrue();
+        scenario.Context.Diagnostics.EventCount.Should().Be(0);
+        scenario.Context.Diagnostics.Disable();
+
+        bool seeded = true;
+        long allocated = AllocationTestHelper.MeasureSteadyState(() =>
+        {
+            upper.Body.AddLinearImpulse(Vector3d.Down * upper.Body.Mass);
+            CollisionResponse.PrepareSolve(support);
+            CollisionResponse.PrepareSolve(load);
+            seeded &= CollisionResponse.TrySeedSupportedIslandNormals(support, load, out _);
+        });
+        seeded.Should().BeTrue();
+        allocated.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(false, 14_268_994)]
+    [InlineData(true, 100)]
+    [InlineData(false, 100_000_000)]
+    public void CoupledSeed_ShouldLeaveBodiesUnchangedWhenPreparedResponseFails(bool exceedsSpeedLimit, int loadMass)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d normal = exceedsSpeedLimit ? Vector3d.Right
+            : new Vector3d(Fixed64.FromFraction(3, 5), Fixed64.FromFraction(4, 5), Fixed64.Zero);
+        if (exceedsSpeedLimit)
+            scenario.Context.Environment.MaxSpeed = Fixed64.One;
+        var floor = new LSCuboidCollider();
+        scenario.InitializeStaticCollider(floor, Vector3d.Zero);
+        var lower = scenario.CreateCuboid(normal);
+        var upper = scenario.CreateCuboid(normal * (Fixed64)2, mass: (Fixed64)loadMass);
+        PhysicsMaterial material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.Zero, Fixed64.Zero);
+        floor.Material = lower.Collider.Material = upper.Collider.Material = material;
+        CollisionPair support = scenario.CreatePair(floor, lower.Collider);
+        CollisionPair load = scenario.CreatePair(lower.Collider, upper.Collider);
+        support.Manifold.SetContact(Vector3d.Zero, lower.Body.Position3d, Fixed64.Zero,
+            exceedsSpeedLimit ? Vector3d.Up : normal);
+        load.Manifold.SetContact(lower.Body.Position3d, upper.Body.Position3d, Fixed64.Zero, normal);
+        lower.Body.AddLinearImpulse(Vector3d.Forward);
+        upper.Body.AddLinearImpulse(-normal * upper.Body.Mass);
+        Vector3d beforeLower = lower.Body.LinearVelocity;
+        Vector3d beforeUpper = upper.Body.LinearVelocity;
+        CollisionResponse.PrepareSolve(support);
+        CollisionResponse.PrepareSolve(load);
+
+        CollisionResponse.TrySeedSupportedIslandNormals(support, load, out bool corrected).Should().BeFalse();
+
+        corrected.Should().BeFalse();
+        lower.Body.LinearVelocity.Should().Be(beforeLower);
+        upper.Body.LinearVelocity.Should().Be(beforeUpper);
+        support.TryGetWarmStartImpulse(support.Manifold[0].ContactId, out _).Should().BeFalse();
+        load.TryGetWarmStartImpulse(load.Manifold[0].ContactId, out _).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CoupledSeed_ShouldRejectOverflowingCachedFrictionWithoutPublishing(bool angularOverflow)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var floor = new LSCuboidCollider();
+        scenario.InitializeStaticCollider(floor, Vector3d.Zero);
+        var lower = scenario.CreateBody(new LSCuboidCollider { Size = new Vector3d(4, 1, 1) },
+            Vector3d.Up, FixedQuaternion.Identity);
+        var upper = scenario.CreateCuboid(Vector3d.Up * (Fixed64)2, mass: (Fixed64)100);
+        var material = new PhysicsMaterial(Fixed64.One, Fixed64.One, Fixed64.Zero);
+        floor.Material = lower.Collider.Material = upper.Collider.Material = material;
+        CollisionPair support = scenario.CreatePair(floor, lower.Collider);
+        CollisionPair load = scenario.CreatePair(lower.Collider, upper.Collider);
+        if (angularOverflow)
+            support.Manifold.AddContact(Vector3d.Right * (Fixed64)2,
+                lower.Body.Position3d + Vector3d.Right * (Fixed64)2, Fixed64.Zero, Vector3d.Up);
+        else
+        {
+            support.Manifold.AddContact(Vector3d.Zero, lower.Body.Position3d, Fixed64.Zero, Vector3d.Up);
+            support.Manifold.AddContact(Vector3d.Right, lower.Body.Position3d, Fixed64.Zero, Vector3d.Up);
+        }
+        load.Manifold.SetContact(lower.Body.Position3d, upper.Body.Position3d, Fixed64.Zero, Vector3d.Up);
+        support.Manifold.Count.Should().Be(angularOverflow ? 1 : 2);
+        ContactGroupKey group = support.Manifold.GetGroup(0).Key;
+        Fixed64 impulse = (Fixed64)1_500_000_000;
+        foreach (ManifoldContact row in support.Manifold)
+            support.StoreWarmStartImpulse(group, row.ContactId, row.Normal, impulse, impulse, Fixed64.Zero);
+        CollisionResponse.PrepareSolve(support);
+        CollisionResponse.PrepareSolve(load);
+
+        CollisionResponse.TrySeedSupportedIslandNormals(support, load, out bool corrected).Should().BeFalse();
+
+        corrected.Should().BeFalse();
+        lower.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        upper.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        foreach (ManifoldContact row in support.Manifold)
+        {
+            support.TryGetWarmStartImpulse(group, row.ContactId, out ContactWarmStartImpulse cached).Should().BeTrue();
+            cached.TangentImpulse.Should().Be(impulse);
+        }
+    }
+
+    [Fact]
+    public void CoupledSeed_ShouldLeaveMixedDirectionTranslationToPairCorrection()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var floor = new LSCuboidCollider();
+        scenario.InitializeStaticCollider(floor, Vector3d.Zero);
+        var lower = scenario.CreateCuboid(Vector3d.Up);
+        var upper = scenario.CreateCuboid(Vector3d.Up * (Fixed64)2, mass: (Fixed64)100);
+        PhysicsMaterial material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.Zero, Fixed64.Zero);
+        floor.Material = lower.Collider.Material = upper.Collider.Material = material;
+        CollisionPair support = scenario.CreatePair(floor, lower.Collider);
+        CollisionPair load = scenario.CreatePair(upper.Collider, lower.Collider);
+        Fixed64 depth = Fixed64.FromFraction(1, 32);
+        support.Manifold.AddContact(Vector3d.Zero, lower.Body.Position3d, depth, Vector3d.Up);
+        support.Manifold.AddContact(Vector3d.Right, lower.Body.Position3d, depth, Vector3d.Right);
+        load.Manifold.SetContact(upper.Body.Position3d, lower.Body.Position3d, depth, Vector3d.Down);
+        CollisionResponse.PrepareSolve(support);
+        CollisionResponse.PrepareSolve(load);
+
+        // Reverse the input order to exercise the same island when the load pair sorts first.
+        CollisionResponse.TrySeedSupportedIslandNormals(load, support, out bool corrected).Should().BeTrue();
+
+        corrected.Should().BeFalse();
+        lower.Body.Position3d.Should().Be(Vector3d.Up);
+        upper.Body.Position3d.Should().Be(Vector3d.Up * (Fixed64)2);
+    }
+
+    [Theory]
+    [InlineData(SeedFallback.MissingSnapshot)]
+    [InlineData(SeedFallback.Restitution)]
+    [InlineData(SeedFallback.FrozenLoad)]
+    [InlineData(SeedFallback.EqualMass)]
+    [InlineData(SeedFallback.OtherShape)]
+    public void CoupledSeed_ShouldLeaveUnsupportedInputsToThePairSolver(SeedFallback input)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var floor = new LSCuboidCollider();
+        scenario.InitializeStaticCollider(floor, Vector3d.Zero);
+        var lower = scenario.CreateCuboid(Vector3d.Up);
+        LSCollider shape = input == SeedFallback.OtherShape ? new LSCapsuleCollider() : new LSCuboidCollider();
+        var upper = scenario.CreateBody(shape, Vector3d.Up * (Fixed64)2, FixedQuaternion.Identity,
+            mass: input == SeedFallback.EqualMass ? Fixed64.One : (Fixed64)100,
+            preventAngularForces: input == SeedFallback.FrozenLoad);
+        PhysicsMaterial material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.Zero,
+            input == SeedFallback.Restitution ? Fixed64.Half : Fixed64.Zero);
+        floor.Material = lower.Collider.Material = upper.Collider.Material = material;
+        CollisionPair support = scenario.CreatePair(floor, lower.Collider);
+        CollisionPair load = scenario.CreatePair(lower.Collider, upper.Collider);
+        support.Manifold.SetContact(Vector3d.Zero, lower.Body.Position3d, Fixed64.Zero, Vector3d.Up);
+        load.Manifold.SetContact(lower.Body.Position3d, upper.Body.Position3d, Fixed64.Zero, Vector3d.Up);
+        upper.Body.AddLinearImpulse(Vector3d.Down * upper.Body.Mass);
+        Vector3d incoming = upper.Body.LinearVelocity;
+        if (input != SeedFallback.MissingSnapshot)
+            CollisionResponse.PrepareSolve(support);
+        CollisionResponse.PrepareSolve(load);
+
+        CollisionResponse.TrySeedSupportedIslandNormals(support, load, out bool corrected).Should().BeFalse();
+
+        corrected.Should().BeFalse();
+        lower.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        upper.Body.LinearVelocity.Should().Be(incoming);
+    }
+
+    [Fact]
+    public void CoupledTranslation_ShouldKeepBothPosesWhenEitherCorrectionOverflows()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d upperPosition = new(Fixed64.Zero, Fixed64.MaxValue - Fixed64.FromFraction(1, 100), Fixed64.Zero);
+        Vector3d lowerPosition = upperPosition - Vector3d.Up;
+        var floor = new LSCuboidCollider();
+        scenario.InitializeStaticCollider(floor, lowerPosition - Vector3d.Up);
+        var lower = scenario.CreateCuboid(lowerPosition);
+        var upper = scenario.CreateCuboid(upperPosition, mass: (Fixed64)100);
+        PhysicsMaterial material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.Zero, Fixed64.Zero);
+        floor.Material = lower.Collider.Material = upper.Collider.Material = material;
+        CollisionPair support = scenario.CreatePair(floor, lower.Collider);
+        CollisionPair load = scenario.CreatePair(lower.Collider, upper.Collider);
+        Fixed64 depth = Fixed64.FromFraction(1, 8);
+        support.Manifold.SetContact(lowerPosition, lowerPosition, depth, Vector3d.Up);
+        load.Manifold.SetContact(lowerPosition, upperPosition, depth, Vector3d.Up);
+        CollisionResponse.PrepareSolve(support);
+        CollisionResponse.PrepareSolve(load);
+
+        CollisionResponse.TrySeedSupportedIslandNormals(support, load, out bool corrected).Should().BeTrue();
+
+        corrected.Should().BeFalse();
+        lower.Body.Position3d.Should().Be(lowerPosition);
+        upper.Body.Position3d.Should().Be(upperPosition);
+    }
+
+    [Fact]
+    public void CoupledSeed_ShouldKeepTwoFixedSupportsOnThePairPath()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var left = new LSCuboidCollider();
+        var right = new LSCuboidCollider();
+        scenario.InitializeStaticCollider(left, -Vector3d.Right * Fixed64.Half);
+        scenario.InitializeStaticCollider(right, Vector3d.Right * Fixed64.Half);
+        var body = scenario.CreateCuboid(Vector3d.Up);
+        CollisionPair first = scenario.CreatePair(left, body.Collider);
+        CollisionPair second = scenario.CreatePair(right, body.Collider);
+        CollisionDetection.DoCollisionCheck(first).Should().BeTrue();
+        CollisionDetection.DoCollisionCheck(second).Should().BeTrue();
+        CollisionResponse.PrepareSolve(first);
+        CollisionResponse.PrepareSolve(second);
+
+        CollisionResponse.TrySeedSupportedIslandNormals(first, second, out bool corrected).Should().BeFalse();
+
+        corrected.Should().BeFalse();
+        body.Body.Position3d.Should().Be(Vector3d.Up);
+    }
+
+    [Fact]
+    public void Simulate_HeavyLoadOnFreelyRotatingCuboid_ShouldKeepBothSupportInterfaces()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.SetFrameRate(60);
+        scenario.Context.Settings.DiscreteSolverIterations = 6;
+        scenario.Context.Environment.Gravity = Fixed64.FromFraction(49, 5);
+        scenario.Context.Environment.AirDensity = Fixed64.Zero;
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+        var floor = new LSCuboidCollider { Size = new Vector3d(16, 1, 16) };
+        scenario.InitializeStaticCollider(floor, -Vector3d.Up * Fixed64.Half);
+        var lower = scenario.CreateBody(new LSCuboidCollider { Size = new Vector3d(2, 1, 2) },
+            Vector3d.Up * Fixed64.FromFraction(17, 32), FixedQuaternion.Identity);
+        var upper = scenario.CreateBody(new LSCuboidCollider { Size = new Vector3d(2, 1, 2) },
+            new Vector3d(Fixed64.FromFraction(1, 64), Fixed64.FromFraction(25, 16), Fixed64.Zero),
+            FixedQuaternion.Identity, mass: (Fixed64)100);
+        var material = new PhysicsMaterial(Fixed64.Half, Fixed64.FromFraction(1, 3), Fixed64.Zero);
+        floor.Material = lower.Collider.Material = upper.Collider.Material = material;
+        lower.Body.LinearDragCoefficient = upper.Body.LinearDragCoefficient = Fixed64.Zero;
+        lower.Body.UseManualGrounding();
+        upper.Body.UseManualGrounding();
+
+        for (int frame = 0; frame < 32; frame++)
+        {
+            scenario.Context.Simulate();
+            scenario.Context.LateSimulate();
+        }
+
+        lower.Body.WorldCenterOfMass.Y.Should().BeGreaterThan(Fixed64.FromFraction(9, 20));
+        upper.Body.WorldCenterOfMass.Y.Should().BeGreaterThan(Fixed64.FromFraction(7, 5));
+        GetPair(floor, lower.Collider).Manifold.HasContact.Should().BeTrue();
+        GetPair(lower.Collider, upper.Collider).Manifold.HasContact.Should().BeTrue();
+        CollisionDetection.DoCollisionCheck(scenario.CreatePair(floor, upper.Collider)).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

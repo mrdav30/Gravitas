@@ -1,7 +1,7 @@
 # Long-Duration Physics Quality And Tuning Plan
 
 **Date:** 2026-10-06  
-**Status:** Phase 1 in progress. The free-stack baseline, 3D high-mass support controls, and support response trace are verified.  
+**Status:** Phase 1 stack support verified and GRV-Issue-151 resolved. Chains and ragdolls are next.  
 **Owner:** Gravitas contact/constraint quality and configuration guidance.
 
 ## Goal
@@ -318,7 +318,177 @@ output with all replay hashes and published frame samples. The floor-only
 experiment also replayed within each configuration and matched across them.
 Its probes and experiment are under ignored
 `artifacts/physics-quality-phase1/issue-151-probe`. The maintained runtime
-is unchanged. Phase 1 can resume with the open issue linked here.
+is unchanged.
+
+#### GRV-Issue-151 Fix Experiments
+
+Started at `4b0d83af` against the released stack on Windows x64 (.NET SDK
+10.0.302 and runtime 10.0.10). A frozen test uses a 1/16-degree tilt about
+two axes, with the incident cuboid centered at Y = 0.49 over a flat face.
+It checks both pair orders, matched witnesses, per-point depth, and finite
+reference bounds. The wide face contains all four incident corners. The
+2-unit face with a half-unit offset requires side clipping. Stock geometry
+emits one row in each case where four rows are expected. The rounded
+prototype passed the wide case. The clipped case reached the witness
+checks and its reported depth differed from the materialized witness
+separation by one Q32.32 unit.
+
+The disposable face prototype preserves SAT admission and the one-witness
+fallback. It chooses a reference face by rounded normal alignment, clips the
+incident rectangle against the four finite side planes and the face plane
+in bounded local coordinates, and reuses the existing four-row manifold
+reduction. This is a rounded prototype. Its stable-ID variant uses the
+clipping boundaries and face identities for rows produced by the prototype.
+The unchanged axis-aligned and fallback paths still use their own IDs.
+
+Each variant ran the eight-case `verify-quality-stack-support` workload.
+The table lists the 1/100 cases only. Each cell lists offset then centered.
+The lower COM minimum and first direct upper-floor overlap are the
+comparison gates because the detached depth probe also uses the changed
+manifold generator. A dash means the COM stayed above zero for all 256 steps.
+
+| Disposable variant | First direct upper-floor overlap | First lower COM ≤ 0 |
+| --- | ---: | ---: |
+| Stock, 6 passes | 29 / 29 | 29 / 29 |
+| Stock, 48 passes | 29 / 29 | 30 / 30 |
+| Clipped faces at both interfaces, 6 passes | 31 / 32 | 33 / 33 |
+| Clipped faces and stable patch IDs, 6 passes | 32 / 30 | — / 44 |
+| Clipped faces and stable patch IDs, 48 passes | 91 / 83 | — / — |
+| Stable patch IDs and island-wide warm start, 6 passes | 33 / 31 | — / — |
+| Same, plus six refreshed position sweeps | 39 / 34 | — / — |
+| Same, with the supported lower body held fixed for inter-box correction | 55 / 100 | — / — |
+
+At six passes the stable-ID prototype supplied four upward rows at both
+interfaces on frame 7 in both heavy-top cases. It still lost the stack.
+The last variant recomputed the residual from endpoint translations between
+position sweeps and let the upper box absorb the inter-box correction while
+the two-interface upward support arrangement held. The minimum lower COM
+was 0.489545 in both alignments, yet the upper box still reached the floor.
+The six matched controls in that variant never reached direct floor contact
+with their upper box. These results isolate a remaining coupled support
+problem beyond the initial missing floor rows. The experimental
+position policy is specific to this fixture's topology and pair order.
+
+For a frozen normal-only comparison, capture frame 7 of the two centered
+mass swaps from the stable-ID face prototype before warm starting. The
+capture provides four normals and levers at each interface, both bodies'
+velocities, inverse masses and inverse inertia tensors, and the compatible
+cached normal impulses. The fixture uses free axes and zero restitution.
+Reconstruct `K = J M⁻¹ Jᵀ` and `q = J v` from the raw values.
+Run sequential projected passes seeded with the cached impulses in the
+captured row order. Independently enumerate active sets for the eight
+unilateral constraints and require nonnegative impulse and normal speed
+with complementary products zero to the analysis tolerance. The analysis
+uses high-precision decimal arithmetic outside the runtime. It holds the
+geometry fixed and isolates normal response from friction, position
+correction, and later frames.
+
+| Lower / upper mass | Normal solve | Minimum floor point speed (units/s) | Total floor normal impulse (mass·units/s) |
+| --- | --- | ---: | ---: |
+| 1 / 100 | 6 projected passes | −1.928190 | 3.295213 |
+| 1 / 100 | 48 projected passes | −1.199451 | 24.412916 |
+| 1 / 100 | Coupled reference | 0.000000 | 75.473201 |
+| 100 / 1 | 6 projected passes | −0.000159 | 17.043354 |
+| 100 / 1 | 48 projected passes | 0.000000 | 17.078979 |
+| 100 / 1 | Coupled reference | 0.000000 | 17.078979 |
+
+The coupled reference leaves no closing normal speed at either interface
+to the reported precision. With the same candidate rows, sequential
+projection transfers the heavy top load too slowly in this frozen case.
+Both eight-row systems have rank six. Use feasible contact velocities and
+aggregate response as the comparison targets, since redundant rows can
+admit more than one impulse distribution. Full-step stability, friction
+coupling, fixed-point range, and runtime cost remain separate gates.
+
+The verifier matched independent repeats and observation-free terminal
+hashes for every variant. The frozen capture and the final pose variant
+matched byte for byte across Release and ReleaseLean. Fresh stock runs in
+both configurations matched the prior clean six-pass captures. The maintained
+cuboid geometry and discrete island test filters passed 21 cases in each
+configuration. Ignored `artifacts/physics-quality-phase1/issue-151-fix`
+contains the frozen test, probe source, CSVs, and reference reduction. The
+next implementation needed finite matched witnesses and a bounded coupled
+solve or preconditioner. Phase 1 expansion stayed on hold during this
+investigation.
+
+#### GRV-Issue-151 Implementation
+
+Registered rotated cuboids now retain finite face patches after exact SAT
+admission and a face-normal match. Each contact retains matched local
+witnesses and an individual depth. Clipping features keep their identities
+when penetration changes. The aligned fast path and the existing
+single-witness fallback remain available.
+
+The 3D response can seed a two-contact, joint-free cuboid island when a
+freely moving cuboid carries a heavier one over a fixed support. The
+bounded normal solve handles redundant rows and checks the prepared body
+velocities before publication. The row sweeps refine friction after the
+coupled seed, using cached tangents only when their basis matches. When
+each interface has one normal direction, the two deepest depths also
+drive a coupled translation correction. Unsupported or unrepresentable
+normal solves keep the sequential path. Unsupported translation solves
+keep the existing per-pair position correction.
+
+The stock frozen geometry regression produced one row where four finite
+rows were expected. The frozen heavy-load response left the lower body
+closing at 0.942045 units/s after six sequential passes. The maintained
+regressions cover the clipped and full faces, reversed order, the coupled
+normal solution, warmed allocations, and a representability fallback that
+preserves both bodies and their caches. A complete host-step regression
+exercises the rotating heavy-top stack through the original onset window.
+
+The opt-in `verify-quality-stack-support` now fails if either original
+support interface disappears after establishment, if either residual
+exceeds 1/16 unit, or if the upper box overlaps the floor or the lower
+COM reaches its plane. This keeps the specialized 256-step matrix separate
+from the base test suite.
+
+All eight cases retained both supports from frame 7 through frame 256.
+The two 100:1 cases had zero direct upper-floor overlaps and zero lower COM
+crossings. The original 3D 1:1 and 1:10 fixtures now meet their provisional
+quality bounds. The 3D 1:100 offset fixture still drifts 0.572327 units by
+the end, above the separate 1/8-unit drift bound. Its final orientation
+change is 1.0925 degrees. Lateral drift remains a Phase 1 quality signal.
+
+| 100:1 alignment | Minimum lower COM | Peak floor/lower depth | Peak lower/upper depth | Final original supports |
+| --- | ---: | ---: | ---: | ---: |
+| 1/64-unit offset | 0.489330 | 0.011098 | 0.011964 | 2 / 2 |
+| Centered | 0.489372 | 0.013735 | 0.014527 | 2 / 2 |
+
+The support and original quality captures matched across Release and
+ReleaseLean against released packages. Each case compared fresh observed
+replays and an observation-free terminal hash. The 2D and tilted capsule
+digests match the original capture. The two 100:1 terminal digests are
+`b4cce723bd2bd44084ccedfa44c71409` (offset) and
+`5409c5048ccaa8d56357ada24b3b4d18` (centered).
+The 1,024-actor 3D strategy verifier also retained its 96-frame trace
+`d5e9d21184fbb529b3b3b83e86f2b6b1` and frame 67 chain completion in both
+configurations.
+
+An isolated warm probe disabled sleep in both the stock and corrected
+fixtures. It warmed 64 steps and measured only `Simulate` plus
+`LateSimulate` for frames 65–256, checking upward rows at both interfaces
+outside the measured window. All 192 steps in each of the eight cases
+had active support rows and allocated 0 B on the stepping thread, in
+Release and ReleaseLean. The Release timing sequence alternated three
+stock and three corrected process launches in `A B B A A B` order. The
+medians of launch means were 1.412 → 1.533 ms for the offset 100:1 stack
+and 0.466 → 0.955 ms for the centered one. The six matched controls
+measured 0.351–0.790 ms stock and 0.822–1.995 ms corrected. The contact
+geometry and physical trajectories differ between revisions, so these are
+scenario costs rather than equivalent-work kernel timings. The isolated
+step cost and the remaining attribution work are tracked under
+[GRV-Benchmark-034](benchmark-signal-hardening-backlog.md#grv-benchmark-034).
+
+The package-backed library built for `net10.0` and `netstandard2.1` in both
+configurations. The complete suites and strict coverage gate passed on the
+same runtime snapshot. The resolved [issue record](issue-tracker.md#grv-issue-151)
+links back to these measurements.
+
+| Configuration | Passing tests | Covered lines | Covered branches | Covered methods |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 8,393 | 54,012 / 54,012 | 22,080 / 22,080 | 5,634 / 5,634 |
+| ReleaseLean | 8,322 | 54,010 / 54,010 | 22,080 / 22,080 | 5,633 / 5,633 |
 
 ## Phase 2: Duration And Continuation
 

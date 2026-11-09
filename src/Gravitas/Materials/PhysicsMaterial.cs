@@ -220,7 +220,7 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
 
     private static void ValidateCombine(PhysicsMaterialCombine value, string paramName)
     {
-        if (value < PhysicsMaterialCombine.Minimum || value > PhysicsMaterialCombine.GeometricMean)
+        if (value > PhysicsMaterialCombine.GeometricMean)
             throw new ArgumentOutOfRangeException(
                 paramName,
                 value,

@@ -79,18 +79,28 @@ public static partial class CollisionDetection
             return TryBuildAxisAlignedCuboidManifold(pair, cuboidA, cuboidB);
         }
 
-        if (!cuboidA.OrientedBox.TryGetContact(
-                cuboidB.OrientedBox,
-                out FixedContactAnchors contact))
+        // Use one SAT order for standalone pairs, including equal-depth feature ties.
+        bool facePatch = cuboidA.Id >= 0 && cuboidB.Id >= 0 && cuboidA.Id != cuboidB.Id
+            && (cuboidA.Shape == ColliderType.OBBox || cuboidB.Shape == ColliderType.OBBox);
+        bool reversed = facePatch && cuboidB.Id < cuboidA.Id;
+        FixedOrientedBox first = (reversed ? cuboidB : cuboidA).OrientedBox;
+        FixedOrientedBox second = (reversed ? cuboidA : cuboidB).OrientedBox;
+        if (!first.TryGetContact(second, out FixedContactAnchors contact))
         {
             return false;
         }
 
+        if (facePatch && !contact.DepthIsClamped
+            && TryBuildCuboidFaceContacts(pair.Manifold, first, second, contact.Normal, reversed))
+        {
+            return true;
+        }
+
         pair.Manifold.SetContact(
-            new ContactAnchor(contact.FirstAnchor),
-            new ContactAnchor(contact.SecondAnchor),
+            new ContactAnchor(reversed ? contact.SecondAnchor : contact.FirstAnchor),
+            new ContactAnchor(reversed ? contact.FirstAnchor : contact.SecondAnchor),
             contact.Depth,
-            contact.Normal,
+            reversed ? -contact.Normal : contact.Normal,
             contact.DepthIsClamped);
         return true;
     }

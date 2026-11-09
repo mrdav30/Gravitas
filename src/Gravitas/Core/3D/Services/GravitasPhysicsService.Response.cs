@@ -211,6 +211,13 @@ public sealed partial class GravitasPhysicsService
                 CollisionResponse.PrepareSolve(constraint.Pair);
         }
 
+        bool correctedPositions = false;
+        bool seededNormals = end - start == 2
+            && _discreteIslandConstraints[start].Kind == DiscreteIslandConstraintKind.Contact
+            && _discreteIslandConstraints[start + 1].Kind == DiscreteIslandConstraintKind.Contact
+            && CollisionResponse.TrySeedSupportedIslandNormals(
+                _discreteIslandConstraints[start].Pair, _discreteIslandConstraints[start + 1].Pair,
+                out correctedPositions);
         int iterations = _context.Settings.DiscreteSolverIterations;
         for (int iteration = 0; iteration < iterations; iteration++)
         {
@@ -223,8 +230,8 @@ public sealed partial class GravitasPhysicsService
                 {
                     CollisionResponse.CalculateImpulse(
                         constraint.Pair,
-                        applyCachedImpulse,
-                        applyPositionCorrection);
+                        applyCachedImpulse && !seededNormals,
+                        applyPositionCorrection && !correctedPositions);
                 }
                 else
                     JointSolver3D.Solve(constraint.Joint!, applyCachedImpulse);

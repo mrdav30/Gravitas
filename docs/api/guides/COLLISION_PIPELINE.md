@@ -129,8 +129,15 @@ changing overlap classification as geometry grows or rotates. The existing
 strict separation tolerance, stable collinear fallback and conservative
 iteration-budget result remain part of the predicate contract.
 
-Convex SAT paths use stable axis generation and pair-oriented normals. Cuboid
-versus capsule checks first solve exact segment-to-oriented-box distance for
+Convex SAT paths use stable axis generation and pair-oriented normals.
+Registered rotated cuboid pairs can build a face manifold after SAT admits
+the pair and the selected normal matches a cuboid face. The incident face is
+clipped to the finite reference face in local coordinates. Retained samples
+use paired anchors, individual depths, and identities derived from the two
+faces and the clipping boundaries. Edge axes and clips with no admitted
+witnesses retain the single SAT witness.
+
+Cuboid versus capsule checks first solve exact segment-to-oriented-box distance for
 rounded features, then use ordered SAT only when the capsule core reaches the
 box; inclusive projections and directional exit depths preserve touching and
 containment semantics. Closed convex mesh versus sphere checks use the same

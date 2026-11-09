@@ -295,7 +295,10 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll ver
 This opt-in command crosses centered and offset 3D stacks with four
 lower/upper mass combinations. It reports when the lower body's floor
 overlap exceeds 1/16 unit, when the upper body first overlaps the floor,
-and when the lower COM first reaches the floor plane. With
+and when the lower COM first reaches the floor plane. All eight cases must
+retain both original support interfaces once established, stay within the
+1/16-unit residual bound, and avoid direct upper-floor contact or a lower
+COM crossing. With
 `GRAVITAS_QUALITY_FRAME_CSV=1`, it also prints both COM heights, lower vertical
 velocity, and each pair's published-pose overlap, residual depth, and fresh
 manifold row counts, including the upward-facing subset. The row counts

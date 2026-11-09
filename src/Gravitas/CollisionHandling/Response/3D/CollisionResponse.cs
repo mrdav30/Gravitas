@@ -176,7 +176,8 @@ public static partial class CollisionResponse
         in ContactAnchor responseCenterB,
         int groupIndex,
         int pointIndex,
-        out SolverContact3D contact)
+        out SolverContact3D contact,
+        bool requireMatchingTangentBasis = false)
     {
         contact = default;
         ref ContactGroup group = ref pair.Manifold.GetGroup(groupIndex);
@@ -206,8 +207,11 @@ public static partial class CollisionResponse
             if (IsWarmStartCompatible(cached.Normal, normal))
             {
                 cachedNormalImpulse = cached.NormalImpulse;
-                cachedTangentImpulse = cached.TangentImpulse;
-                cachedSecondaryTangentImpulse = cached.SecondaryTangentImpulse;
+                if (!requireMatchingTangentBasis || cached.Normal == normal)
+                {
+                    cachedTangentImpulse = cached.TangentImpulse;
+                    cachedSecondaryTangentImpulse = cached.SecondaryTangentImpulse;
+                }
             }
         }
 

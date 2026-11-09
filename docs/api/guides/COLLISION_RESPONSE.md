@@ -148,6 +148,17 @@ Sequential multipoint response has a finite-iteration residual. More
 symmetric face contacts. Choose the budget using representative quality and
 frame-time measurements.
 
+A joint-free cuboid island with a fixed support and two freely moving cuboids
+can seed both interfaces together when the supported body carries a heavier
+cuboid. The bounded solve uses up to eight normal
+rows and keeps compatible cached friction in an unchanged tangent basis.
+It prepares both bodies before applying impulses, then uses the configured
+row sweeps to refine the normal and friction response. If each interface
+shares one normal direction, the deepest depth on each interface can also
+drive one coupled translation correction. The ordinary sequential path
+handles restitution, constrained motion, larger islands, and cases where the
+coupled state cannot be prepared within the numeric limits.
+
 3D response torque arms are measured from `SolidBody.WorldCenterOfMass`.
 Collider centers remain collision-geometry references for narrow phase, culling,
 and normal fallback; they are not implicit body COM.
