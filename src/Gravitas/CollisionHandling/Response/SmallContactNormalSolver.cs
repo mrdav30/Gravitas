@@ -1,5 +1,5 @@
 //=======================================================================
-// SmallContactNormalSolver3D.cs
+// SmallContactNormalSolver.cs
 //=======================================================================
 //
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
@@ -12,8 +12,8 @@ using FixedMathSharp;
 
 namespace Gravitas.CollisionHandling;
 
-/// <summary>Solves a bounded unilateral normal response for a small 3D contact island.</summary>
-internal static class SmallContactNormalSolver3D
+/// <summary>Solves a bounded unilateral normal response from a small scalar effective-mass matrix.</summary>
+internal static class SmallContactNormalSolver
 {
     internal const int MaxRows = 8;
     private const int Satisfied = -1;

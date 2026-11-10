@@ -21,7 +21,7 @@ public static partial class CollisionResponse
             && !TryGetSupportedBodies(second, first, out lower, out upper))
             return false;
 
-        Span<IslandNormal> rows = stackalloc IslandNormal[SmallContactNormalSolver3D.MaxRows];
+        Span<IslandNormal> rows = stackalloc IslandNormal[SmallContactNormalSolver.MaxRows];
         int firstCount = first.Manifold.Count;
         int count = firstCount + second.Manifold.Count;
         System.Diagnostics.Debug.Assert(count <= rows.Length);
@@ -29,9 +29,9 @@ public static partial class CollisionResponse
             & TryReadIslandNormals(second, lower, upper, rows[firstCount..count])))
             return false;
 
-        Span<Fixed64> matrix = stackalloc Fixed64[SmallContactNormalSolver3D.MaxRows * SmallContactNormalSolver3D.MaxRows];
-        Span<Fixed64> speeds = stackalloc Fixed64[SmallContactNormalSolver3D.MaxRows];
-        Span<Fixed64> impulses = stackalloc Fixed64[SmallContactNormalSolver3D.MaxRows];
+        Span<Fixed64> matrix = stackalloc Fixed64[SmallContactNormalSolver.MaxRows * SmallContactNormalSolver.MaxRows];
+        Span<Fixed64> speeds = stackalloc Fixed64[SmallContactNormalSolver.MaxRows];
+        Span<Fixed64> impulses = stackalloc Fixed64[SmallContactNormalSolver.MaxRows];
         var lowerMobility = new IslandMobility(lower);
         var upperMobility = new IslandMobility(upper);
         bool preparedSystem = TryPrepareIslandFriction(rows[..count], lowerMobility, upperMobility,
@@ -56,7 +56,7 @@ public static partial class CollisionResponse
 
         if (!preparedSystem)
             return false;
-        if (!SmallContactNormalSolver3D.TrySolve(count, matrix[..(count * count)], speeds[..count], impulses[..count]))
+        if (!SmallContactNormalSolver.TrySolve(count, matrix[..(count * count)], speeds[..count], impulses[..count]))
             return false;
         bool preparedVelocities = TryPrepareIslandVelocity(lower, rows[..count], impulses[..count], lowerFriction,
                 isLower: true, out IslandMotion lowerState)
@@ -244,7 +244,7 @@ public static partial class CollisionResponse
             matrix[i * 2 + j] = matrix[j * 2 + i] = entry;
         }
 
-        prepared &= SmallContactNormalSolver3D.TrySolve(2, matrix, depths, impulses);
+        prepared &= SmallContactNormalSolver.TrySolve(2, matrix, depths, impulses);
         return prepared & TryPrepareIslandTranslation(lower, lowerAxes, impulses, out lowerPosition)
             & TryPrepareIslandTranslation(upper, upperAxes, impulses, out upperPosition);
     }

@@ -529,10 +529,84 @@ geometric overlaps sampled after each step.
 The lower COM of the centered 100:1 case first reached the floor plane on
 frame 34 and was at or below it on six sampled frames. The same-total-mass
 swap stayed within the floor-depth bound at both alignments. This isolates
-the support loss to top-heavy loading in these fixtures. It leaves the
-specific response cause open. [GRV-Issue-152](issue-tracker.md#grv-issue-152)
-owns the pure 2D investigation. Keep the passing 3D support results and the
-planar failure distinct in later duration and solver comparisons.
+the support loss to top-heavy loading in these fixtures. The result was
+recorded as [GRV-Issue-152](issue-tracker.md#grv-issue-152) and traced to
+the planar response below.
+
+#### GRV-Issue-152 Implementation
+
+On `a850645f`, frame 7 of the centered top-heavy and same-total-mass swap
+starts the next step with matching body height and vertical velocity. On
+frame 8 both cases generate two fresh upward rows at each support. The
+100:1 top load leaves the lower body moving into the floor at 0.739674
+unit/s. The swap leaves it moving up at 0.017107 unit/s. At frame 12 the
+top-loaded lower body is still closing at 1.067449 units/s and its
+floor penetration is 0.074013 unit. The swap is closing at 0.001038
+unit/s with floor depth 0.010027 unit.
+
+The two interfaces share the light body. The normal load must transfer
+through both contacts within a step. For the centered translational
+component the diagonal effective-mass entries are 1 and 1.01, with
+off-diagonal entries of −1. The six pair sweeps leave a substantial
+closing velocity. The production regression reproduces the onset with
+freely moving convex bodies, including offset 10:1 and 100:1 and centered
+100:1 loads. The initial geometry-only check fails on the committed build
+by frame 11 as the lower-upper depth exceeds 1/16 unit.
+
+The pure 2D service now seeds the normal loads together for a two-contact
+convex island with a fixed support and two unrestricted dynamic bodies,
+where the outer body is heavier. The four-row planar solve reuses the
+dimension-neutral scalar unilateral solver shared with 3D. It includes
+the planar angular lever at each contact and validates both prepared
+velocities after the same motion deadbands the body will apply. Rejected
+inputs use the ordinary pair solve. Accepted rows start friction from
+zero tangential impulse and let the existing sweeps refine it. The same
+per-pair position correction runs once after the seeded sweeps, keeping
+the incoming normal orientation and levers stable during refinement.
+
+In all four top-heavy cases the lower vertical speed at frame 8 is zero
+to six decimal places. The centered and offset versions reach the same
+peak residuals to the displayed precision. Both original supports remain
+present after establishment through frame 256. Both offset top-heavy
+cases now meet the original planar quality bounds. The mass-swap and
+equal-mass controls retain their baseline trajectories. The offset
+equal-mass cases can briefly separate and recover.
+
+| Lower / upper mass | Alignment | Minimum lower COM | Peak floor/lower depth | Peak lower/upper depth |
+| --- | --- | ---: | ---: | ---: |
+| 1 / 10 | Offset / centered | 0.471493 | 0.028507 | 0.031229 |
+| 1 / 100 | Offset / centered | 0.461284 | 0.038716 | 0.041438 |
+
+`verify-quality-stack-support 2d` captures the ten matched cases with
+repeated observed replays and an observation-free terminal check. Release
+and ReleaseLean match. `measure-quality-stack-support 2d` disables sleep,
+warms 64 steps and measures `Simulate` plus `LateSimulate` across frames
+65–256. Each corrected heavy-top case keeps both support interfaces on all
+192 steps, with 768 fresh rows and 0 B of managed stepping allocation in
+both configurations. In three balanced Release launches per build, all
+candidate controls also allocate 0 B. The offset 10:1 stock case allocates
+1,144 B over the same window. The stock and corrected
+scenarios exercise different contacts. Mean step times for the corrected
+heavy cases are about 0.30–0.88 ms at the launch medians. The control times
+also vary between builds, so the captures establish the workload cost and
+allocation bound without isolating the marginal solve cost.
+
+The other Phase 1 captures match their baseline output. The 1,024-actor
+strategy workloads retain their 96-frame traces in both dimensions and
+first complete their chains on frame 67. An independent source review
+identified the velocity publication and contact-orientation edge cases.
+The focused long-lever regression rejects a seed that would rely on spin
+below the published deadband and verifies that velocities and retained
+impulses remain intact on rejection. Removing the publication guard makes
+that regression fail. Additional directed cases exercise the planar torque
+sign and the representability fallbacks.
+
+The final solution builds passed for `net10.0` and `netstandard2.1` with
+released packages. The full suites passed 8,414 Release and 8,343 ReleaseLean
+tests. Each configuration covered all 54,094 lines, 22,176 branches, and
+5,652 methods with the repository filters. DocFX passed with warnings
+treated as errors. Raw captures are in ignored
+`artifacts/physics-quality-phase1/issue-152`.
 
 ### Aligned Long-Chain Checkpoint
 
@@ -758,8 +832,8 @@ and coverage reports are in ignored `artifacts/physics-quality-phase1/closeout`.
 Phase 1 completes the fixture and measurement checklist. Carry the
 100:1 matched-speed chain and the ragdoll drop and supported-start cases
 into duration and iteration comparisons with the same physical bounds.
-The planar support failure remains active under
-[GRV-Issue-152](issue-tracker.md#grv-issue-152).
+The [GRV-Issue-152 support correction](#grv-issue-152-implementation)
+supplies the planar top-heavy baseline for Phase 2.
 
 ## Phase 2: Duration And Continuation
 

@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
-public sealed class SmallContactNormalSolver3DTests
+public sealed class SmallContactNormalSolverTests
 {
     [Fact]
     public void TrySolve_WithCapturedRankSixSupportIsland_ShouldBalanceTheHeavyLoad()
@@ -35,7 +35,7 @@ public sealed class SmallContactNormalSolver3DTests
         }
 
         var impulses = new Fixed64[count];
-        Assert.True(SmallContactNormalSolver3D.TrySolve(count, matrix, speeds, impulses));
+        Assert.True(SmallContactNormalSolver.TrySolve(count, matrix, speeds, impulses));
 
         decimal floorImpulse = 0m;
         decimal interBoxImpulse = 0m;
@@ -66,7 +66,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { -one, Fixed64.Zero };
         var impulses = new Fixed64[2];
 
-        Assert.True(SmallContactNormalSolver3D.TrySolve(2, matrix, speeds, impulses));
+        Assert.True(SmallContactNormalSolver.TrySolve(2, matrix, speeds, impulses));
 
         Assert.Equal(one, impulses[0]);
         Assert.Equal(Fixed64.Zero, impulses[1]);
@@ -85,7 +85,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { one, (Fixed64)(-2), Fixed64.Zero };
         var impulses = new Fixed64[3];
 
-        Assert.True(SmallContactNormalSolver3D.TrySolve(3, matrix, speeds, impulses));
+        Assert.True(SmallContactNormalSolver.TrySolve(3, matrix, speeds, impulses));
 
         Assert.Equal(new[] { Fixed64.Zero, one, one }, impulses);
     }
@@ -107,7 +107,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { (Fixed64)13, (Fixed64)(-18), (Fixed64)(-12), (Fixed64)(-13), (Fixed64)(-18) };
         var impulses = new Fixed64[5];
 
-        Assert.True(SmallContactNormalSolver3D.TrySolve(5, matrix, speeds, impulses));
+        Assert.True(SmallContactNormalSolver.TrySolve(5, matrix, speeds, impulses));
 
         Fixed64 tolerance = Fixed64.FromFraction(1, 1_000_000);
         Fixed64[] expected =
@@ -129,7 +129,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { -one, -one };
         Fixed64[] impulses = { one, one };
 
-        Assert.False(SmallContactNormalSolver3D.TrySolve(2, matrix, speeds, impulses));
+        Assert.False(SmallContactNormalSolver.TrySolve(2, matrix, speeds, impulses));
 
         Assert.Equal(new[] { one, one }, impulses);
     }
@@ -145,7 +145,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { Fixed64.FromRaw(speedRaw) };
         Fixed64[] impulses = { Fixed64.One };
 
-        Assert.False(SmallContactNormalSolver3D.TrySolve(1, matrix, speeds, impulses));
+        Assert.False(SmallContactNormalSolver.TrySolve(1, matrix, speeds, impulses));
 
         Assert.Equal(Fixed64.One, impulses[0]);
     }
@@ -157,7 +157,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { Fixed64.MinValue };
         Fixed64[] impulses = { Fixed64.One };
 
-        Assert.False(SmallContactNormalSolver3D.TrySolve(1, matrix, speeds, impulses));
+        Assert.False(SmallContactNormalSolver.TrySolve(1, matrix, speeds, impulses));
 
         Assert.Equal(Fixed64.One, impulses[0]);
     }
@@ -174,7 +174,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { (Fixed64)(-1_500_000_000), (Fixed64)secondSpeed };
         Fixed64[] impulses = { one, Fixed64.Two };
 
-        Assert.False(SmallContactNormalSolver3D.TrySolve(2, matrix, speeds, impulses));
+        Assert.False(SmallContactNormalSolver.TrySolve(2, matrix, speeds, impulses));
 
         Assert.Equal(new[] { one, Fixed64.Two }, impulses);
     }
@@ -186,7 +186,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { -Fixed64.One };
         Fixed64[] impulses = { Fixed64.One };
 
-        Assert.False(SmallContactNormalSolver3D.TrySolve(1, matrix, speeds, impulses));
+        Assert.False(SmallContactNormalSolver.TrySolve(1, matrix, speeds, impulses));
 
         Assert.Equal(Fixed64.One, impulses[0]);
     }
@@ -207,7 +207,7 @@ public sealed class SmallContactNormalSolver3DTests
         var impulses = new Fixed64[9];
         Array.Fill(impulses, Fixed64.One);
 
-        Assert.False(SmallContactNormalSolver3D.TrySolve(rowCount,
+        Assert.False(SmallContactNormalSolver.TrySolve(rowCount,
             matrix.AsSpan(0, matrixLength), speeds.AsSpan(0, speedLength), impulses.AsSpan(0, impulseLength)));
 
         Assert.All(impulses, value => Assert.Equal(Fixed64.One, value));
@@ -221,7 +221,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { Fixed64.Zero, Fixed64.Zero };
         Fixed64[] impulses = { one, Fixed64.Two };
 
-        Assert.False(SmallContactNormalSolver3D.TrySolve(2, matrix, speeds, impulses));
+        Assert.False(SmallContactNormalSolver.TrySolve(2, matrix, speeds, impulses));
 
         Assert.Equal(new[] { one, Fixed64.Two }, impulses);
     }
@@ -238,7 +238,7 @@ public sealed class SmallContactNormalSolver3DTests
         Fixed64[] speeds = { -Fixed64.One, -Fixed64.One };
         Fixed64[] impulses = { Fixed64.One, Fixed64.Two };
 
-        Assert.False(SmallContactNormalSolver3D.TrySolve(2, matrix, speeds, impulses));
+        Assert.False(SmallContactNormalSolver.TrySolve(2, matrix, speeds, impulses));
 
         Assert.Equal(new[] { Fixed64.One, Fixed64.Two }, impulses);
     }

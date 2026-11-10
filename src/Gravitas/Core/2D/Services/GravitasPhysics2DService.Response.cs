@@ -211,11 +211,15 @@ public sealed partial class GravitasPhysics2DService
                 CollisionResponse2D.PrepareSolve(constraint.Pair);
         }
 
+        bool seededNormals = end - start == 2
+            && _discreteIslandConstraints[start].Kind == DiscreteIslandConstraint2DKind.Contact
+            && _discreteIslandConstraints[start + 1].Kind == DiscreteIslandConstraint2DKind.Contact
+            && CollisionResponse2D.TrySeedSupportedIslandNormals(
+                _discreteIslandConstraints[start].Pair, _discreteIslandConstraints[start + 1].Pair);
         int iterations = _context.Settings.DiscreteSolverIterations;
         for (int iteration = 0; iteration < iterations; iteration++)
         {
-            bool applyCachedImpulse = iteration == 0;
-            bool applyPositionCorrection = iteration == 0;
+            bool prepare = iteration == 0 && !seededNormals;
             for (int i = start; i < end; i++)
             {
                 DiscreteIslandConstraint2D constraint = _discreteIslandConstraints[i];
@@ -223,12 +227,18 @@ public sealed partial class GravitasPhysics2DService
                 {
                     CollisionResponse2D.Resolve(
                         constraint.Pair,
-                        applyCachedImpulse,
-                        applyPositionCorrection);
+                        applyCachedImpulse: prepare,
+                        applyPositionCorrection: prepare);
                 }
                 else
-                    JointSolver2D.Solve(constraint.Joint!, applyCachedImpulse);
+                    JointSolver2D.Solve(constraint.Joint!, prepare);
             }
+        }
+        if (seededNormals)
+        {
+            // Keep the seeded row normals and lever arms fixed through velocity refinement.
+            CollisionResponse2D.CorrectSeededSupportPosition(_discreteIslandConstraints[start].Pair);
+            CollisionResponse2D.CorrectSeededSupportPosition(_discreteIslandConstraints[start + 1].Pair);
         }
         for (int i = start; i < end; i++)
         {

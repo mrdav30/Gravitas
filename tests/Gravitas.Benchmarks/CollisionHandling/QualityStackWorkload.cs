@@ -34,21 +34,23 @@ internal static partial class QualityStackWorkload
         return 0;
     }
 
-    internal static int VerifySupport(bool measure = false)
+    internal static int VerifySupport(bool measure = false, bool planar = false)
     {
+        (int, int)[] loads = planar ? [(1, 10), (1, 100), (100, 1), (100, 100), (1, 1)]
+            : [(1, 100), (100, 1), (100, 100), (1, 1)];
         foreach (bool aligned in new[] { false, true })
-        foreach (var (lower, upper) in new[] { (1, 100), (100, 1), (100, 100), (1, 1) })
+        foreach (var (lower, upper) in loads)
         {
-            string id = $"quality-3d-support-{lower}-{upper}-{(aligned ? "aligned" : "offset")}-v1";
+            string id = $"quality-{(planar ? "2d" : "3d")}-support-{lower}-{upper}-{(aligned ? "aligned" : "offset")}-v1";
             var load = new StackLoad(lower, upper, aligned);
             if (measure)
             {
                 Console.WriteLine(id);
-                Result result = Run(planar: false, load, tilted: false, observe: false, measure: true);
+                Result result = Run(planar, load, tilted: false, observe: false, measure: true);
                 Console.WriteLine($"terminal hash {result.Terminal}");
             }
             else
-                Verify(id, planar: false, load, tilted: false, support: true);
+                Verify(id, planar, load, tilted: false, support: true);
         }
         return 0;
     }
@@ -73,7 +75,7 @@ internal static partial class QualityStackWorkload
         if (support)
         {
             Require(samples.AsSpan().SequenceEqual(repeat), Frames, $"{id} support samples changed");
-            WriteSupport(id, first, samples, writeFrames);
+            WriteSupport(id, first, samples, writeFrames, requireContinuousSupport: !planar || load.Upper > load.Lower);
             return;
         }
         Reading end = first.Final;
@@ -99,7 +101,7 @@ internal static partial class QualityStackWorkload
             ? BenchmarkPhysicsScene.CreatePlanarContext(new Vector2d(-16, -8), new Vector2d(16, 16), cellSize: 4)
             : CreateSpatialContext();
         ConfigureQualityContext(context);
-        Scene scene = planar ? Planar(context, load.Upper, tilted) : Spatial(context, load, tilted, measure);
+        Scene scene = planar ? Planar(context, load, tilted, measure) : Spatial(context, load, tilted, measure);
         var trace = new ChronicleHashWriter();
         trace.WriteSection("quality-stack-v1", 1);
         var sleeping = new bool[scene.Count];
@@ -160,7 +162,8 @@ internal static partial class QualityStackWorkload
         if (measure)
         {
             const int measuredFrames = Frames - WarmupFrames;
-            Require(activeSupports == measuredFrames, Frames, "warm timing window lost a support interface");
+            if (!planar || load.Upper > load.Lower)
+                Require(activeSupports == measuredFrames, Frames, "warm timing window lost a support interface");
             Console.WriteLine(FormattableString.Invariant(
                 $"frames {measuredFrames}, active supports {activeSupports}, fresh support rows {freshSupportRows}, bytes {totalBytes}, max bytes {maxBytes}, mean us {totalTicks * 1_000_000d / Stopwatch.Frequency / measuredFrames:F3}"));
         }
@@ -189,7 +192,8 @@ internal static partial class QualityStackWorkload
     private static void WriteFrame(string id, int frame, Reading row) => Console.WriteLine(FormattableString.Invariant(
         $"{id},{frame},{row.SolverDepth:F6},{row.Residual:F6},{row.ResidualPairs},{row.NeighborPairs},{row.LowestHeight:F6},{row.Drift:F6},{row.Angle:F6},{row.LinearEnergy:F6},{row.AngularEnergy:F6},{row.Potential:F6},{row.Sleeping},{row.ContactSet}"));
 
-    private static void WriteSupport(string id, Result result, SupportSample[] samples, bool writeFrames)
+    private static void WriteSupport(string id, Result result, SupportSample[] samples, bool writeFrames,
+        bool requireContinuousSupport)
     {
         Require(!samples[0].FloorLower.Overlap && !samples[0].FloorUpper.Overlap && !samples[0].LowerUpper.Overlap,
             0, $"{id} must start with clearance");
@@ -203,8 +207,8 @@ internal static partial class QualityStackWorkload
         Console.WriteLine($"  First frame (-1 absent) upward manifold rows at floor {firstFloor}, at both supports {firstStack}, floor/lower residual > 1/16 {deep}, floor/upper overlap {upperFloor}, lower COM at/below floor {crossing}");
         Console.WriteLine(FormattableString.Invariant(
             $"  Minimum lower COM {samples.Min(row => row.LowerHeight):F6}, frames at/below floor {samples.Count(row => row.LowerHeight <= Fixed64.Zero)}, peak floor/lower residual {samples.Max(row => row.FloorLower.Residual):F6}"));
-        Require(upperFloor < 0 && crossing < 0, Frames, $"{id} lost vertical support");
-        for (int frame = firstStack; frame <= Frames; frame++)
+        Require(upperFloor < 0 && crossing < 0 && deep < 0, Frames, $"{id} lost vertical support");
+        for (int frame = requireContinuousSupport ? firstStack : Frames; frame <= Frames; frame++)
         {
             SupportSample row = samples[frame];
             Require(row.FloorLower.Overlap && row.LowerUpper.Overlap
@@ -223,7 +227,7 @@ internal static partial class QualityStackWorkload
         }
     }
 
-    private static string PairCsv(SpatialPairReading pair) => FormattableString.Invariant(
+    private static string PairCsv(SupportPairReading pair) => FormattableString.Invariant(
         $"{pair.Overlap},{pair.Residual:F6},{pair.FreshRows},{pair.UpwardRows}");
 
     private static Reading Read(Scene scene, bool[] sleeping, int frame, ref ChronicleHashWriter trace,
@@ -341,7 +345,7 @@ internal static partial class QualityStackWorkload
         return body;
     }
 
-    private static Scene Planar(GravitasWorldContext context, int ratio, bool tilted)
+    private static Scene Planar(GravitasWorldContext context, StackLoad load, bool tilted, bool measure)
     {
         int count = tilted ? 1 : 2;
         var colliders = new LSCollider2D[count + 1];
@@ -352,7 +356,7 @@ internal static partial class QualityStackWorkload
         Fixed64 initialRotation = tilted ? TiltRadians : Fixed64.Zero;
         for (int i = 0; i < count; i++)
         {
-            Vector2d start = Start(i, tilted);
+            Vector2d start = Start(i, tilted, load.Aligned);
             LSCollider2D collider = tilted
                 ? new LSCapsuleCollider2D(ColliderShapeDefinition2D.Capsule(Fixed64.Half, (Fixed64)2, Material))
                 : new LSPolygonCollider2D(ColliderShapeDefinition2D.ConvexPolygon(Material,
@@ -360,9 +364,9 @@ internal static partial class QualityStackWorkload
                     new Vector2d(Fixed64.One, Fixed64.Half), new Vector2d(-Fixed64.One, Fixed64.Half)));
             var body = new SolidBody2D(new BenchmarkMatterAgent(context, new Vector3d(start.X, Fixed64.Zero, start.Y)), collider)
             {
-                Mass = (Fixed64)(i == 0 ? 1 : ratio),
+                Mass = (Fixed64)(i == 0 ? load.Lower : load.Upper),
                 Gravity = new Vector2d(Fixed64.Zero, -Gravity),
-                SleepEnabled = true
+                SleepEnabled = !measure
             };
             body.UseManualGrounding();
             body.Initialize(start, initialRotation);
@@ -380,10 +384,10 @@ internal static partial class QualityStackWorkload
                 (int)context.FrameCount, "planar actor left the fixture domain");
             Fixed64 angle = FixedMath.RadToDeg(FixedMath.Atan2(FixedMath.Sin(body.Rotation - initialRotation),
                 FixedMath.Cos(body.Rotation - initialRotation)).Abs());
-            return new Motion(new Vector3d(center.X, center.Y, Fixed64.Zero), body.LinearVelocity.ToVector3d(Fixed64.Zero),
+            return new Motion(new Vector3d(center.X, center.Y, Fixed64.Zero), new Vector3d(body.LinearVelocity.X, body.LinearVelocity.Y, Fixed64.Zero),
                 body.Mass, Fixed64.Half * body.MomentOfInertia * spinSquared,
-                (center.X - Start(i, tilted).X).Abs(), angle, body.IsSleeping);
-        }, frame => PlanarContacts(colliders, frame));
+                (center.X - Start(i, tilted, load.Aligned).X).Abs(), angle, body.IsSleeping);
+        }, frame => PlanarContacts(colliders, frame, readResidual: !measure));
     }
 
     private static ContactReading SpatialContacts((CollisionPair Pair, bool Neighbors)[] probes, int frame, bool readResidual)
@@ -393,7 +397,7 @@ internal static partial class QualityStackWorkload
         Fixed64 solver = Fixed64.Zero, residual = Fixed64.Zero;
         int pairs = 0, neighbors = 0;
         Span<ulong> contacts = stackalloc ulong[ContactManifold.MaxContactsPerGroup];
-        Span<SpatialPairReading> readings = stackalloc SpatialPairReading[probes.Length];
+        Span<SupportPairReading> readings = stackalloc SupportPairReading[probes.Length];
         int pairIndex = 0;
         foreach (var (probe, isNeighbor) in probes)
         {
@@ -431,7 +435,7 @@ internal static partial class QualityStackWorkload
                     residual = Max(residual, depth);
                 }
             }
-            readings[pairIndex++] = new SpatialPairReading(overlap, depth, currentRows, upwardRows);
+            readings[pairIndex++] = new SupportPairReading(overlap, depth, currentRows, upwardRows);
         }
         // The two-body probes are emitted in endpoint order: (0,1), (0,2), (1,2).
         return probes.Length == 3
@@ -439,19 +443,21 @@ internal static partial class QualityStackWorkload
             : new ContactReading(solver, residual, pairs, neighbors, ids.ToHash());
     }
 
-    private static ContactReading PlanarContacts(LSCollider2D[] colliders, int frame)
+    private static ContactReading PlanarContacts(LSCollider2D[] colliders, int frame, bool readResidual)
     {
         var ids = new ChronicleHashWriter();
         ids.WriteSection("pairs", 1);
         Fixed64 solver = Fixed64.Zero, residual = Fixed64.Zero;
         int pairs = 0, neighbors = 0;
         Span<ulong> contacts = stackalloc ulong[2];
+        Span<SupportPairReading> readings = stackalloc SupportPairReading[3];
+        int index = 0;
         for (int i = 0; i < colliders.Length; i++)
         for (int j = i + 1; j < colliders.Length; j++)
         {
             LSCollider2D a = colliders[i];
             LSCollider2D b = colliders[j];
-            int count = 0;
+            int count = 0, fresh = 0, upward = 0;
             if ((a.TryGetCollisionPair(b.Id, out CollisionPair2D pair) || b.TryGetCollisionPair(a.Id, out pair)) && pair.IsColliding)
                 for (int k = 0; k < pair.Manifold.Count; k++)
                 {
@@ -459,16 +465,33 @@ internal static partial class QualityStackWorkload
                     Require(!row.DepthIsClamped && count < contacts.Length, frame, "unexpected planar contact row");
                     solver = Max(solver, row.Depth);
                     contacts[count++] = row.ContactId;
+                    if (pair.Manifold.LastUpdatedFrame == frame)
+                    {
+                        fresh++;
+                        if ((pair.ColliderB == b ? row.Normal.Y : -row.Normal.Y) > Fixed64.Zero)
+                            upward++;
+                    }
                 }
-            WriteIds(ref ids, contacts[..count]);
-            if (!CollisionDetection2D.TryCollide(a, b, out Contact2D contact))
-                continue;
-            Require(!contact.DepthIsClamped, frame, "planar residual depth clamped");
-            pairs++;
-            if (j == i + 1) neighbors++;
-            residual = Max(residual, contact.Depth);
+            bool overlap = false;
+            Fixed64 depth = Fixed64.Zero;
+            if (readResidual)
+            {
+                WriteIds(ref ids, contacts[..count]);
+                overlap = CollisionDetection2D.TryCollide(a, b, out Contact2D contact);
+                if (overlap)
+                {
+                    Require(!contact.DepthIsClamped, frame, "planar residual depth clamped");
+                    pairs++;
+                    if (j == i + 1) neighbors++;
+                    depth = contact.Depth;
+                    residual = Max(residual, depth);
+                }
+            }
+            readings[index++] = new SupportPairReading(overlap, depth, fresh, upward);
         }
-        return new ContactReading(solver, residual, pairs, neighbors, ids.ToHash());
+        return index == 3
+            ? new ContactReading(solver, residual, pairs, neighbors, ids.ToHash(), readings[0], readings[1], readings[2])
+            : new ContactReading(solver, residual, pairs, neighbors, ids.ToHash());
     }
 
     private static void WriteIds(ref ChronicleHashWriter writer, Span<ulong> ids)
@@ -489,11 +512,11 @@ internal static partial class QualityStackWorkload
     private readonly record struct Motion(Vector3d Center, Vector3d Linear, Fixed64 Mass, Fixed64 AngularEnergy,
         Fixed64 Drift, Fixed64 Angle, bool Sleeping);
     private readonly record struct ContactReading(Fixed64 SolverDepth, Fixed64 Residual, int ResidualPairs,
-        int NeighborPairs, ChronicleHash Set, SpatialPairReading FloorLower = default,
-        SpatialPairReading FloorUpper = default, SpatialPairReading LowerUpper = default);
-    private readonly record struct SpatialPairReading(bool Overlap, Fixed64 Residual, int FreshRows, int UpwardRows);
+        int NeighborPairs, ChronicleHash Set, SupportPairReading FloorLower = default,
+        SupportPairReading FloorUpper = default, SupportPairReading LowerUpper = default);
+    private readonly record struct SupportPairReading(bool Overlap, Fixed64 Residual, int FreshRows, int UpwardRows);
     private readonly record struct SupportSample(Fixed64 LowerHeight, Fixed64 LowerVelocityY, Fixed64 UpperHeight,
-        SpatialPairReading FloorLower, SpatialPairReading FloorUpper, SpatialPairReading LowerUpper);
+        SupportPairReading FloorLower, SupportPairReading FloorUpper, SupportPairReading LowerUpper);
     private readonly record struct Reading(Fixed64 Drift, Fixed64 Angle, Fixed64 LowestHeight, Fixed64 LinearEnergy,
         Fixed64 AngularEnergy, Fixed64 Potential, int Sleeping, int Sleeps, int Wakes, Fixed64 SolverDepth,
         Fixed64 Residual, int ResidualPairs, int NeighborPairs, ChronicleHash ContactSet)

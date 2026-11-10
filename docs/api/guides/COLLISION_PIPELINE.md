@@ -487,6 +487,14 @@ frame, delivers notifications, and clears per-step impulses. It does not enable
 cross-frame mixed warm starts. Pure 2D and mixed response revalidate pending
 pairs after contact callbacks.
 
+In pure 2D, a two-contact convex island can solve its normal load together
+when a freely moving body carries a heavier one over a fixed support.
+The unilateral solve includes each contact's linear and angular response
+and requires inelastic rows and representable body velocities. The ordinary
+row sweeps refine friction against these normal loads. Seeded islands apply
+the existing pair position corrections after the velocity sweeps so the
+normal and lever used by a seeded impulse remain valid through refinement.
+
 Changed geometry or eligibility rebuilds their constraints before solving;
 retiring a pair removes its pending response before its object can be pooled and
 reused. Physical overlap notifications remain independent of response-row

@@ -305,6 +305,15 @@ manifold row counts, including the upward-facing subset. The row counts
 describe contact geometry. The [matched controls](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#3d-high-mass-support-controls)
 record the results and their limits.
 
+Append `2d` to `verify-quality-stack-support` for the planar support matrix.
+It covers centered and offset 10:1 and 100:1 top loads, the 100:1 mass swap,
+and two equal-mass controls. The heavy-top cases must keep both interfaces
+within the depth bound once established. The matched controls check floor
+clearance throughout and both original supports at the final sample.
+`measure-quality-stack-support 2d` disables sleep and measures the 192
+steps after frame 64. It reports fresh support rows and managed allocations
+on the stepping thread.
+
 ### Opt-in physics quality chains
 
 ```powershell

@@ -139,10 +139,7 @@ public static partial class CollisionResponse2D
         byte failedResponseMask = 0;
         Fixed64 contactShare = impact.IsValid ? Fixed64.One : Fixed64.One / (Fixed64)contacts.Count;
         if (applyPositionCorrection)
-        {
-            for (int i = 0; i < contacts.Count; i++)
-                ApplyPositionCorrection(contacts.GetContact(i), contactShare);
-        }
+            ApplyPositionCorrections(ref contacts, contactShare);
 
         if (applyCachedImpulse)
         {
@@ -495,6 +492,12 @@ public static partial class CollisionResponse2D
             contactShare,
             contactShare,
             out result, impact);
+    }
+
+    private static void ApplyPositionCorrections(ref SolverContactBuffer2D contacts, Fixed64 contactShare)
+    {
+        for (int i = 0; i < contacts.Count; i++)
+            ApplyPositionCorrection(contacts.GetContact(i), contactShare);
     }
 
     private static void ApplyPositionCorrection(SolverContact2D contact, Fixed64 contactShare)

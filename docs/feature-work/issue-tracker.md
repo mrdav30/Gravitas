@@ -55,33 +55,7 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-<a id="grv-issue-152"></a>
-
-#### GRV-Issue-152 — Top-heavy planar stacks lose floor support
-
-**Opened** 2026-11-09. **Priority** High. **Owner** Gravitas pure 2D contact
-generation and island response.
-
-On `50c5d555` with released dependencies, run `verify-quality-stacks` from
-the Release benchmark DLL with `GRAVITAS_QUALITY_FRAME_CSV=1`. The 10:1 and
-100:1 top-loaded planar polygons peak at 0.508188 and 0.518161 units of
-residual overlap across all pairs. Both finish with the upper body on the
-floor and the original lower-floor support absent. Release and ReleaseLean
-match. This is a freely moving 60 Hz fixture using six iterations, 2-by-1
-polygons, 1/32-unit starting clearances, 1/64-unit lateral offset, gravity
-9.8, and zero restitution.
-
-The [matched controls](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#current-stack-baseline-and-planar-support-follow-up)
-separate the two support interfaces. At 100:1, removing the offset still
-allows the lower COM to reach the floor plane on frame 34. Swapping the
-same masses retains both supports with peak lower-floor depth near 0.0101
-unit. The centered control uses the same fixture with upper X set to zero.
-For the swap, set the lower mass to 100 and the upper mass to 1.
-
-Next isolate the fresh floor and lower-upper rows, normal velocity response
-and positional correction from frame 8 through frame 12 against the swap.
-Verify a focused reproducer and preserve replay and warm allocations before
-accepting a runtime change.
+No active issues.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
@@ -98,6 +72,7 @@ validation, tradeoffs and links to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                                                                                         | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="grv-issue-152"></a>GRV-Issue-152 | 2026-11-09 | Fixed. Coupled normal loads preserve both planar support interfaces for centered and offset 10:1 and 100:1 top loads. | [Reproduction, implementation, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-152-implementation) |
 | <a id="grv-issue-151"></a>GRV-Issue-151 | 2026-11-09 | Fixed. Finite cuboid face witnesses and coupled support response preserve both interfaces under the 100:1 top load. | [Implementation and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-151-implementation) |
 | <a id="grv-issue-150"></a>GRV-Issue-150 | 2026-11-09 | Fixed. 3D pair shells release endpoints on return to the pool after separation notifications. The service clears pair snapshots and solver work lists after use, and grounding releases temporary query hits after selecting support. | [Live-context regression](../../tests/Gravitas.Tests/CollisionHandling/CollisionPairLifecycleHardeningTests.cs) fails on `c0b055e0` and passes with pooling on and off. The 1,024-actor 3D soak replay and all 10,240 frame allocation records match Phase 3. Warm mesh steps and 64-body ray and swept-sphere probes allocated 0 B before and after. |
 | <a id="grv-issue-149"></a>GRV-Issue-149 | 2026-11-09 | Fixed: Clear the occupied body and pair snapshot slots after the outer 2D grounding refresh. Reusable capacity and nested callback ranges are preserved. | [Live-context regression](../../tests/Gravitas.Tests/Physics2D/SolidBody2DGroundingTests.cs), [soak finding](done/2026-10-06-evolving-game-capacity-and-soak-plan.md#retained-managed-memory). The retired body, collider and agent are collectible after 1,024 empty steps. Both 2D strategy traces and the 1,024-actor soak replay and per-frame allocations match their baselines. The 64- and 1,024-pair warm step probes allocated 0 B before and after, with overlapping timing ranges across three launches per variant. |

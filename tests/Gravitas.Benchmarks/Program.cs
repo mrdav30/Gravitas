@@ -44,11 +44,12 @@ internal static class Program
         if (string.Equals(command, "verify-quality-work-energy", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
             return QualityWorkEnergyWorkload.Verify();
 
-        if (string.Equals(command, "verify-quality-stack-support", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
-            return QualityStackWorkload.VerifySupport();
+        bool supportProfile = args.Length == 1 || args.Length == 2 && args[1] == "2d";
+        if (string.Equals(command, "verify-quality-stack-support", StringComparison.OrdinalIgnoreCase) && supportProfile)
+            return QualityStackWorkload.VerifySupport(planar: args.Length == 2);
 
-        if (string.Equals(command, "measure-quality-stack-support", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
-            return QualityStackWorkload.VerifySupport(measure: true);
+        if (string.Equals(command, "measure-quality-stack-support", StringComparison.OrdinalIgnoreCase) && supportProfile)
+            return QualityStackWorkload.VerifySupport(measure: true, planar: args.Length == 2);
 
         if (string.Equals(command, "measure-quality-stack-density", StringComparison.OrdinalIgnoreCase)
             && (args.Length == 1 || args.Length == 2 && args[1] == "verify"))
@@ -208,8 +209,8 @@ internal static class Program
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-ragdolls");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-mixed");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-work-energy");
-        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stack-support");
-        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll measure-quality-stack-support");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stack-support [2d]");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll measure-quality-stack-support [2d]");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll measure-quality-stack-density [verify]");
         Console.WriteLine();
         Console.WriteLine("Leading arguments that do not start with '-' are treated as benchmark selections.");
