@@ -1,7 +1,7 @@
 # Long-Duration Physics Quality And Tuning Plan
 
 **Date:** 2026-10-06  
-**Status:** Phase 1 stack support verified and GRV-Issue-151 resolved. Chains and ragdolls are next.  
+**Status:** Phase 1 stack and aligned chain checkpoints captured. Resting/contact ragdolls are next.  
 **Owner:** Gravitas contact/constraint quality and configuration guidance.
 
 ## Goal
@@ -494,7 +494,77 @@ links back to these measurements.
 closed after reducing the exact response cost of sustained cuboid support.
 The [density closeout](done/2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure)
 preserves the four-, eight-, and sixteen-stack replay and budget evidence.
-Phase 1 can continue with chains and ragdolls.
+[GRV-Benchmark-035](benchmark-signal-hardening-backlog.md#grv-benchmark-035)
+closed after rejecting disjoint cross-stack pairs before acquisition.
+
+### Aligned Long-Chain Checkpoint
+
+On `1839af2e` with the new opt-in `verify-quality-chains` command, use
+released LSF packages on Windows x64 (.NET SDK 10.0.302, runtime 10.0.10).
+Each dimension runs 256 complete steps at 60 Hz and six discrete solver
+iterations. The verifier reuses the long-chain benchmark builders with
+32 centered, radius-1/2 circles or spheres spaced one unit apart. Half-unit
+local anchors coincide initially. The first link is static. The remaining
+links move freely through unrestricted planar pins or spatial ball sockets.
+Adjacent collision is suppressed, and the verifier checks for zero physical
+contacts throughout. Gravity, motors, aerodynamic drag, angular damping and
+sleep are disabled for this checkpoint. The spatial pulse lies in X/Y and
+the planar equivalent uses the simulation's X/Z axes.
+
+Non-tip links have unit mass. The matched-speed cases give the tip an
+impulse of its mass times `(3/16, 1/16)`, yielding the same initial velocity
+to fixed-point precision. The mass-100 control receives the unit-mass case's
+impulse, so its initial velocity is 1/100 as large. The no-pulse control uses
+unit mass throughout. Frame 0 verifies coincident anchors and the initial
+kinetic energy against the energy supplied by the authored impulse. Gravity
+and motor work are zero. Kinetic energy includes body-local rotational
+energy. The matched inputs leave each dimension's inertia and solver policy
+in effect. Constraint stabilization can change mechanical energy, so this
+checkpoint uses an energy growth bound and measures decay separately.
+
+The no-pulse control must remain motionless with coincident anchors. Loaded
+cases use provisional bounds of 1/16 unit for peak anchor separation, 1/64
+unit for terminal separation, and one unit for peak tip displacement. These
+are lengths relative to the one-unit link diameter. Kinetic energy must stay
+within twice the input energy. The verifier reconstructs anchor separation
+from published poses and checks each joint's latest solve metrics for the
+prepared gap and two planar or three spatial rows per step. Frame samples
+also report maximum link rotation in degrees and linear/angular energy in
+mass × distance²/s².
+
+| Tip load | 2D peak / final gap | 3D peak / final gap | 2D / 3D peak tip travel | Bounds |
+| --- | ---: | ---: | ---: | --- |
+| No pulse, unit mass | 0 / 0 | 0 / 0 | 0 / 0 | Within |
+| 1, matched speed | 0.003294 / 0.001441 | 0.003294 / 0.001446 | 0.218119 / 0.223470 | Within |
+| 10, matched speed | 0.003835 / 0.003710 | 0.003835 / 0.003711 | 0.260301 / 0.260868 | Within |
+| 100, matched speed | 0.018635 / 0.018635 | 0.018643 / 0.018643 | 0.601408 / 0.601458 | Outside final gap |
+| 100, matched impulse | 0.000185 / 0.000185 | 0.000185 / 0.000185 | 0.006054 / 0.006046 | Within |
+
+Peak energy stayed at the frame-0 input in all ten cases. The mass-100
+matched-speed cases began at 1.953125 and finished at 0.558412 (2D) and
+0.558567 (3D). Their final frames were also their peak gap frames. The
+matched-impulse controls show that mass ratio alone is insufficient to
+reproduce the bound miss. Carry the matched-speed row into the equal-duration
+continuation and iteration comparisons to measure whether the gap subsides
+and how much additional solve work improves it.
+
+Each case matched two observed runs and the terminal hash of an
+observation-free run. Both Release and ReleaseLean matched across launches.
+Prepared row totals were 15,872 per planar case and 23,808 per spatial case.
+The 192 warm steps in frames 65–256 allocated 0 B in nine cases. The spatial
+mass-100 matched-speed case allocated 4,536 B on frame 227. A disposable
+partition probe measured 1,080 B in partition rental and 3,456 B in voxel
+membership, with no pair acquisitions or joint-solver allocation in that
+frame. This is first-use growth of the kind recorded in the
+[#035 closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-035).
+Keep the measured burst visible when extending the workload. Captures are
+under ignored `artifacts/physics-quality-phase1/chains`.
+
+The focused constraint suites passed 90 Release and 86 ReleaseLean tests.
+Both existing long-chain BenchmarkDotNet rows completed a Dry smoke run.
+
+The next Phase 1 checkpoint is resting/contact ragdolls. Mixed-response
+parity, angular limits and controlled gravity/motor work remain open.
 
 ## Phase 2: Duration And Continuation
 

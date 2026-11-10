@@ -305,6 +305,26 @@ manifold row counts, including the upward-facing subset. The row counts
 describe contact geometry. The [matched controls](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#3d-high-mass-support-controls)
 record the results and their limits.
 
+### Opt-in physics quality chains
+
+```powershell
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0 -p:UseLocalLsfStack=false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-chains
+```
+
+Runs matched 32-link planar pin and spatial ball-socket chains for 256 steps
+at 60 Hz. Each dimension includes an unloaded control, three tip masses at
+matched starting velocity, and a heavy tip given the unit-mass case's impulse.
+The verifier checks replay, contact-free motion, and prepared rows for every
+joint. It reports anchor gaps at the published poses, tip drift, rotation,
+kinetic energy, and allocations in a separate observation-free run. Quality
+bounds are reported separately from replay and fixture validity.
+
+Set `GRAVITAS_QUALITY_FRAME_CSV=1` to include frame 0 and each post-step sample.
+The command runs separately from base tests and BenchmarkDotNet selections.
+The [Phase 1 chain checkpoint](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#aligned-long-chain-checkpoint)
+records the setup and measured bounds.
+
 ### Opt-in curved-contact step envelopes
 
 ```bash

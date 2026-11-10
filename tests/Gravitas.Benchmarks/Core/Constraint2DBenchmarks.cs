@@ -144,7 +144,7 @@ public class Constraint2DBenchmarks
         return _inactiveContext.Constraints2D.EnabledJointCount;
     }
 
-    private static GravitasWorldContext CreateConstraintContext(int gridExtent, Fixed64 gravity, int solverIterations)
+    internal static GravitasWorldContext CreateConstraintContext(int gridExtent, Fixed64 gravity, int solverIterations)
     {
         GravitasWorldContext context = BenchmarkPhysicsScene.CreateContext(gridExtent, clearAllPools: true);
         context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
@@ -155,19 +155,15 @@ public class Constraint2DBenchmarks
         return context;
     }
 
-    private static void CreatePinLine(
+    internal static void CreatePinLine(
         GravitasWorldContext context,
         int count,
         out SolidBody2D[] bodies,
-        out Joint2D[] joints)
+        out Joint2D[] joints,
+        bool seedForce = true,
+        int spacing = 2)
     {
-        bodies = new SolidBody2D[count];
-        for (int i = 0; i < bodies.Length; i++)
-        {
-            bool dynamic = i != 0;
-            bodies[i] = CreateCircle(context, new Vector2d((Fixed64)(i * 2), Fixed64.Zero), dynamic, sleepEnabled: false);
-        }
-
+        bodies = CreateCircleLineBodies(context, count, (Fixed64)spacing, sleepEnabled: false);
         joints = new Joint2D[count - 1];
         for (int i = 0; i < joints.Length; i++)
         {
@@ -182,7 +178,8 @@ public class Constraint2DBenchmarks
                 JointCollisionPolicy.SuppressLinked));
         }
 
-        bodies[^1].AddForce(new Vector2d((Fixed64)6, (Fixed64)2));
+        if (seedForce)
+            bodies[^1].AddForce(new Vector2d((Fixed64)6, (Fixed64)2));
     }
 
     private static void CreateMotorLine(

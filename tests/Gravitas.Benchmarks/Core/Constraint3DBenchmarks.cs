@@ -128,7 +128,7 @@ public class Constraint3DBenchmarks
         return _toggleRagdoll.IsActive;
     }
 
-    private static GravitasWorldContext CreateConstraintContext(int gridExtent, Fixed64 gravity, int solverIterations)
+    internal static GravitasWorldContext CreateConstraintContext(int gridExtent, Fixed64 gravity, int solverIterations)
     {
         GravitasWorldContext context = BenchmarkPhysicsScene.CreateContext(gridExtent, clearAllPools: true);
         context.Environment.Gravity = gravity;
@@ -138,20 +138,15 @@ public class Constraint3DBenchmarks
         return context;
     }
 
-    private static void CreateBallSocketLine(
+    internal static void CreateBallSocketLine(
         GravitasWorldContext context,
         int count,
         out SolidBody[] bodies,
         out Joint3D[] joints,
-        bool seedImpulse = true)
+        bool seedImpulse = true,
+        int spacing = 2)
     {
-        bodies = new SolidBody[count];
-        for (int i = 0; i < bodies.Length; i++)
-        {
-            bool dynamic = i != 0;
-            bodies[i] = CreateSphere(context, new Vector3d((Fixed64)(i * 2), Fixed64.Zero, Fixed64.Zero), dynamic, sleepEnabled: false);
-        }
-
+        bodies = CreateSphereLineBodies(context, count, (Fixed64)spacing, sleepEnabled: false);
         joints = new Joint3D[count - 1];
         for (int i = 0; i < joints.Length; i++)
         {

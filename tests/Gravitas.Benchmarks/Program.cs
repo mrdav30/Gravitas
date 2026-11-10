@@ -32,6 +32,9 @@ internal static class Program
         if (string.Equals(command, "verify-quality-stacks", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
             return QualityStackWorkload.Verify();
 
+        if (string.Equals(command, "verify-quality-chains", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
+            return ConstraintChainWorkload.Verify();
+
         if (string.Equals(command, "verify-quality-stack-support", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
             return QualityStackWorkload.VerifySupport();
 
@@ -192,6 +195,7 @@ internal static class Program
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll soak-strategy-3d [1024 [4|8|16]]");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-curved-workload [case]");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stacks");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-chains");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stack-support");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll measure-quality-stack-support");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll measure-quality-stack-density [verify]");
