@@ -32,11 +32,25 @@ internal static class Program
         if (string.Equals(command, "verify-quality-stacks", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
             return QualityStackWorkload.Verify();
 
+        if (string.Equals(command, "verify-quality-stack-duration", StringComparison.OrdinalIgnoreCase)
+            && (args.Length == 1 || args.Length == 2 && args[1] == "--strict"))
+            return QualityStackWorkload.VerifyDuration(strict: args.Length == 2);
+
         if (string.Equals(command, "verify-quality-chains", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
             return ConstraintChainWorkload.Verify();
 
+        if (string.Equals(command, "verify-quality-chain-duration", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
+            return ConstraintChainWorkload.VerifyDuration();
+
         if (string.Equals(command, "verify-quality-ragdolls", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
             return ConstraintRagdollWorkload.Verify();
+
+        if (string.Equals(command, "verify-quality-ragdoll-duration", StringComparison.OrdinalIgnoreCase)
+            && (args.Length == 1 || args.Length == 2 && args[1] == "--strict"))
+            return ConstraintRagdollWorkload.VerifyDuration(strict: args.Length == 2);
+
+        if (string.Equals(command, "verify-quality-continuation", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
+            return QualityContinuationWorkload.Verify();
 
         if (string.Equals(command, "verify-quality-mixed", StringComparison.OrdinalIgnoreCase) && args.Length == 1)
             return MixedQualityWorkload.Verify();
@@ -205,8 +219,12 @@ internal static class Program
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll soak-strategy-3d [1024 [4|8|16]]");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-curved-workload [case]");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stacks");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stack-duration [--strict]");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-chains");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-chain-duration");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-ragdolls");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-ragdoll-duration [--strict]");
+        Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-continuation");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-mixed");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-work-energy");
         Console.WriteLine("  dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stack-support [2d]");

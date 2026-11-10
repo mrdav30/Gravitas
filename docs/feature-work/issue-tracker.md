@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-153`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-156`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -55,7 +55,63 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-No active issues.
+<a id="grv-issue-153"></a>
+
+#### GRV-Issue-153 — Planar top-heavy penetration grows during settling and wake cycles
+
+**Opened** 2026-11-09. **Priority** High. **Owner** Pure 2D contact position
+correction and supported island response.
+
+Run `verify-quality-stack-duration --strict` with released dependencies on
+`aef5995f` plus the [Phase 2 fixture](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#stack-settling-and-disturbance).
+The `quality-2d-stack-m100-32hz-control-v1` row exceeds the 1/16-unit depth
+bound on frame 8 and reaches 0.117561 units without any pulse. Its 60 Hz
+control remains within the bound. The pulse rows retain both interfaces
+and wake and re-sleep together, while depth grows to 0.344618 at 32 Hz and
+0.155248 at 60 Hz. The 60 Hz bound first fails on frame 121, immediately
+after the first downward pulse. The equal-mass controls stay within bounds.
+
+Trace the two published-pose depth corrections and normal speeds at onset
+and the first wake. A fix must preserve both interfaces, stay within the
+1/16-unit bound, and preserve deterministic replay and warm allocations.
+
+<a id="grv-issue-154"></a>
+
+#### GRV-Issue-154 — Spatial top-heavy support drifts into direct upper-floor contact
+
+**Opened** 2026-11-09. **Priority** High. **Owner** 3D convex support geometry
+and discrete island response.
+
+Run `verify-quality-stack-duration --strict` with released dependencies on
+`aef5995f` plus the [Phase 2 fixture](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#stack-settling-and-disturbance).
+The centered `quality-3d-stack-m100-32hz-control-v1` and
+`quality-3d-stack-m100-60hz-control-v1` rows reach direct upper-floor contact
+on frames 75 and 289 without an applied impulse. Both subsequently lose an
+original support. The 60 Hz onset is beyond the earlier 256-frame support
+capture. The equal-mass cases retain both supports through the full duration.
+
+Trace lateral and angular drift against the equal-mass control before the
+upper-floor contact forms. A fix must preserve both original supports and
+upper-floor clearance through the full no-pulse and disturbance runs.
+
+<a id="grv-issue-155"></a>
+
+#### GRV-Issue-155 — Contact ragdoll drops accumulate large joint anchor error
+
+**Opened** 2026-11-09. **Priority** Medium. **Owner** Planar and spatial joint
+response in contact islands.
+
+Run `verify-quality-ragdoll-duration --strict` on `aef5995f` plus the
+[Phase 2 fixture](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#chain-and-ragdoll-recovery).
+Both six-link drops retain floor support at six iterations and develop
+anchor gaps of 1.045442 and 1.098444 units at 32 Hz. At 60 Hz the peak gaps
+are 0.913928 and 0.903113. The Phase 1 peak bound is 1/4 of the one-unit
+limb diameter. Supported-start controls have much smaller gaps, and both
+meet the original geometry bounds at 60 Hz.
+
+Compare the drop's first contact and joint response against the supported
+start, and determine how the error depends on solver iteration count. Keep
+the floor support and connected wake checks with any focused correction.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 

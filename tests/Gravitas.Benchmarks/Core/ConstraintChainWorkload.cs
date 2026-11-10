@@ -13,6 +13,7 @@ internal static class ConstraintChainWorkload
     private const int Frames = 256;
     private const int Warmup = 64;
     private static readonly Vector2d UnitImpulse = new(Fixed64.FromFraction(3, 16), Fixed64.FromFraction(1, 16));
+    private static readonly Fixed64 QuietSpeed = Fixed64.FromFraction(1, 20);
 
     internal static int Verify()
     {
@@ -48,26 +49,69 @@ internal static class ConstraintChainWorkload
         return 0;
     }
 
-    private static RunResult Run(bool planar, int mass, Vector2d impulse, string id, bool observe, bool csv)
+    internal static int VerifyDuration()
+    {
+        bool csv = Environment.GetEnvironmentVariable("GRAVITAS_QUALITY_FRAME_CSV") == "1";
+        if (csv)
+            Console.WriteLine("fixture,frame,seconds,anchor_gap,prepared_anchor_gap,tip_drift,peak_rotation_degrees,linear_energy,angular_energy,prepared_rows,max_speed,max_spin,quiet_steps");
+
+        const int tipMass = 100;
+        Vector2d impulse = UnitImpulse * (Fixed64)tipMass;
+        foreach (int rate in new[] { 32, 60 })
+        foreach (bool planar in new[] { true, false })
+        {
+            string id = $"duration-{(planar ? "2d" : "3d")}-chain-100-{rate}hz-v1";
+            RunResult first = Run(planar, tipMass, impulse, id, observe: true, csv, rate);
+            RunResult repeat = Run(planar, tipMass, impulse, id, observe: true, csv: false, rate);
+            RunResult control = Run(planar, tipMass, impulse, id, observe: false, csv: false, rate);
+            Require(first == repeat && first.Terminal == control.Terminal, rate * QualityDuration.Seconds, $"{id} replay diverged");
+            bool withinGeometry = first.PeakGap <= Fixed64.FromFraction(1, 16) && first.Final.Gap <= Fixed64.FromFraction(1, 64)
+                && first.PeakDrift <= Fixed64.One;
+            Console.WriteLine(FormattableString.Invariant(
+                $"{id} trace {first.Trace}, terminal {first.Terminal}, peak/final gap {first.PeakGap:F6}/{first.Final.Gap:F6}, peak prepared gap {first.PeakPreparedGap:F6}, peak/final tip drift {first.PeakDrift:F6}/{first.Final.TipDrift:F6}, peak rotation {first.PeakRotation:F4} deg, prepared rows {first.PreparedRows}, geometry {(withinGeometry ? "within" : "outside")} bounds"));
+            Console.WriteLine(FormattableString.Invariant(
+                $"  First confirmed quiet frames by episode {first.Quiet0}/{first.Quiet1}/{first.Quiet2}/{first.Quiet3}, longest/final quiet steps {first.LongestQuiet}/{first.FinalQuiet}, final max speed/spin {first.Final.MaxSpeed:F6}/{first.Final.MaxSpin:F6}, positive input/peak/final energy {first.InputEnergy + first.PulseWork:F6}/{first.PeakEnergy:F6}/{first.Final.Energy:F6}, energy {(first.ExcessEnergy ? "outside" : "within")} bounds, warm bytes {control.WarmBytes}, peak {control.PeakBytes} on frame {control.PeakBytesFrame}"));
+        }
+        return 0;
+    }
+
+    private static RunResult Run(bool planar, int mass, Vector2d impulse, string id, bool observe, bool csv, int durationRate = 0)
     {
         const int gridExtent = Links + 4;
+        bool duration = durationRate != 0;
+        int rate = duration ? durationRate : 60;
+        int frames = duration ? rate * QualityDuration.Seconds : Frames;
+        int warmup = duration ? rate : Warmup;
         using GravitasWorldContext context = planar
             ? Constraint2DBenchmarks.CreateConstraintContext(gridExtent, Fixed64.Zero, PhysicsSettings.DefaultDiscreteSolverIterations)
             : Constraint3DBenchmarks.CreateConstraintContext(gridExtent, Fixed64.Zero, PhysicsSettings.DefaultDiscreteSolverIterations);
-        context.SetFrameRate(60);
+        context.SetFrameRate(rate);
         Scene scene = planar ? CreatePlanar(context, mass, impulse) : CreateSpatial(context, mass, impulse);
         var trace = new ChronicleHashWriter();
         trace.WriteSection(id, 1);
         Sample sample = default;
         Fixed64 peakGap = Fixed64.Zero, peakPreparedGap = Fixed64.Zero, peakDrift = Fixed64.Zero;
-        Fixed64 peakRotation = Fixed64.Zero, peakEnergy = Fixed64.Zero, inputEnergy = Fixed64.Zero;
+        Fixed64 peakRotation = Fixed64.Zero, peakEnergy = Fixed64.Zero, inputEnergy = Fixed64.Zero, pulseWork = Fixed64.Zero;
         int preparedRows = 0, peakBytesFrame = -1;
+        int quietSteps = 0, longestQuiet = 0, episode = 0;
+        Span<int> quietAt = stackalloc int[QualityDuration.Episodes];
+        quietAt.Fill(-1);
+        bool excessEnergy = false;
         long warmBytes = 0, peakBytes = 0;
-        for (int frame = 0; frame <= Frames; frame++)
+        for (int frame = 0; frame <= frames; frame++)
         {
+            if (duration && QualityDuration.IsPulse(frame, rate))
+            {
+                Fixed64 before = observe ? scene.ReadBody(Links - 1).LinearEnergy : Fixed64.Zero;
+                scene.Kick(impulse);
+                if (observe)
+                    pulseWork += FixedMath.Max(Fixed64.Zero, scene.ReadBody(Links - 1).LinearEnergy - before);
+                episode++;
+                quietSteps = 0;
+            }
             if (frame > 0)
             {
-                bool measure = !observe && frame > Warmup;
+                bool measure = !observe && frame > warmup;
                 long startBytes = measure ? GC.GetAllocatedBytesForCurrentThread() : 0;
                 context.Simulate();
                 context.LateSimulate();
@@ -81,6 +125,11 @@ internal static class ConstraintChainWorkload
                         peakBytesFrame = frame;
                     }
                 }
+                if (duration)
+                    Require(context.FrameCount == frame && context.LateSimulateToken == frame
+                        && (planar ? context.Physics2D.BodyCount : context.Physics.BodyCount) == Links - 1
+                        && (planar ? context.Physics2D.ColliderCount : context.Physics.ColliderCount) == Links,
+                        frame, "chain lost its completed-step timeline or registered links");
             }
 
             if (!observe)
@@ -113,19 +162,37 @@ internal static class ConstraintChainWorkload
             trace.WriteFixed64(sample.LinearEnergy);
             trace.WriteFixed64(sample.AngularEnergy);
             trace.WriteInt32(sample.Rows);
-            if (csv)
+            if (duration)
+            {
+                quietSteps = frame > 0 && sample.MaxSpeed <= QuietSpeed && sample.MaxSpin <= QuietSpeed ? quietSteps + 1 : 0;
+                if (quietSteps == rate / 2)
+                    quietAt[episode] = quietAt[episode] < 0 ? frame : quietAt[episode];
+                longestQuiet = Math.Max(longestQuiet, quietSteps);
+                excessEnergy |= sample.Energy > (inputEnergy + pulseWork) * 2;
+                trace.WriteFixed64(sample.MaxSpeed);
+                trace.WriteFixed64(sample.MaxSpin);
+                trace.WriteInt32(quietSteps);
+                if (csv)
+                    Console.WriteLine(FormattableString.Invariant(
+                        $"{id},{frame},{(Fixed64)frame / rate:F6},{sample.Gap:F6},{sample.PreparedGap:F6},{sample.TipDrift:F6},{sample.RotationDegrees:F4},{sample.LinearEnergy:F6},{sample.AngularEnergy:F6},{sample.Rows},{sample.MaxSpeed:F6},{sample.MaxSpin:F6},{quietSteps}"));
+            }
+            else if (csv)
                 Console.WriteLine(FormattableString.Invariant(
                     $"{id},{frame},{sample.Gap:F6},{sample.PreparedGap:F6},{sample.TipDrift:F6},{sample.RotationDegrees:F4},{sample.LinearEnergy:F6},{sample.AngularEnergy:F6},{sample.Rows}"));
         }
 
+        if (duration)
+            Require(episode == QualityDuration.Episodes - 1, frames, "chain missed a scheduled pulse");
         return new RunResult(trace.ToHash(), context.ComputeReplayHash(), sample, inputEnergy,
-            peakGap, peakPreparedGap, peakDrift, peakRotation, peakEnergy, preparedRows, warmBytes, peakBytes, peakBytesFrame);
+            peakGap, peakPreparedGap, peakDrift, peakRotation, peakEnergy, preparedRows, warmBytes, peakBytes, peakBytesFrame,
+            pulseWork, excessEnergy, quietAt[0], quietAt[1], quietAt[2], quietAt[3], longestQuiet, quietSteps);
     }
 
     private static Sample Read(Scene scene, int rowsPerJoint, string id, int frame)
     {
         Fixed64 gap = Fixed64.Zero, preparedGap = Fixed64.Zero, tipDrift = Fixed64.Zero;
         Fixed64 rotation = Fixed64.Zero, linear = Fixed64.Zero, angular = Fixed64.Zero;
+        Fixed64 maxSpeed = Fixed64.Zero, maxSpin = Fixed64.Zero;
         int rows = 0;
         for (int i = 0; i < Links; i++)
         {
@@ -136,8 +203,10 @@ internal static class ConstraintChainWorkload
             if (i == Links - 1)
                 tipDrift = (body.Center - Vector3d.Right * i).Magnitude;
             rotation = FixedMath.Max(rotation, body.RotationDegrees);
-            linear += KineticEnergy(body.Mass, body.Speed * body.Speed);
+            linear += body.LinearEnergy;
             angular += body.AngularEnergy;
+            maxSpeed = FixedMath.Max(maxSpeed, body.Speed);
+            maxSpin = FixedMath.Max(maxSpin, body.Spin);
             if (i == Links - 1)
                 continue;
 
@@ -149,7 +218,7 @@ internal static class ConstraintChainWorkload
             rows += joint.Rows;
         }
 
-        return new Sample(gap, preparedGap, tipDrift, rotation, linear, angular, rows);
+        return new Sample(gap, preparedGap, tipDrift, rotation, linear, angular, rows, maxSpeed, maxSpin);
     }
 
     private static Scene CreatePlanar(GravitasWorldContext context, int mass, Vector2d impulse)
@@ -164,7 +233,9 @@ internal static class ConstraintChainWorkload
         return new Scene(i =>
         {
             SolidBody2D body = bodies[i];
-            Require(body.AngularVelocity.Abs() < (Fixed64)8, (int)context.FrameCount, "Planar chain spin exceeded the sample domain.");
+            Fixed64 spin = body.AngularVelocity.Abs();
+            Require((i == 0 ? body.IsStatic : body.IsDynamic) && spin < (Fixed64)8,
+                (int)context.FrameCount, "Planar chain mobility or spin left the sample domain.");
             bool touching = false;
             if (body.Collider.CollisionPairs is { } pairs)
                 foreach (var entry in pairs)
@@ -173,7 +244,7 @@ internal static class ConstraintChainWorkload
                 body.Mass, body.LinearVelocity.Magnitude,
                 KineticEnergy(body.MomentOfInertia, body.AngularVelocity * body.AngularVelocity),
                 FixedMath.RadToDeg(FixedMath.Atan2(FixedMath.Sin(body.Rotation), FixedMath.Cos(body.Rotation)).Abs()),
-                body.Collider.IsPartitioned, touching);
+                body.Collider.IsPartitioned, touching, spin);
         }, i =>
         {
             Joint2D joint = joints[i];
@@ -181,7 +252,7 @@ internal static class ConstraintChainWorkload
             Vector2d b = joint.BodyB.Position + Vector2d.Rotate(joint.LocalFrameB.Anchor, joint.BodyB.Rotation);
             return new JointSample((b - a).Magnitude, joint.LastSolveMetrics.LinearAnchorErrorMagnitude,
                 joint.LastSolveMetrics.PreparedRowCount);
-        });
+        }, bodies[^1].AddLinearImpulse);
     }
 
     private static Scene CreateSpatial(GravitasWorldContext context, int mass, Vector2d impulse)
@@ -200,7 +271,9 @@ internal static class ConstraintChainWorkload
         return new Scene(i =>
         {
             SolidBody body = bodies[i];
-            Require(body.AngularVelocity.Magnitude < (Fixed64)8, (int)context.FrameCount, "Spatial chain spin exceeded the sample domain.");
+            Fixed64 spin = body.AngularVelocity.Magnitude;
+            Require((i == 0 ? body.IsStatic : body.IsDynamic) && spin < (Fixed64)8,
+                (int)context.FrameCount, "Spatial chain mobility or spin left the sample domain.");
             Vector3d localSpin = body.Rotation.Conjugate().Rotate(body.AngularVelocity);
             bool touching = false;
             if (body.Collider.CollisionPairs is { } pairs)
@@ -208,7 +281,7 @@ internal static class ConstraintChainWorkload
                     touching |= entry.Value.Manifold.HasContact;
             return new BodySample(body.Position3d, body.Mass, body.LinearVelocity.Magnitude,
                 Fixed64.Half * Vector3d.Dot(localSpin, inertia[i] * localSpin),
-                FixedQuaternion.Angle(FixedQuaternion.Identity, body.Rotation), body.Collider.IsPartitioned, touching);
+                FixedQuaternion.Angle(FixedQuaternion.Identity, body.Rotation), body.Collider.IsPartitioned, touching, spin);
         }, i =>
         {
             Joint3D joint = joints[i];
@@ -216,25 +289,29 @@ internal static class ConstraintChainWorkload
             Vector3d b = joint.BodyB.Position3d + joint.BodyB.Rotation.Rotate(joint.LocalFrameB.Position);
             return new JointSample((b - a).Magnitude, joint.LastSolveMetrics.LinearAnchorErrorMagnitude,
                 joint.LastSolveMetrics.PreparedRowCount);
-        });
+        }, value => bodies[^1].AddLinearImpulse(new Vector3d(value.X, value.Y, Fixed64.Zero)));
     }
 
     private static Fixed64 KineticEnergy(Fixed64 mass, Fixed64 speedSquared) => Fixed64.Half * mass * speedSquared;
 
-    private sealed record Scene(Func<int, BodySample> ReadBody, Func<int, JointSample> ReadJoint);
+    private sealed record Scene(Func<int, BodySample> ReadBody, Func<int, JointSample> ReadJoint, Action<Vector2d> Kick);
 
     private readonly record struct BodySample(Vector3d Center, Fixed64 Mass, Fixed64 Speed,
-        Fixed64 AngularEnergy, Fixed64 RotationDegrees, bool Partitioned, bool Touching);
+        Fixed64 AngularEnergy, Fixed64 RotationDegrees, bool Partitioned, bool Touching, Fixed64 Spin)
+    {
+        internal Fixed64 LinearEnergy => KineticEnergy(Mass, Speed * Speed);
+    }
 
     private readonly record struct JointSample(Fixed64 Gap, Fixed64 PreparedGap, int Rows);
 
     private readonly record struct Sample(Fixed64 Gap, Fixed64 PreparedGap, Fixed64 TipDrift, Fixed64 RotationDegrees,
-        Fixed64 LinearEnergy, Fixed64 AngularEnergy, int Rows)
+        Fixed64 LinearEnergy, Fixed64 AngularEnergy, int Rows, Fixed64 MaxSpeed, Fixed64 MaxSpin)
     {
         internal Fixed64 Energy => LinearEnergy + AngularEnergy;
     }
 
     private readonly record struct RunResult(ChronicleHash Trace, ChronicleHash Terminal, Sample Final, Fixed64 InputEnergy,
         Fixed64 PeakGap, Fixed64 PeakPreparedGap, Fixed64 PeakDrift, Fixed64 PeakRotation, Fixed64 PeakEnergy,
-        int PreparedRows, long WarmBytes, long PeakBytes, int PeakBytesFrame);
+        int PreparedRows, long WarmBytes, long PeakBytes, int PeakBytesFrame, Fixed64 PulseWork, bool ExcessEnergy,
+        int Quiet0, int Quiet1, int Quiet2, int Quiet3, int LongestQuiet, int FinalQuiet);
 }

@@ -1,7 +1,7 @@
 # Long-Duration Physics Quality And Tuning Plan
 
 **Date:** 2026-10-06  
-**Status:** Phase 1 complete. Phase 2 duration and continuation is next.  
+**Status:** Phases 1 and 2 complete. Phase 3 quality versus cost is next.  
 **Owner:** Gravitas contact/constraint quality and configuration guidance.
 
 ## Goal
@@ -837,16 +837,16 @@ supplies the planar top-heavy baseline for Phase 2.
 
 ## Phase 2: Duration And Continuation
 
-- [ ] Measure settling, sustained rest and repeated controlled disturbances over
+- [x] Measure settling, sustained rest and repeated controlled disturbances over
       equal simulated durations at different frame rates. Begin with 32 and 60
       Hz; use a shorter regression plus an extended local characterization, not
       a huge soak in every unit test.
-- [ ] Exercise repeated sleeping/waking, connected wake propagation, runtime
+- [x] Exercise repeated sleeping/waking, connected wake propagation, runtime
       mass changes between complete steps and deterministic spawn/despawn.
       Verify the scene still contains the intended dynamic bodies and contacts.
-- [ ] Compare repeated command traces, then supported save/populate continuation
+- [x] Compare repeated command traces, then supported save/populate continuation
       into host-created matching shells and a matching clock timeline.
-- [ ] Respect the [serialization contract](../api/guides/SERIALIZATION.md): body
+- [x] Respect the [serialization contract](../api/guides/SERIALIZATION.md): body
       records do not restore a world, arbitrary host/coroutine state or solver
       caches. Compare exact traces only where continuation state is equivalent.
       If population invalidates caches, use an equivalently cold-cache control
@@ -857,6 +857,162 @@ supplies the planar top-heavy baseline for Phase 2.
 Exit: long-duration quality curves, repeatable disturbances and supported
 continuation evidence. Record failures as focused issues with reproducing tests;
 repair their owning layer before calling an affected configuration acceptable.
+
+### Duration Matrix
+
+The opt-in duration commands reuse the Phase 1 stack, chain and ragdoll
+fixtures at six solver iterations on `aef5995f` with the benchmark changes
+below. Each case advances eight nominal seconds at 32 Hz (256 complete
+steps) and 60 Hz (480). The same disturbances are applied before the steps
+at elapsed times 2, 4 and 6 seconds. Where sleep is enabled, the quiet window
+is 16 or 30 steps so it represents half a nominal second at both rates.
+Times in this record use the authored rate. Replay equality is checked
+within each rate. Each duration case compares two observed runs and the
+terminal hash of a separate observation-free run. Stepping-thread allocation
+is measured in the latter after the first second, excluding observation and
+host commands.
+
+#### Stack Settling And Disturbance
+
+`verify-quality-stack-duration` uses centered Phase 1 boxes and the 1/32-unit
+starting clearances. At each disturbance, the upper body receives a downward
+impulse equal to its mass times 1/4 unit/s. The verifier checks the actual
+velocity change. The 100:1 no-pulse controls use the same rates and rest
+settings. Supported quiet requires both original interfaces, clearance
+between the upper body and the floor, and linear and angular speeds at most
+1/20 unit/s and 1/20 rad/s for half a second. It reports independently of
+the 1/16-unit depth bound and the engine sleep state.
+
+| Case | 32 Hz peak interface depth | 60 Hz peak interface depth | First bound miss or upper-floor touch |
+| --- | ---: | ---: | --- |
+| 2D 1:1, pulses | 0.049093 | 0.022756 | Both rates within support bounds |
+| 3D 1:1, pulses | 0.052517 | 0.023468 | Both rates within support bounds |
+| 2D 100:1, no pulses | 0.117561 | 0.057822 | Depth on frame 8 at 32 Hz. 60 Hz within. |
+| 2D 100:1, pulses | 0.344618 | 0.155248 | Depth on frames 8 and 121 |
+| 3D 100:1, no pulses | 0.124734 | 0.094910 | Upper-floor touch on frames 75 and 289 |
+| 3D 100:1, pulses | 0.089891 | 0.087497 | Upper-floor touch on frames 74 and 302 |
+
+The 1:1 controls keep both supports and regain supported quiet after each
+pulse. They remain engine-awake. The planar 100:1 cases keep both supports
+and exercise three connected wakes at each rate. Both bodies return to sleep
+in 16 or 30 steps after each pulse. Penetration grows across those episodes.
+The no-pulse 32 Hz case already exceeds the depth bound at 0.25 s, and the
+60 Hz no-pulse case settles within the bound. The disturbed 60 Hz case
+first exceeds it on its first kick step. [GRV-Issue-153](issue-tracker.md#grv-issue-153)
+tracks the planar residual failure separately from the velocity transfer
+addressed in #152.
+
+The spatial 100:1 stack reaches the floor with its upper body in the no-pulse
+controls at 2.344 and 4.817 s. The impulses shift onset to 2.313 and 5.033 s.
+This places the 60 Hz failure beyond the 256-frame Phase 1 capture. Both
+rates later lose original support. [GRV-Issue-154](issue-tracker.md#grv-issue-154)
+tracks this support topology failure. These heavy spatial cases each allocate
+2,944 B in one warm step. The other stack cases allocate 0 B.
+
+#### Chain And Ragdoll Recovery
+
+`verify-quality-chain-duration` extends the Phase 1 matched-speed 100:1 tip
+case. It applies the same impulse at frame 0 and each later disturbance,
+tracks the measured positive impulse work, and requires two or three prepared
+rows per joint in the planar or spatial run. Sleep remains disabled. A quiet
+window uses the same speed bounds as the stacks over all links. The 31
+dynamic links, fixed anchor and 31 joints stay in the scene. All four cases
+remain contact-free and satisfy their impulse energy envelope. None reaches
+the quiet window. The peak and terminal gaps are 0.098183 and 0.098559
+units at 32 Hz (2D and 3D) and 0.075911 and 0.076136 units at 60 Hz. These
+exceed the Phase 1 peak and terminal gap bounds. The planar cases allocate
+0 B in the warm window. The spatial cases allocate 16,632 B at 32 Hz and
+12,096 B at 60 Hz.
+
+`verify-quality-ragdoll-duration` repeats the Phase 1 angular impulse on
+the last link at the three disturbance times. Each drop first retains an
+upward floor pair at 7/32 s or 13/60 s and keeps floor support through the
+capture. The supported-start cases reach all-link sleep at half a second
+and wake all six links on the first impulse step. Later complete resettling
+varies. At 32 Hz the spatial case settles again half a second after the
+second and third impulses. At 60 Hz the planar case settles 91/60 s after
+the second impulse. The other post-pulse windows end before all links
+resettle.
+
+| Ragdoll case | 32 Hz peak / final anchor gap | 60 Hz peak / final anchor gap |
+| --- | ---: | ---: |
+| 2D drop | 1.045442 / 1.045442 | 0.913928 / 0.878833 |
+| 3D drop | 1.098444 / 1.098444 | 0.903113 / 0.863833 |
+| 2D supported start | final 0.083256 | final 0.039217 |
+| 3D supported start | final 0.078965 | final 0.034647 |
+
+The drops exceed the Phase 1 joint geometry bounds. The supported-start
+cases meet those bounds at 60 Hz and exceed the 1/16-unit terminal gap
+bound at 32 Hz. [GRV-Issue-155](issue-tracker.md#grv-issue-155) tracks the
+drop anchor error with the supported starts as controls. The heavy-tip chain
+remains a measured high-load tuning case for Phase 3. Supported starts
+allocate 0 B in the warm window. The 2D drops allocate 8,096 B at 32 Hz
+and 4,896 B at 60 Hz. The 3D drops allocate 13,664 B and 10,648 B.
+
+### Command Replay And Body Population
+
+`verify-quality-continuation` uses eight cases across both rates and pure
+dimensions, with a contact-free motion case and an awake single-floor-support
+case for each combination. Each context creates its own registered host
+agents, colliders and bodies in stable order. The real fixed-step prefix
+establishes matching world time, registration and retained contact history.
+The verifier compares an independent uninterrupted run over all 256 or
+480 steps. The ordered schedule applies three primary mass changes and
+three auxiliary spawns and despawns between complete steps. It checks
+registration after each step and four explicit sleep/impulse-wake transitions
+in the contact-free cases. After the first second, supported cases retain
+upward rows with floor residual within 1/16 unit. They report one floor
+enter and zero exits over the whole run.
+
+At four seconds (frame 128 or 240), save the primary and currently live
+auxiliary body records using JSON. A queued force also crosses the checkpoint.
+The verifier perturbs the target shells before populating them. The supported
+target retains positive normal warm rows up to the load itself. Population
+preserves the recorded body state and clears one planar or four spatial
+warm rows. The contact-free primary is asleep at save and remains asleep
+at load. Both restored payloads serialize back to the original records.
+
+The independent cold control clears the floor pair impulses and invalidates
+the primary collider's contact dependency, reproducing the effects of body
+population on retained response state. The authoritative hash and sampled
+observations match exactly at the checkpoint and for every subsequent
+step, 128 at 32 Hz and 240 at 60 Hz. The free cases also match the
+uninterrupted run at the checkpoint. Both planar support cases match the
+uninterrupted trace from the first subsequent complete step.
+
+The 3D support hashes differ from the uninterrupted warm run throughout
+the suffix. Measured recovery still retains the intended support and zero
+terminal velocity difference. The table measures the primary body's
+position in units, velocity in units/s and rotation in degrees.
+
+| Rate | Peak / final position delta | Peak / final velocity delta | Peak / final rotation delta | Peak floor residual difference |
+| --- | ---: | ---: | ---: | ---: |
+| 32 Hz | 0.000008148 / 0.000002542 | 0.000137051 / 0 | 0.000347353 / 0.000347353 | 0.000002335 |
+| 60 Hz | 0.000059131 / 0.000059131 | 0.002844395 / 0 | 0.001898659 / 0.001898633 | 0.000002702 |
+
+The [serialization guide](../api/guides/SERIALIZATION.md#replay-workflow)
+describes the distinction between body payloads and replay-relevant live
+state. The exact active-contact check uses matched clocks and pair history.
+The uninterrupted comparison measures the effect of clearing warm state.
+
+### Phase 2 Verification
+
+The 24 duration cases and eight continuation cases matched byte for byte
+between Release and ReleaseLean, including per-frame captures. Builds used
+released dependencies on Windows x64 with .NET SDK 10.0.302 and runtime
+10.0.10. The existing short support, constraint wake, mass mutation and
+replay/population regressions passed 143 Release and 138 ReleaseLean tests.
+Two independent reviews checked the controls, state equivalence and results.
+All seven existing Phase 1 captures matched their recorded outputs. The
+new workloads are separate from BenchmarkDotNet discovery. DocFX built
+with warnings treated as errors.
+Raw captures are under ignored `artifacts/physics-quality-phase2`.
+
+The opt-in stack and ragdoll `--strict` checks reproduce the measured
+physical failures while preserving the replay and validity checks. Phase 2
+completes the characterization and supported continuation evidence. The
+three tracked physical limits remain open and the Phase 3 comparison can
+use these same workloads and bounds.
 
 ## Phase 3: Quality Versus Cost
 

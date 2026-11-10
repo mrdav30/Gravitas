@@ -41,14 +41,10 @@ internal static class ConstraintRagdollWorkload
             Require(first.FirstSupport > 0 && first.PeakDepth > Fixed64.Zero, Frames, $"{id} missed floor contact");
             if (rest && first.AsleepBeforeKick == Links)
                 Require(first.KickWork > Fixed64.Zero, KickFrame, $"{id} received no positive angular impulse work from rest");
-            bool geometryWithin = first.Final.Supports > 0 && first.LowestCom > Fixed64.Zero
-                && first.Final.Residual <= Fixed64.FromFraction(1, 16) && first.PeakResidual <= Fixed64.FromFraction(1, 8)
-                && first.PeakGap <= Fixed64.FromFraction(1, 4) && first.Final.Gap <= Fixed64.FromFraction(1, 16)
-                && first.PeakLimit <= (Fixed64)10 && first.Final.Limit <= (Fixed64)3 && first.PeakDrift <= Fixed64.One;
             string recovery = rest
                 ? $", sleep recovery {(first.AsleepBeforeKick == Links && first.AwakeAfterKick == Links && first.Final.Sleeping == Links ? "within" : "outside")} bounds"
                 : "";
-            Console.WriteLine($"{id} trace {first.Trace}, terminal {first.Terminal}, geometry {(geometryWithin ? "within" : "outside")} bounds{recovery}");
+            Console.WriteLine($"{id} trace {first.Trace}, terminal {first.Terminal}, geometry {(GeometryWithin(first) ? "within" : "outside")} bounds{recovery}");
             Console.WriteLine(FormattableString.Invariant(
                 $"  Solver depth peak {first.PeakDepth:F6}, floor residual peak/final {first.PeakResidual:F6}/{first.Final.Residual:F6}, lowest COM {first.LowestCom:F6}, first support frame {first.FirstSupport}, final retained supports {first.Final.Supports}, supported frames {first.SupportFrames}, contact ID change frames {first.ContactChanges}"));
             Console.WriteLine(FormattableString.Invariant(
@@ -59,32 +55,95 @@ internal static class ConstraintRagdollWorkload
         return 0;
     }
 
-    private static Result Run(bool planar, bool rest, string id, bool observe, bool csv)
+    internal static int VerifyDuration(bool strict = false)
+    {
+        bool csv = Environment.GetEnvironmentVariable("GRAVITAS_QUALITY_FRAME_CSV") == "1";
+        if (csv)
+            Console.WriteLine("fixture,frame,seconds,solver_depth,floor_residual,retained_supports,contact_ids,anchor_gap,prepared_gap,limit_error_deg,lateral_drift,rotation_deg,sleeping,sleeps,wakes,kinetic,potential");
+
+        bool geometryMet = true;
+        foreach (int rate in new[] { 32, 60 })
+        foreach (bool planar in new[] { true, false })
+        foreach (bool rest in new[] { false, true })
+        {
+            string id = $"duration-{(planar ? "2d" : "3d")}-ragdoll-{(rest ? "rest" : "drop")}-{rate}hz-v1";
+            Result first = Run(planar, rest, id, observe: true, csv, rate);
+            Result repeat = Run(planar, rest, id, observe: true, csv: false, rate);
+            Result control = Run(planar, rest, id, observe: false, csv: false, rate);
+            int frames = rate * QualityDuration.Seconds;
+            Require(first == repeat && first.Terminal == control.Terminal, frames, $"{id} replay diverged");
+            Require(first.FirstSupport > 0 && first.PeakDepth > Fixed64.Zero && first.Final.Supports > 0,
+                frames, $"{id} did not retain intended floor contact");
+            if (rest)
+                Require(first.Recovery1.AsleepBefore == Links && first.Recovery1.AwakeAfter == Links,
+                    2 * rate + 1, $"{id} did not exercise connected wake from supported rest");
+            bool within = GeometryWithin(first);
+            geometryMet &= within;
+            Console.WriteLine($"{id} trace {first.Trace}, terminal {first.Terminal}, geometry {(within ? "within" : "outside")} bounds");
+            Console.WriteLine(FormattableString.Invariant(
+                $"  Floor residual peak/final {first.PeakResidual:F6}/{first.Final.Residual:F6}, lowest COM {first.LowestCom:F6}, first support frame {first.FirstSupport}, final retained supports {first.Final.Supports}, supported frames {first.SupportFrames}, contact ID change frames {first.ContactChanges}, anchor gap peak/final {first.PeakGap:F6}/{first.Final.Gap:F6}, peak prepared gap {first.PeakPreparedGap:F6}, prepared limit error peak/final {first.PeakLimit:F4}/{first.Final.Limit:F4} deg, lateral drift peak/final {first.PeakDrift:F6}/{first.Final.Drift:F6}, peak rotation {first.PeakRotation:F4} deg"));
+            Console.WriteLine(FormattableString.Invariant(
+                $"  First pre-pulse all-rest frame {first.FirstRest}, all-rest steps {first.RestFrames}, longest/final rest steps {first.LongestRest}/{first.FinalRest}, sleep/wake transitions {first.Sleeps}/{first.Wakes}, final sleeping {first.Final.Sleeping}, gravity work {first.GravityWork:F6}, final K/U {first.Final.Kinetic:F6}/{first.Final.Potential:F6}, warm bytes {control.WarmBytes}, peak {control.PeakBytes} on frame {control.PeakBytesFrame}"));
+            PrintRecovery(2, first.Recovery1);
+            PrintRecovery(4, first.Recovery2);
+            PrintRecovery(6, first.Recovery3);
+        }
+        return strict && !geometryMet ? 1 : 0;
+    }
+
+    private static void PrintRecovery(int seconds, Recovery recovery) => Console.WriteLine(FormattableString.Invariant(
+        $"  Pulse at {seconds}s, asleep before/awake after {recovery.AsleepBefore}/{recovery.AwakeAfter}, first all-rest frame {recovery.RestFrame}, pulse work {recovery.Work:F6}"));
+
+    private static bool GeometryWithin(Result result) => result.Final.Supports > 0 && result.LowestCom > Fixed64.Zero
+        && result.Final.Residual <= Fixed64.FromFraction(1, 16) && result.PeakResidual <= Fixed64.FromFraction(1, 8)
+        && result.PeakGap <= Fixed64.FromFraction(1, 4) && result.Final.Gap <= Fixed64.FromFraction(1, 16)
+        && result.PeakLimit <= (Fixed64)10 && result.Final.Limit <= (Fixed64)3 && result.PeakDrift <= Fixed64.One;
+
+    private static Result Run(bool planar, bool rest, string id, bool observe, bool csv, int durationRate = 0)
     {
         const int extent = 48;
+        bool duration = durationRate != 0;
+        int rate = duration ? durationRate : 60;
+        int frames = duration ? rate * QualityDuration.Seconds : Frames;
+        int warmup = duration ? rate : 64;
         using GravitasWorldContext context = planar
             ? Constraint2DBenchmarks.CreateConstraintContext(extent, Gravity, PhysicsSettings.DefaultDiscreteSolverIterations)
             : Constraint3DBenchmarks.CreateConstraintContext(extent, Gravity, PhysicsSettings.DefaultDiscreteSolverIterations);
-        context.SetFrameRate(60);
+        context.SetFrameRate(rate);
         ReadOnlySpan<int> supportedX = rest ? RestPositions : default;
-        Scene scene = planar ? CreatePlanar(context, supportedX) : CreateSpatial(context, supportedX);
+        int sleepSteps = durationRate / 2;
+        Scene scene = planar ? CreatePlanar(context, supportedX, sleepSteps) : CreateSpatial(context, supportedX, sleepSteps);
         var trace = new ChronicleHashWriter();
         trace.WriteSection(id, 1);
         Result result = new() { PeakBytesFrame = -1 };
-        int sleepMask = 0;
+        int sleepMask = 0, episode = 0, restSteps = 0;
+        Span<Recovery> recoveries = stackalloc Recovery[QualityDuration.Episodes];
+        recoveries.Fill(new Recovery(-1, -1, -1, Fixed64.Zero));
         Fixed64 initialPotential = Fixed64.Zero;
-        for (int frame = 0; frame <= Frames; frame++)
+        for (int frame = 0; frame <= frames; frame++)
         {
-            if (frame == KickFrame)
+            bool kick = duration ? QualityDuration.IsPulse(frame, rate) : frame == KickFrame;
+            if (kick)
             {
+                if (duration)
+                {
+                    episode++;
+                    restSteps = 0;
+                }
                 Fixed64 before = observe ? scene.ReadLink(Links - 1).Kinetic : Fixed64.Zero;
                 scene.Kick();
                 if (observe)
-                    result = result with { AsleepBeforeKick = result.Final.Sleeping, KickWork = scene.ReadLink(Links - 1).Kinetic - before };
+                {
+                    Fixed64 work = scene.ReadLink(Links - 1).Kinetic - before;
+                    if (duration)
+                        recoveries[episode] = recoveries[episode] with { AsleepBefore = result.Final.Sleeping, Work = work };
+                    else
+                        result = result with { AsleepBeforeKick = result.Final.Sleeping, KickWork = work };
+                }
             }
             if (frame > 0)
             {
-                bool measure = !observe && frame > 64;
+                bool measure = !observe && frame > warmup;
                 long bytes = measure ? GC.GetAllocatedBytesForCurrentThread() : 0;
                 context.Simulate();
                 context.LateSimulate();
@@ -96,13 +155,31 @@ internal static class ConstraintRagdollWorkload
                         result = result with { PeakBytes = bytes, PeakBytesFrame = frame };
                 }
                 Require(context.FrameCount == frame && context.LateSimulateToken == frame, frame, $"{id} did not complete its fixed step");
+                if (duration)
+                    Require((planar ? context.Physics2D.BodyCount : context.Physics.BodyCount) == Links
+                        && (planar ? context.Physics2D.ColliderCount : context.Physics.ColliderCount) == Links + 1,
+                        frame, "ragdoll lost its registered bodies");
             }
             if (!observe)
                 continue;
 
             Frame row = Read(scene, frame, ref sleepMask, ref result);
-            if (frame == KickFrame)
-                result = result with { AwakeAfterKick = Links - row.Sleeping };
+            if (kick)
+            {
+                if (duration)
+                    recoveries[episode] = recoveries[episode] with { AwakeAfter = Links - row.Sleeping };
+                else
+                    result = result with { AwakeAfterKick = Links - row.Sleeping };
+            }
+            if (duration && row.Sleeping == Links && row.Supports > 0)
+            {
+                if (recoveries[episode].RestFrame < 0)
+                    recoveries[episode] = recoveries[episode] with { RestFrame = frame };
+                restSteps++;
+                result = result with { RestFrames = result.RestFrames + 1, LongestRest = Math.Max(result.LongestRest, restSteps) };
+            }
+            else
+                restSteps = 0;
             if (frame == 0)
             {
                 initialPotential = row.Potential;
@@ -119,11 +196,21 @@ internal static class ConstraintRagdollWorkload
             trace.WriteUInt64(hash.Low);
             trace.WriteUInt64(hash.High);
             row.Hash(ref trace);
-            if (csv)
+            if (csv && duration)
+                Console.WriteLine(FormattableString.Invariant(
+                    $"{id},{frame},{(Fixed64)frame / rate:F6},{row.Depth:F6},{row.Residual:F6},{row.Supports},{row.ContactIds},{row.Gap:F6},{row.PreparedGap:F6},{row.Limit:F4},{row.Drift:F6},{row.Rotation:F4},{row.Sleeping},{row.Sleeps},{row.Wakes},{row.Kinetic:F6},{row.Potential:F6}"));
+            else if (csv)
                 Console.WriteLine(FormattableString.Invariant(
                     $"{id},{frame},{row.Depth:F6},{row.Residual:F6},{row.Supports},{row.ContactIds},{row.Gap:F6},{row.PreparedGap:F6},{row.Limit:F4},{row.Drift:F6},{row.Rotation:F4},{row.Sleeping},{row.Sleeps},{row.Wakes},{row.Kinetic:F6},{row.Potential:F6}"));
         }
-        return result with { Trace = trace.ToHash(), Terminal = context.ComputeReplayHash(), GravityWork = initialPotential - result.Final.Potential };
+        if (duration)
+            Require(episode == QualityDuration.Episodes - 1, frames, "ragdoll missed a scheduled pulse");
+        return result with
+        {
+            Trace = trace.ToHash(), Terminal = context.ComputeReplayHash(), GravityWork = initialPotential - result.Final.Potential,
+            FirstRest = recoveries[0].RestFrame, Recovery1 = recoveries[1], Recovery2 = recoveries[2], Recovery3 = recoveries[3],
+            FinalRest = restSteps
+        };
     }
 
     private static Frame Read(Scene scene, int frame, ref int sleepMask, ref Result result)
@@ -192,7 +279,7 @@ internal static class ConstraintRagdollWorkload
         return row;
     }
 
-    private static Scene CreatePlanar(GravitasWorldContext context, ReadOnlySpan<int> supportedX)
+    private static Scene CreatePlanar(GravitasWorldContext context, ReadOnlySpan<int> supportedX, int sleepSteps)
     {
         LSCollider2D floor = Constraint2DBenchmarks.CreateRagdoll(context, Vector2d.Zero,
             out SolidBody2D[] links, out Joint2D[] joints, sleepEnabled: true, angularLimit: Limit, supportedX);
@@ -204,6 +291,8 @@ internal static class ConstraintRagdollWorkload
             link.Collider.Material = Material;
             link.Gravity = new Vector2d(Fixed64.Zero, -Gravity);
             link.UseManualGrounding();
+            if (sleepSteps > 0)
+                link.SleepFrameThreshold = sleepSteps;
             if (!supportedX.IsEmpty)
             {
                 link.SleepLinearSpeedThreshold = RestSpeed;
@@ -215,7 +304,7 @@ internal static class ConstraintRagdollWorkload
             SolidBody2D link = links[i];
             Fixed64 speed = link.LinearVelocity.Magnitude, spin = link.AngularVelocity;
             var bounds = link.Collider.Bounds;
-            Require(link.Collider.IsPartitioned && bounds.Min.X > floor.Bounds.Min.X && bounds.Max.X < floor.Bounds.Max.X
+            Require(link.IsDynamic && link.Collider.IsPartitioned && bounds.Min.X > floor.Bounds.Min.X && bounds.Max.X < floor.Bounds.Max.X
                 && link.Position.Magnitude < (Fixed64)8 && speed < (Fixed64)16 && spin.Abs() < (Fixed64)16,
                 (int)context.FrameCount, "planar ragdoll left the finite measurement domain");
             Fixed64 height = link.Position.Y - floor.Bounds.Max.Y;
@@ -252,7 +341,7 @@ internal static class ConstraintRagdollWorkload
         }, () => links[^1].AddAngularImpulse(SpinImpulse));
     }
 
-    private static Scene CreateSpatial(GravitasWorldContext context, ReadOnlySpan<int> supportedX)
+    private static Scene CreateSpatial(GravitasWorldContext context, ReadOnlySpan<int> supportedX, int sleepSteps)
     {
         LSCollider floor = Constraint3DBenchmarks.CreateRagdoll(context, Vector3d.Zero,
             out SolidBody[] links, out Joint3D[] joints, sleepEnabled: true, angularLimit: Limit, supportedX);
@@ -264,6 +353,8 @@ internal static class ConstraintRagdollWorkload
         {
             link.Collider.Material = Material;
             link.UseManualGrounding();
+            if (sleepSteps > 0)
+                link.SleepFrameThreshold = sleepSteps;
             if (!supportedX.IsEmpty)
             {
                 link.SleepLinearSpeedThreshold = RestSpeed;
@@ -274,7 +365,7 @@ internal static class ConstraintRagdollWorkload
         {
             SolidBody link = links[i];
             Fixed64 speed = link.LinearVelocity.Magnitude;
-            Require(link.Collider.IsPartitioned && link.Collider.BoundsMin.X > floor.BoundsMin.X && link.Collider.BoundsMax.X < floor.BoundsMax.X
+            Require(link.IsDynamic && link.Collider.IsPartitioned && link.Collider.BoundsMin.X > floor.BoundsMin.X && link.Collider.BoundsMax.X < floor.BoundsMax.X
                 && link.Collider.BoundsMin.Z > floor.BoundsMin.Z && link.Collider.BoundsMax.Z < floor.BoundsMax.Z
                 && link.Position3d.Magnitude < (Fixed64)8 && speed < (Fixed64)16 && link.AngularVelocity.Magnitude < (Fixed64)16,
                 (int)context.FrameCount, "spatial ragdoll left the finite measurement domain");
@@ -341,8 +432,11 @@ internal static class ConstraintRagdollWorkload
             writer.WriteFixed64(Potential);
         }
     }
+    private readonly record struct Recovery(int AsleepBefore, int AwakeAfter, int RestFrame, Fixed64 Work);
+
     private readonly record struct Result(ChronicleHash Trace, ChronicleHash Terminal, Frame Final, Fixed64 PeakDepth,
         Fixed64 PeakResidual, Fixed64 LowestCom, Fixed64 PeakGap, Fixed64 PeakPreparedGap, Fixed64 PeakLimit, Fixed64 PeakDrift,
         Fixed64 PeakRotation, Fixed64 GravityWork, Fixed64 KickWork, int FirstSupport, int SupportFrames, int ContactChanges,
-        int Sleeps, int Wakes, int AsleepBeforeKick, int AwakeAfterKick, long WarmBytes, long PeakBytes, int PeakBytesFrame);
+        int Sleeps, int Wakes, int AsleepBeforeKick, int AwakeAfterKick, long WarmBytes, long PeakBytes, int PeakBytesFrame,
+        int FirstRest, int RestFrames, int LongestRest, int FinalRest, Recovery Recovery1, Recovery Recovery2, Recovery Recovery3);
 }

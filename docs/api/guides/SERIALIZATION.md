@@ -130,13 +130,17 @@ and refreshed partition coordinates are not serialized. A blocked or invalid
 attempt publishes nothing, so its serialized payload and authoritative replay
 hash remain unchanged.
 
-Pair-local contact caches and joint solver caches are rebuildable runtime data
-unless a drift investigation explicitly hashes them through
-`GravitasReplayHashMode.AuthoritativeWithSolverCaches`.
+Retained contacts and pair-local warm-start impulses affect the next response
+and contribute to the authoritative replay hash. They belong to the live
+context. Populating body records clears the affected warm starts and joint
+impulses, as described above. The extended
+`GravitasReplayHashMode.AuthoritativeWithSolverCaches` adds diagnostic state
+such as joint solve metrics and additional solver bookkeeping.
 
-When solver caches are included, contact and query-adjacent witnesses are hashed
-as the canonical `Origin`, `Rotation`, `LocalPoint`, and `LocalDisplacement`
-components of their `ContactAnchor` or `ContactAnchor2D` frame. A clipped or
+Retained manifold witnesses and witnesses in diagnostic cache sections are
+hashed as the canonical `Origin`, `Rotation`, `LocalPoint`, and
+`LocalDisplacement` components of their `ContactAnchor` or `ContactAnchor2D`
+frame. A clipped or
 unavailable rotated offset or absolute world point is not replay truth. Derived
 bounds and other rebuildable shape caches remain outside the authoritative shape
 hash and are covered only by their dedicated cache section.
@@ -188,11 +192,12 @@ A deterministic replay or rollback restore should follow this shape:
 6. Continue fixed-step simulation from the restored frame using the same ordered
    input commands.
 
-For dynamic replay tests, compare the uninterrupted simulation against a fresh
-shell restored at frame N and advanced with the same subsequent inputs. Do not
-compare runtime-owned service IDs or partition list identities; compare
-authoritative body/collider values and externally observable collision/query
-behavior.
+For dynamic replay tests, compare authoritative body/collider values and
+observable collision/query behavior at the checkpoint. Advance the matching
+host-created shell and timeline with the same subsequent inputs. When loading
+clears a cache that affects response, compare exact replay against a control
+with equivalent live continuation state. Measure the recovery against the
+uninterrupted warm run separately.
 
 ## Replay Hashes
 
@@ -216,23 +221,24 @@ without changing the equality contract. Native execution provides evidence for
 the workloads and platforms exercised; repeated agreement on one machine does
 not establish agreement across all platforms.
 
-After Chronicler populates existing runtime shells, the restored context should
-produce the same per-frame `ChronicleHash` sequence as the uninterrupted context
-when both receive the same subsequent inputs.
+Contexts with equivalent continuation state and ordered inputs should produce
+the same per-frame `ChronicleHash` sequence after population. Equivalence
+includes replay-relevant live state such as retained contacts and warm-start
+impulses.
 
-The authoritative hash follows the same boundary as
-`IRecordable.RecordData(...)`:
+The authoritative hash covers context state that can affect continuation:
 
 - serialized continuation state is included.
 - host-owned bindings are excluded.
-- rebuildable runtime caches are excluded.
+- derived shape caches are excluded from the authoritative shape hash.
+- live pair identity, retained contact state, and pair warm starts are included.
 - active cross-frame CCD handoff state is included because it can affect the
   next fixed step.
 - runtime collider IDs are context-local lookup and pair keys; replay hashes use
   canonical live registration order with dense replay ordinals for collider,
   hierarchy, and pair identity, so deleted collider ID history and allocator
   holes are excluded.
-- solver caches and diagnostic counters are included only in
+- additional solver cache state and diagnostic counters are included in
   `AuthoritativeWithSolverCaches` mode for RCA.
 
 Replay hashes use `Chronicler.Hashing.ChronicleHash` and Chronicler's

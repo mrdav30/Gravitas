@@ -97,10 +97,7 @@ internal static partial class QualityStackWorkload
     private static Result Run(bool planar, StackLoad load, bool tilted, bool observe, string frameLabel = null,
         SupportSample[] samples = null, bool measure = false)
     {
-        using GravitasWorldContext context = planar
-            ? BenchmarkPhysicsScene.CreatePlanarContext(new Vector2d(-16, -8), new Vector2d(16, 16), cellSize: 4)
-            : CreateSpatialContext();
-        ConfigureQualityContext(context);
+        using GravitasWorldContext context = CreateQualityContext(planar);
         Scene scene = planar ? Planar(context, load, tilted, measure) : Spatial(context, load, tilted, measure);
         var trace = new ChronicleHashWriter();
         trace.WriteSection("quality-stack-v1", 1);
@@ -171,6 +168,15 @@ internal static partial class QualityStackWorkload
             lowest, changes, sleeps, wakes, peakNeighbors, initial.Potential, initial.Energy);
     }
 
+    private static GravitasWorldContext CreateQualityContext(bool planar)
+    {
+        GravitasWorldContext context = planar
+            ? BenchmarkPhysicsScene.CreatePlanarContext(new Vector2d(-16, -8), new Vector2d(16, 16), cellSize: 4)
+            : CreateSpatialContext();
+        ConfigureQualityContext(context);
+        return context;
+    }
+
     private static GravitasWorldContext CreateSpatialContext()
     {
         GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext();
@@ -237,19 +243,23 @@ internal static partial class QualityStackWorkload
         Fixed64 potential = Fixed64.Zero, lowest = (Fixed64)16;
         Motion lower = default, upper = default;
         int asleep = 0, sleeps = 0, wakes = 0;
+        bool quiet = true;
+        Fixed64 quietSpeedSquared = Fixed64.FromFraction(1, 400);
         for (int i = 0; i < scene.Count; i++)
         {
             Motion body = scene.ReadBody(i);
             if (i == 0) lower = body;
             else upper = body;
-            Require(body.Center.MagnitudeSquared < (Fixed64)256 && body.Linear.MagnitudeSquared < (Fixed64)4096,
+            Fixed64 speedSquared = body.Linear.MagnitudeSquared;
+            Require(body.Center.MagnitudeSquared < (Fixed64)256 && speedSquared < (Fixed64)4096,
                 frame, "quality sample exceeded the bounded fixture domain");
             drift = Max(drift, body.Drift);
             angle = Max(angle, body.Angle);
             lowest = Min(lowest, body.Center.Y);
-            linear += Fixed64.Half * body.Mass * body.Linear.MagnitudeSquared;
+            linear += Fixed64.Half * body.Mass * speedSquared;
             angular += body.AngularEnergy;
             potential += body.Mass * Gravity * body.Center.Y;
+            quiet &= speedSquared <= quietSpeedSquared && body.SpinSquared <= quietSpeedSquared;
             if (body.Sleeping) asleep++;
             if (!sleeping[i] && body.Sleeping) sleeps++;
             if (sleeping[i] && !body.Sleeping) wakes++;
@@ -276,10 +286,11 @@ internal static partial class QualityStackWorkload
         trace.WriteUInt64(contact.Set.Low);
         trace.WriteUInt64(contact.Set.High);
         return new Reading(drift, angle, lowest, linear, angular, potential, asleep, sleeps, wakes,
-            contact.SolverDepth, contact.Residual, contact.ResidualPairs, contact.NeighborPairs, contact.Set);
+            contact.SolverDepth, contact.Residual, contact.ResidualPairs, contact.NeighborPairs, contact.Set, quiet);
     }
 
-    private static Scene Spatial(GravitasWorldContext context, StackLoad load, bool tilted, bool measure)
+    private static Scene Spatial(GravitasWorldContext context, StackLoad load, bool tilted, bool measure,
+        int quietFrames = 0)
     {
         int count = tilted ? 1 : 2;
         var colliders = new LSCollider[count + 1];
@@ -298,6 +309,8 @@ internal static partial class QualityStackWorkload
                 : CreateStackCuboid();
             SolidBody body = CreateSpatialBody(context, collider, position, initialRotation,
                 i == 0 ? load.Lower : load.Upper, sleep: !measure);
+            if (quietFrames > 0)
+                body.SleepFrameThreshold = quietFrames;
             inertia[i] = collider.CalculateInertiaTensor(body.Mass, body.LocalCenterOfMassOffset);
             bodies[i] = body;
             colliders[i + 1] = collider;
@@ -311,13 +324,15 @@ internal static partial class QualityStackWorkload
             SolidBody body = bodies[i];
             Vector3d center = body.WorldCenterOfMass;
             Vector3d localAngular = body.Rotation.Conjugate().Rotate(body.AngularVelocity);
-            Require(body.Collider.IsPartitioned && localAngular.MagnitudeSquared < (Fixed64)4096,
+            Fixed64 spinSquared = localAngular.MagnitudeSquared;
+            Require(body.Collider.IsPartitioned && spinSquared < (Fixed64)4096,
                 (int)context.FrameCount, "spatial actor left the fixture domain");
             Fixed64 energy = Fixed64.Half * Vector3d.Dot(localAngular, inertia[i] * localAngular);
             return new Motion(center, body.LinearVelocity, body.Mass, energy,
                 new Vector2d(center.X - Start(i, tilted, load.Aligned).X, center.Z).Magnitude,
-                FixedQuaternion.Angle(initialRotation, body.Rotation), body.IsSleeping);
-        }, frame => SpatialContacts(probes, frame, readResidual: !measure));
+                FixedQuaternion.Angle(initialRotation, body.Rotation), body.IsSleeping, spinSquared);
+        }, frame => SpatialContacts(probes, frame, readResidual: !measure), quietFrames == 0 ? null
+            : speed => bodies[^1].AddLinearImpulse(Vector3d.Up * (speed * bodies[^1].Mass)));
     }
 
     private static LSCuboidCollider CreateFloor(GravitasWorldContext context)
@@ -345,7 +360,8 @@ internal static partial class QualityStackWorkload
         return body;
     }
 
-    private static Scene Planar(GravitasWorldContext context, StackLoad load, bool tilted, bool measure)
+    private static Scene Planar(GravitasWorldContext context, StackLoad load, bool tilted, bool measure,
+        int quietFrames = 0)
     {
         int count = tilted ? 1 : 2;
         var colliders = new LSCollider2D[count + 1];
@@ -369,6 +385,8 @@ internal static partial class QualityStackWorkload
                 SleepEnabled = !measure
             };
             body.UseManualGrounding();
+            if (quietFrames > 0)
+                body.SleepFrameThreshold = quietFrames;
             body.Initialize(start, initialRotation);
             Require(body.CanTranslate && body.CanRotate, 0, "planar stack body must move and rotate freely");
             bodies[i] = body;
@@ -386,8 +404,9 @@ internal static partial class QualityStackWorkload
                 FixedMath.Cos(body.Rotation - initialRotation)).Abs());
             return new Motion(new Vector3d(center.X, center.Y, Fixed64.Zero), new Vector3d(body.LinearVelocity.X, body.LinearVelocity.Y, Fixed64.Zero),
                 body.Mass, Fixed64.Half * body.MomentOfInertia * spinSquared,
-                (center.X - Start(i, tilted, load.Aligned).X).Abs(), angle, body.IsSleeping);
-        }, frame => PlanarContacts(colliders, frame, readResidual: !measure));
+                (center.X - Start(i, tilted, load.Aligned).X).Abs(), angle, body.IsSleeping, spinSquared);
+        }, frame => PlanarContacts(colliders, frame, readResidual: !measure), quietFrames == 0 ? null
+            : speed => bodies[^1].AddLinearImpulse(Vector2d.Forward * (speed * bodies[^1].Mass)));
     }
 
     private static ContactReading SpatialContacts((CollisionPair Pair, bool Neighbors)[] probes, int frame, bool readResidual)
@@ -508,9 +527,10 @@ internal static partial class QualityStackWorkload
             Fixed64.Half + Fixed64.FromFraction(1 + 33 * index, 32));
 
     private readonly record struct StackLoad(int Lower, int Upper, bool Aligned);
-    private sealed record Scene(int Count, Func<int, Motion> ReadBody, Func<int, ContactReading> ReadContacts);
+    private sealed record Scene(int Count, Func<int, Motion> ReadBody, Func<int, ContactReading> ReadContacts,
+        Action<Fixed64> PulseUpper);
     private readonly record struct Motion(Vector3d Center, Vector3d Linear, Fixed64 Mass, Fixed64 AngularEnergy,
-        Fixed64 Drift, Fixed64 Angle, bool Sleeping);
+        Fixed64 Drift, Fixed64 Angle, bool Sleeping, Fixed64 SpinSquared);
     private readonly record struct ContactReading(Fixed64 SolverDepth, Fixed64 Residual, int ResidualPairs,
         int NeighborPairs, ChronicleHash Set, SupportPairReading FloorLower = default,
         SupportPairReading FloorUpper = default, SupportPairReading LowerUpper = default);
@@ -519,7 +539,7 @@ internal static partial class QualityStackWorkload
         SupportPairReading FloorLower, SupportPairReading FloorUpper, SupportPairReading LowerUpper);
     private readonly record struct Reading(Fixed64 Drift, Fixed64 Angle, Fixed64 LowestHeight, Fixed64 LinearEnergy,
         Fixed64 AngularEnergy, Fixed64 Potential, int Sleeping, int Sleeps, int Wakes, Fixed64 SolverDepth,
-        Fixed64 Residual, int ResidualPairs, int NeighborPairs, ChronicleHash ContactSet)
+        Fixed64 Residual, int ResidualPairs, int NeighborPairs, ChronicleHash ContactSet, bool Quiet)
     {
         internal Fixed64 Energy => LinearEnergy + AngularEnergy + Potential;
     }

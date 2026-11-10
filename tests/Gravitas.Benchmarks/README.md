@@ -353,6 +353,28 @@ for per-frame ragdoll and work/energy output. The
 [Phase 1 record](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-1-physical-fixtures-and-metrics)
 describes each case's settings, bounds, and observed limits.
 
+### Opt-in duration and continuation quality
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-stack-duration
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-chain-duration
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-ragdoll-duration
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-continuation
+```
+
+Run these after the package-backed build above. Each scenario advances eight
+nominal seconds at both 32 and 60 Hz. Duration commands measure response to
+repeated disturbances and preserve the matched no-pulse stack controls.
+The continuation command checks a JSON checkpoint at four seconds, exact
+replay against a cache-equivalent control and recovery against uninterrupted
+warm physics. Set `GRAVITAS_QUALITY_FRAME_CSV=1` for per-frame samples.
+
+The default duration commands report physical bounds separately from replay
+and fixture validity. Append `--strict` to the stack or ragdoll duration
+command to fail on a support or geometry bound miss, respectively. The
+[Phase 2 record](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-2-duration-and-continuation)
+identifies the scenarios that currently exceed those bounds.
+
 ### Opt-in curved-contact step envelopes
 
 ```bash
