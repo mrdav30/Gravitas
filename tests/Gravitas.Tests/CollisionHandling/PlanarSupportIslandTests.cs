@@ -10,6 +10,37 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class PlanarSupportIslandTests
 {
     [Theory]
+    [InlineData(32, 8, false)]
+    [InlineData(60, 121, true)]
+    public void FreeTopHeavyStack_ShouldBoundBothDepthsAfterSettlingOrWake(int rate, int lastFrame, bool pulse)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: rate, extent: 16);
+        var material = new PhysicsMaterial(Fixed64.Half, Fixed64.FromFraction(1, 3), Fixed64.Zero);
+        LSAABBoxCollider2D floor = CreateFloor(context, material);
+        SolidBody2D lower = CreateBox(context, Vector2d.Forward * Fixed64.FromFraction(17, 32), 1, material);
+        SolidBody2D upper = CreateBox(context, Vector2d.Forward * Fixed64.FromFraction(25, 16), 100, material);
+        lower.Gravity = upper.Gravity = -Vector2d.Forward * Fixed64.FromFraction(49, 5);
+        lower.SleepFrameThreshold = upper.SleepFrameThreshold = rate / 2;
+
+        for (int frame = 1; frame <= lastFrame; frame++)
+        {
+            if (pulse && frame == lastFrame)
+            {
+                Assert.True(lower.IsSleeping && upper.IsSleeping);
+                upper.AddLinearImpulse(-Vector2d.Forward * (upper.Mass * Fixed64.Quarter));
+            }
+            context.Simulate();
+            context.LateSimulate();
+        }
+
+        CheckSupportDepth(floor, lower.Collider, lastFrame, "floor/lower");
+        CheckSupportDepth(lower.Collider, upper.Collider, lastFrame, "lower/upper");
+        Assert.False(CollisionDetection2D.TryCollide(floor, upper.Collider, out _));
+        if (pulse)
+            Assert.False(lower.IsSleeping || upper.IsSleeping);
+    }
+
+    [Theory]
     [InlineData(10, false)]
     [InlineData(100, false)]
     [InlineData(100, true)]
@@ -23,7 +54,6 @@ public sealed class PlanarSupportIslandTests
             Fixed64.FromFraction(25, 16)), upperMass, material);
         floor ??= CreateFloor(context, material);
         lower.Gravity = upper.Gravity = new Vector2d(Fixed64.Zero, -Fixed64.FromFraction(49, 5));
-        Fixed64 depthBound = Fixed64.FromFraction(1, 16);
 
         for (int frame = 1; frame <= 80; frame++)
         {
@@ -36,18 +66,115 @@ public sealed class PlanarSupportIslandTests
             if (frame < 8)
                 continue;
 
-            CheckSupport(floor, lower.Collider, "floor/lower");
-            CheckSupport(lower.Collider, upper.Collider, "lower/upper");
+            CheckSupportDepth(floor, lower.Collider, frame, "floor/lower");
+            CheckSupportDepth(lower.Collider, upper.Collider, frame, "lower/upper");
             if (frame == 8)
                 Assert.True(lower.LinearVelocity.Y.Abs() <= Fixed64.FromFraction(1, 256),
                     $"Frame {frame}: the lower body retained vertical speed {lower.LinearVelocity.Y} after both supports engaged.");
-
-            void CheckSupport(LSCollider2D a, LSCollider2D b, string name)
-            {
-                Assert.True(CollisionDetection2D.TryCollide(a, b, out Contact2D contact), $"Frame {frame}: lost {name}.");
-                Assert.True(contact.Depth <= depthBound, $"Frame {frame}: {name} depth {contact.Depth} exceeds {depthBound}.");
-            }
         }
+    }
+
+    private static void CheckSupportDepth(LSCollider2D a, LSCollider2D b, int frame, string name)
+    {
+        Assert.True(CollisionDetection2D.TryCollide(a, b, out Contact2D contact), $"Frame {frame}: lost {name}.");
+        Assert.True(contact.Depth <= Fixed64.FromFraction(1, 16), $"Frame {frame}: {name} depth {contact.Depth} exceeds 1/16.");
+    }
+
+    [Theory]
+    [InlineData(5, true)]
+    [InlineData(50, false)]
+    public void CoupledTranslation_ShouldCorrectBothInterfacesIncludingShallowLoad(int loadMillidepth, bool reverse)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        PhysicsMaterial material = PhysicsMaterial.Frictionless;
+        var floor = CreateFloor(context, material);
+        Fixed64 lowerHeight = Fixed64.FromFraction(47, 100);
+        Fixed64 loadDepth = Fixed64.FromFraction(loadMillidepth, 1000);
+        SolidBody2D lower = CreateBox(context, Vector2d.Forward * lowerHeight, 1, material);
+        SolidBody2D upper = CreateBox(context, Vector2d.Forward * (lowerHeight + Fixed64.One - loadDepth), 100, material);
+        var support = new CollisionPair2D(floor, lower.Collider);
+        var load = new CollisionPair2D(lower.Collider, upper.Collider);
+        Assert.True(CollisionDetection2D.TryCollide(support, support.Manifold, frame: 0));
+        Assert.True(CollisionDetection2D.TryCollide(load, load.Manifold, frame: 0));
+
+        Assert.True(CollisionResponse2D.TryCorrectSeededSupportPositions(reverse ? load : support, reverse ? support : load));
+
+        Fixed64 tolerance = Fixed64.FromRaw(4096);
+        Assert.True((lower.Position.Y - Fixed64.FromFraction(49, 100)).Abs() <= tolerance);
+        Assert.True((upper.Position.Y - Fixed64.FromFraction(148, 100)).Abs() <= tolerance);
+        Assert.Equal(Fixed64.Zero, lower.Rotation);
+        Assert.Equal(Fixed64.Zero, upper.Rotation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CoupledTranslation_ShouldKeepLowerPoseWhenFloorIsAtSlop(bool excessLoadDepth)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        PhysicsMaterial material = PhysicsMaterial.Frictionless;
+        var floor = CreateFloor(context, material);
+        Vector2d lowerPosition = Vector2d.Forward * Fixed64.Half;
+        Vector2d upperPosition = lowerPosition + Vector2d.Forward;
+        SolidBody2D lower = CreateBox(context, lowerPosition, 1, material);
+        SolidBody2D upper = CreateBox(context, upperPosition, 2, material);
+        Fixed64 excess = excessLoadDepth ? Fixed64.FromFraction(1, 8) : Fixed64.Zero;
+        var support = Contact(floor, lower.Collider, Vector2d.Zero, CollisionResponse2D.PenetrationSlop);
+        var load = Contact(lower.Collider, upper.Collider, Vector2d.Forward, CollisionResponse2D.PenetrationSlop + excess);
+
+        Assert.True(CollisionResponse2D.TryCorrectSeededSupportPositions(support, load));
+        Assert.Equal(lowerPosition, lower.Position);
+        Assert.Equal(upperPosition + Vector2d.Forward * excess, upper.Position);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CoupledTranslation_ShouldLeaveBothPosesWhenUpperPoseCannotBePrepared(bool bodyPositionOverflows)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        PhysicsMaterial material = PhysicsMaterial.Frictionless;
+        var floor = CreateFloor(context, material);
+        Vector2d upperPosition = Vector2d.Forward * (Fixed64.MaxValue - Fixed64.FromFraction(9, 16));
+        Vector2d lowerPosition = upperPosition - Vector2d.Forward;
+        SolidBody2D lower = CreateBox(context, lowerPosition, 1, material);
+        SolidBody2D upper = CreateBox(context, upperPosition, 100, material);
+        if (!bodyPositionOverflows)
+            upper.Collider.LocalOffset = Vector2d.Forward * Fixed64.Half;
+        Vector2d upperCenter = upper.Collider.Center;
+        Fixed64 depth = bodyPositionOverflows ? Fixed64.Half : Fixed64.FromFraction(1, 8);
+        var support = Contact(floor, lower.Collider, lowerPosition, depth);
+        var load = Contact(lower.Collider, upper.Collider, upperPosition, depth);
+
+        Assert.False(CollisionResponse2D.TryCorrectSeededSupportPositions(support, load));
+        Assert.Equal(lowerPosition, lower.Position);
+        Assert.Equal(upperPosition, upper.Position);
+        Assert.Equal(upperCenter, upper.Collider.Center);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CoupledTranslation_ShouldLeaveMixedDirectionsToPairCorrection(bool lowerLeads)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        PhysicsMaterial material = PhysicsMaterial.Frictionless;
+        LSAABBoxCollider2D? floor = lowerLeads ? null : CreateFloor(context, material);
+        SolidBody2D lower = CreateBox(context, Vector2d.Forward * Fixed64.Half, 1, material);
+        SolidBody2D upper = CreateBox(context, Vector2d.Forward * Fixed64.FromFraction(3, 2), 100, material);
+        floor ??= CreateFloor(context, material);
+        Fixed64 depth = Fixed64.FromFraction(1, 8);
+        var support = Contact(floor, lower.Collider, Vector2d.Zero, depth);
+        Assert.Equal(lowerLeads, support.ColliderA == lower.Collider);
+        support.Manifold.AddContact(Vector2d.Right, Vector2d.Right, depth,
+            lowerLeads ? -Vector2d.Right : Vector2d.Right);
+        var load = Contact(lower.Collider, upper.Collider, Vector2d.Forward, depth);
+
+        Assert.False(CollisionResponse2D.TryCorrectSeededSupportPositions(support, load));
+        Assert.Equal(Vector2d.Forward * Fixed64.Half, lower.Position);
+        Assert.Equal(Vector2d.Forward * Fixed64.FromFraction(3, 2), upper.Position);
+        CollisionResponse2D.CorrectSeededSupportPositions(support, load);
+        Assert.True(lower.Position.X > Fixed64.Zero);
     }
 
     [Theory]
@@ -102,6 +229,13 @@ public sealed class PlanarSupportIslandTests
         upper.ApplyCollisionLinearVelocityDelta(-Vector2d.Forward);
 
         Assert.False(CollisionResponse2D.TrySeedSupportedIslandNormals(support, load));
+        if (boundary is SeedBoundary.FixedLoad or SeedBoundary.UnresolvedPivot)
+        {
+            Fixed64 depth = Fixed64.FromFraction(1, 8);
+            support = Contact(floor, lower.Collider, Vector2d.Zero, depth);
+            load = Contact(lower.Collider, loadCollider, Vector2d.Forward, depth);
+            Assert.False(CollisionResponse2D.TryCorrectSeededSupportPositions(support, load));
+        }
         Assert.Equal(Vector2d.Zero, lower.LinearVelocity);
         Assert.Equal(Fixed64.Zero, lower.AngularVelocity);
         Assert.Equal(-Vector2d.Forward, upper.LinearVelocity);
@@ -151,10 +285,10 @@ public sealed class PlanarSupportIslandTests
         return floor;
     }
 
-    private static CollisionPair2D Contact(LSCollider2D lower, LSCollider2D upper, Vector2d witness)
+    private static CollisionPair2D Contact(LSCollider2D lower, LSCollider2D upper, Vector2d witness, Fixed64 depth = default)
     {
         var pair = new CollisionPair2D(lower, upper);
-        pair.Manifold.SetContact(witness, witness, Fixed64.Zero,
+        pair.Manifold.SetContact(witness, witness, depth,
             pair.ColliderA == lower ? Vector2d.Forward : -Vector2d.Forward);
         return pair;
     }

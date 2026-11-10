@@ -898,9 +898,8 @@ and exercise three connected wakes at each rate. Both bodies return to sleep
 in 16 or 30 steps after each pulse. Penetration grows across those episodes.
 The no-pulse 32 Hz case already exceeds the depth bound at 0.25 s, and the
 60 Hz no-pulse case settles within the bound. The disturbed 60 Hz case
-first exceeds it on its first kick step. [GRV-Issue-153](issue-tracker.md#grv-issue-153)
-tracks the planar residual failure separately from the velocity transfer
-addressed in #152.
+first exceeds it on its first kick step. This baseline exposed the planar
+positional correction failure addressed in [GRV-Issue-153](issue-tracker.md#grv-issue-153).
 
 The spatial 100:1 stack reaches the floor with its upper body in the no-pulse
 controls at 2.344 and 4.817 s. The impulses shift onset to 2.313 and 5.033 s.
@@ -908,6 +907,63 @@ This places the 60 Hz failure beyond the 256-frame Phase 1 capture. Both
 rates later lose original support. [GRV-Issue-154](issue-tracker.md#grv-issue-154)
 tracks this support topology failure. These heavy spatial cases each allocate
 2,944 B in one warm step. The other stack cases allocate 0 B.
+
+#### GRV-Issue-153 Implementation
+
+The centered 100:1 free-top planar stack reproduced the failure on `37de2c97`
+with released dependencies. Trace the Phase 2 `verify-quality-stack-duration`
+fixture at 32 Hz frame 8 without a pulse and at 60 Hz frame 121, the step
+immediately following the first 0.25-unit/s pulse. The incoming normal speeds
+at the floor and load were -0.306250 / 0 at 32 Hz and 0 / -0.413333 at 60 Hz.
+At entry to positional correction both bodies had zero linear and angular
+speed at both rates. The floor pass lifted the lower body to 0.49 units. This
+deepened the load contact, but the load pass used its original rows and
+pushed the lower body back down.
+
+| Target | Floor lift | Load depth stored / after floor pass | Lower / upper move from load pass | Final floor / load depth before fix | After fix |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 32 Hz frame 8 | +0.054713 | 0.043997 / 0.098710 | -0.033660 / +0.000337 | 0.043660 / 0.064713 | 0.010000 / 0.010000 |
+| 60 Hz frame 121 | +0.039050 | 0.064710 / 0.103760 | -0.054169 / +0.000542 | 0.064169 / 0.049050 | 0.010000 / 0.010000 |
+
+After the seeded normal and friction sweeps, both translations now use the
+same pre-correction poses and the deepest row at each interface. The shared
+two-row translation solver accounts for the opposite effects of the lower
+body on floor and load depth. It retains signed slack for a shallow contact,
+prepares both body and attached collider poses before applying either, and
+keeps the existing pair correction for incompatible rows or infeasible
+translations. The 3D path uses the same Gram matrix construction with its
+existing geometry, solve and pose application. The two full-step regressions
+failed at the traced interfaces on the baseline. Focused solver cases cover
+pair order, shallow load slack, a stationary lower pose, incompatible normals,
+and body and attached collider pose limits.
+
+All four planar 100:1 cases retained both original supports and upper-floor
+clearance through eight seconds. Peak floor and load depths were
+0.010000 / 0.023203 units at 32 Hz and 0.010000 / 0.010000 at 60 Hz. Both
+rates ended at 0.010000 units. All three pulses started asleep, woke both
+bodies, and returned them to sleep after 16 steps at 32 Hz or 30 at 60 Hz.
+The duration verifier repeated each fixture and the frame CSV and hashes
+matched between `Release` and `ReleaseLean` with released dependencies.
+The pulse trace hashes were `daa1600adf929bf62b8dd4d009f4ef44` at 32 Hz and
+`e73cdda457b2dd60bd1c008e3d2a2699` at 60 Hz. The 1:1 planar and all spatial
+duration cases matched the baseline, as did spatial stack support and
+save/populate continuation. The 1,024-actor strategy verifiers reproduced
+their existing 96-frame traces in both dimensions and build profiles.
+
+`measure-quality-stack-support 2d` exercised ten always-awake cases for
+192 measured steps each. All cases kept 192 active support steps, with 768
+fresh rows for each 10:1 or 100:1 free top load and 384 for each control.
+Every launch measured 0 B total and 0 B peak per case, including three
+baseline launches, three corrected `Release` launches, and a `ReleaseLean`
+launch. The 32 and 60 Hz planar duration cases also measured 0 B total and
+0 B peak. Timing varied across launches and controls. The offset 100:1 case
+had a median launch mean of 567 us before and 621 us after the fix, with
+launch ranges of 529–933 us and 542–1,007 us. The measurements did not resolve
+the latency cost of the correction.
+
+On 2026-11-10 the full suites passed 8,424 `Release` and 8,353 `ReleaseLean`
+tests with 100% reachable line, branch, and method coverage in both profiles.
+Both target frameworks built and DocFX passed with warnings treated as errors.
 
 #### Chain And Ragdoll Recovery
 

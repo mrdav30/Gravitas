@@ -229,22 +229,10 @@ public static partial class CollisionResponse
         Span<Vector3d> lowerAxes = stackalloc Vector3d[] { first[0].Lower.Linear, second[0].Lower.Linear };
         Span<Vector3d> upperAxes = stackalloc Vector3d[] { first[0].Upper.Linear, second[0].Upper.Linear };
         Span<Fixed64> depths = stackalloc Fixed64[] { PenetrationSlop - firstDepth, PenetrationSlop - secondDepth };
-        Span<Fixed64> matrix = stackalloc Fixed64[4];
         Span<Fixed64> impulses = stackalloc Fixed64[2];
         impulses.Clear();
-        bool prepared = true;
-        for (int i = 0; i < 2; i++)
-        for (int j = 0; j <= i; j++)
-        {
-            bool terms = Vector3d.TryDot(lowerAxes[i], lowerAxes[j], out Fixed64 low)
-                & Vector3d.TryDot(upperAxes[i], upperAxes[j], out Fixed64 high);
-            terms &= Fixed64.TryMultiplyDivide(low, lower.EffectiveInverseMass, Fixed64.One, out low)
-                & Fixed64.TryMultiplyDivide(high, upper.EffectiveInverseMass, Fixed64.One, out high);
-            prepared &= terms & Fixed64.TryAdd(low, high, out Fixed64 entry);
-            matrix[i * 2 + j] = matrix[j * 2 + i] = entry;
-        }
-
-        prepared &= SmallContactNormalSolver.TrySolve(2, matrix, depths, impulses);
+        bool prepared = SmallContactNormalSolver.TrySolveTranslations(lowerAxes, upperAxes,
+            lower.EffectiveInverseMass, upper.EffectiveInverseMass, depths, impulses);
         return prepared & TryPrepareIslandTranslation(lower, lowerAxes, impulses, out lowerPosition)
             & TryPrepareIslandTranslation(upper, upperAxes, impulses, out upperPosition);
     }

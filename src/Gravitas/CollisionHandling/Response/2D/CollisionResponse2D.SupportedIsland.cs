@@ -16,7 +16,72 @@ public static partial class CollisionResponse2D
 {
     private const int MaxSupportRows = 2 * ContactManifold2D.MaxContactsPerGroup;
 
-    internal static void CorrectSeededSupportPosition(CollisionPair2D pair)
+    internal static void CorrectSeededSupportPositions(CollisionPair2D first, CollisionPair2D second)
+    {
+        if (TryCorrectSeededSupportPositions(first, second))
+            return;
+        CorrectSeededSupportPosition(first);
+        CorrectSeededSupportPosition(second);
+    }
+
+    internal static bool TryCorrectSeededSupportPositions(CollisionPair2D first, CollisionPair2D second)
+    {
+        if (!TryGetSupportedBodies(first, second, out SolidBody2D lower, out SolidBody2D upper)
+            && !TryGetSupportedBodies(second, first, out lower, out upper))
+            return false;
+
+        Span<Vector3d> lowerAxes = stackalloc Vector3d[2];
+        Span<Vector3d> upperAxes = stackalloc Vector3d[2];
+        if (!(TryReadTranslationInterface(first, lower, upper, out lowerAxes[0], out upperAxes[0], out Fixed64 firstDepth)
+            & TryReadTranslationInterface(second, lower, upper, out lowerAxes[1], out upperAxes[1], out Fixed64 secondDepth)))
+            return false;
+        if (firstDepth <= PenetrationSlop & secondDepth <= PenetrationSlop)
+            return true;
+
+        // Keep the signed slack of each interface. Correcting one can deepen the other.
+        Span<Fixed64> depths = stackalloc Fixed64[] { PenetrationSlop - firstDepth, PenetrationSlop - secondDepth };
+        Span<Fixed64> impulses = stackalloc Fixed64[2];
+        if (!SmallContactNormalSolver.TrySolveTranslations(lowerAxes, upperAxes,
+                lower.EffectiveInverseMass, upper.EffectiveInverseMass, depths, impulses)
+            || !(TryPrepareSupportTranslation(lower, lowerAxes, impulses, out Vector2d lowerPosition)
+                & TryPrepareSupportTranslation(upper, upperAxes, impulses, out Vector2d upperPosition)))
+            return false;
+
+        lower.ApplyCollisionPositionState(lowerPosition);
+        upper.ApplyCollisionPositionState(upperPosition);
+        return true;
+    }
+
+    private static bool TryReadTranslationInterface(CollisionPair2D pair, SolidBody2D lower, SolidBody2D upper,
+        out Vector3d lowerAxis, out Vector3d upperAxis, out Fixed64 depth)
+    {
+        ref ContactGroup2D group = ref pair.Manifold.GetGroup(0);
+        Vector2d normal = ResolveContactNormal(pair, group.Key, group[0].Normal);
+        bool lowerIsA = pair.ColliderA.Body == lower;
+        var axis = new Vector3d(normal.X, normal.Y, Fixed64.Zero);
+        lowerAxis = lowerIsA ? -axis : axis;
+        upperAxis = (lowerIsA ? pair.ColliderB.Body : pair.ColliderA.Body) == upper ? -lowerAxis : default;
+        depth = group[0].Depth;
+        bool compatible = !group[0].DepthIsClamped;
+        for (int i = 1; i < group.Count; i++)
+        {
+            ManifoldContact2D row = group[i];
+            compatible &= !row.DepthIsClamped & (ResolveContactNormal(pair, group.Key, row.Normal) == normal);
+            depth = FixedMath.Max(depth, row.Depth);
+        }
+        return compatible;
+    }
+
+    private static bool TryPrepareSupportTranslation(SolidBody2D body, ReadOnlySpan<Vector3d> axes,
+        ReadOnlySpan<Fixed64> impulses, out Vector2d position)
+    {
+        bool prepared = Vector3d.TryScaledLinearCombination(axes[0], impulses[0], axes[1], impulses[1],
+            default, Fixed64.Zero, body.EffectiveInverseMass * PenetrationCorrectionPercent, out Vector3d delta);
+        prepared &= Vector2d.TryAdd(body.Position, new Vector2d(delta.X, delta.Y), out position);
+        return prepared && (position == body.Position || body.Collider.TryPrepareBodyPose(position, body.Rotation));
+    }
+
+    private static void CorrectSeededSupportPosition(CollisionPair2D pair)
     {
         ResponseBody2D a = ResponseBody2D.Create(pair.ColliderA), b = ResponseBody2D.Create(pair.ColliderB);
         SolverContactBuffer2D contacts = BuildContactBuffer(pair, a, b,

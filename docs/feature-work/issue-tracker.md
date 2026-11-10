@@ -55,26 +55,6 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-<a id="grv-issue-153"></a>
-
-#### GRV-Issue-153 — Planar top-heavy penetration grows during settling and wake cycles
-
-**Opened** 2026-11-09. **Priority** High. **Owner** Pure 2D contact position
-correction and supported island response.
-
-Run `verify-quality-stack-duration --strict` with released dependencies on
-`aef5995f` plus the [Phase 2 fixture](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#stack-settling-and-disturbance).
-The `quality-2d-stack-m100-32hz-control-v1` row exceeds the 1/16-unit depth
-bound on frame 8 and reaches 0.117561 units without any pulse. Its 60 Hz
-control remains within the bound. The pulse rows retain both interfaces
-and wake and re-sleep together, while depth grows to 0.344618 at 32 Hz and
-0.155248 at 60 Hz. The 60 Hz bound first fails on frame 121, immediately
-after the first downward pulse. The equal-mass controls stay within bounds.
-
-Trace the two published-pose depth corrections and normal speeds at onset
-and the first wake. A fix must preserve both interfaces, stay within the
-1/16-unit bound, and preserve deterministic replay and warm allocations.
-
 <a id="grv-issue-154"></a>
 
 #### GRV-Issue-154 — Spatial top-heavy support drifts into direct upper-floor contact
@@ -128,6 +108,7 @@ validation, tradeoffs and links to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                                                                                         | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="grv-issue-153"></a>GRV-Issue-153 | 2026-11-10 | Fixed. Coupled positional translation keeps both planar support depths within bounds during settling and connected wakes at 32 and 60 Hz. | [Trace, regressions, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-153-implementation) |
 | <a id="grv-issue-152"></a>GRV-Issue-152 | 2026-11-09 | Fixed. Coupled normal loads preserve both planar support interfaces for centered and offset 10:1 and 100:1 top loads. | [Reproduction, implementation, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-152-implementation) |
 | <a id="grv-issue-151"></a>GRV-Issue-151 | 2026-11-09 | Fixed. Finite cuboid face witnesses and coupled support response preserve both interfaces under the 100:1 top load. | [Implementation and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-151-implementation) |
 | <a id="grv-issue-150"></a>GRV-Issue-150 | 2026-11-09 | Fixed. 3D pair shells release endpoints on return to the pool after separation notifications. The service clears pair snapshots and solver work lists after use, and grounding releases temporary query hits after selecting support. | [Live-context regression](../../tests/Gravitas.Tests/CollisionHandling/CollisionPairLifecycleHardeningTests.cs) fails on `c0b055e0` and passes with pooling on and off. The 1,024-actor 3D soak replay and all 10,240 frame allocation records match Phase 3. Warm mesh steps and 64-body ray and swept-sphere probes allocated 0 B before and after. |

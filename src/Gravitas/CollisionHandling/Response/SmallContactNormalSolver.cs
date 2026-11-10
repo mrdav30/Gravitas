@@ -23,6 +23,25 @@ internal static class SmallContactNormalSolver
     private static readonly Signed192 WideResidualTolerance = WideArithmetic.ShiftLeftSigned192By32(
         Signed192.Raw(Fixed64.FromRaw(1L << 12)));
 
+    internal static bool TrySolveTranslations(ReadOnlySpan<Vector3d> lowerAxes, ReadOnlySpan<Vector3d> upperAxes,
+        Fixed64 lowerInverseMass, Fixed64 upperInverseMass, ReadOnlySpan<Fixed64> depths, Span<Fixed64> impulses)
+    {
+        Span<Fixed64> matrix = stackalloc Fixed64[4];
+        bool prepared = true;
+        for (int i = 0; i < 2; i++)
+        for (int j = 0; j <= i; j++)
+        {
+            bool terms = Vector3d.TryDot(lowerAxes[i], lowerAxes[j], out Fixed64 low)
+                & Vector3d.TryDot(upperAxes[i], upperAxes[j], out Fixed64 high);
+            terms &= Fixed64.TryMultiplyDivide(low, lowerInverseMass, Fixed64.One, out low)
+                & Fixed64.TryMultiplyDivide(high, upperInverseMass, Fixed64.One, out high);
+            prepared &= terms & Fixed64.TryAdd(low, high, out Fixed64 entry);
+            matrix[i * 2 + j] = matrix[j * 2 + i] = entry;
+        }
+
+        return prepared & TrySolve(2, matrix, depths, impulses);
+    }
+
     internal static bool TrySolve(int rowCount, ReadOnlySpan<Fixed64> matrix,
         ReadOnlySpan<Fixed64> freeSpeeds, Span<Fixed64> impulses)
     {

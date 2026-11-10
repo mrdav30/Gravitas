@@ -234,12 +234,10 @@ public sealed partial class GravitasPhysics2DService
                     JointSolver2D.Solve(constraint.Joint!, prepare);
             }
         }
+        // Use the incoming normals and depths together after the velocity refinement.
         if (seededNormals)
-        {
-            // Keep the seeded row normals and lever arms fixed through velocity refinement.
-            CollisionResponse2D.CorrectSeededSupportPosition(_discreteIslandConstraints[start].Pair);
-            CollisionResponse2D.CorrectSeededSupportPosition(_discreteIslandConstraints[start + 1].Pair);
-        }
+            CollisionResponse2D.CorrectSeededSupportPositions(
+                _discreteIslandConstraints[start].Pair, _discreteIslandConstraints[start + 1].Pair);
         for (int i = start; i < end; i++)
         {
             DiscreteIslandConstraint2D constraint = _discreteIslandConstraints[i];
