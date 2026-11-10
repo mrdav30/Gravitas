@@ -1,7 +1,7 @@
 # Long-Duration Physics Quality And Tuning Plan
 
 **Date:** 2026-10-06  
-**Status:** Phase 1 stack and aligned chain checkpoints captured. Resting/contact ragdolls are next.  
+**Status:** Phase 1 complete. Phase 2 duration and continuation is next.  
 **Owner:** Gravitas contact/constraint quality and configuration guidance.
 
 ## Goal
@@ -29,22 +29,22 @@ add a second runner or generic physics-quality framework.
 
 ## Phase 1: Physical Fixtures And Metrics
 
-- [ ] Add or extend freely simulated stacks without hidden axis locks or joints
+- [x] Add or extend freely simulated stacks without hidden axis locks or joints
       that manufacture stability. Include ordinary primitives and an explicit
       tilted/curved-feature stress case. Extend long chains and resting/contact
       ragdolls from existing fixtures instead of rebuilding them.
-- [ ] Cover equal and varied mass ratios, initially 1:1, 1:10 and 1:100, with
+- [x] Cover equal and varied mass ratios, initially 1:1, 1:10 and 1:100, with
       fixed documented lengths/masses and an admitted fixed-point range. Cover
       pure 2D and 3D equivalents and focused mixed-response parity where the
       constrained model applies; do not demand 3D behavior from planar bodies.
-- [ ] Measure maximum/residual penetration, positional/angular drift, joint
+- [x] Measure maximum/residual penetration, positional/angular drift, joint
       anchor/limit error, contact identity churn and sleep/wake transitions over
       time. Report units and normalize geometric errors to declared shape scale.
-- [ ] Track kinetic/potential energy and work from gravity, impulses and motors
+- [x] Track kinetic/potential energy and work from gravity, impulses and motors
       with the fixture's friction, restitution and damping policy. Conservation
       is a gate only in an appropriate conservative fixture; resting friction,
       damping and stabilization need their own explainable behavior bounds.
-- [ ] Keep physical comparisons deterministic and overflow-safe. Reuse neutral
+- [x] Keep physical comparisons deterministic and overflow-safe. Reuse neutral
       upstream math when needed; do not move rigid-body policy into
       FixedMathSharp. Wall-clock measurements and chart formatting remain
       outside physics logic.
@@ -497,6 +497,43 @@ preserves the four-, eight-, and sixteen-stack replay and budget evidence.
 [GRV-Benchmark-035](benchmark-signal-hardening-backlog.md#grv-benchmark-035)
 closed after rejecting disjoint cross-stack pairs before acquisition.
 
+### Current Stack Baseline And Planar Support Follow-Up
+
+At `50c5d555` with released packages, `verify-quality-stacks` matched between
+Release and ReleaseLean. The 3D equal-mass and 10:1 top-loaded cases now meet
+the initial bounds. The 100:1 offset case retains both supports, with peak
+residual depth 0.011964 unit and lowest COM 0.489330 unit. Its final lateral
+drift is 0.572327 unit, above the provisional 1/8-unit bound. All eight
+`verify-quality-stack-support` controls meet their separate support bounds.
+The two tilted capsules and the equal-mass planar stack remain within their
+initial bounds.
+
+The offset 2D 10:1 and 100:1 stacks still lose the lower link's floor
+support. A disposable probe reused the same planar setup and sampled each
+pair's published-pose depth separately. It changed only the lower and upper
+masses and the upper body's lateral offset (1/64 unit or zero). Fresh
+upward rows first reached the floor on frame 5 and both support interfaces
+on frame 8 in all ten cases. These row timestamps differ from the first
+geometric overlaps sampled after each step.
+
+| Lower / upper mass | Alignment | First lower-floor depth > 1/16 | Peak lower-floor depth | First upper-floor overlap with positive depth | Lowest lower COM |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 / 10 | Offset | 12 | 0.480540 | 65 | 0.021710 |
+| 1 / 100 | Offset | 12 | 0.499387 | 29 | 0.022959 |
+| 1 / 10 | Centered | 28 | 0.081449 | — | 0.418551 |
+| 1 / 100 | Centered | 12 | 0.502097 | 34 | −0.002097 |
+| 100 / 1 | Offset / centered | — | 0.010154 / 0.010112 | — | 0.489888 / 0.489888 |
+| 100 / 100 | Offset / centered | — | 0.049561 / 0.016754 | — | 0.453711 / 0.483246 |
+| 1 / 1 | Offset / centered | — | 0.049561 / 0.016754 | — | 0.453711 / 0.483246 |
+
+The lower COM of the centered 100:1 case first reached the floor plane on
+frame 34 and was at or below it on six sampled frames. The same-total-mass
+swap stayed within the floor-depth bound at both alignments. This isolates
+the support loss to top-heavy loading in these fixtures. It leaves the
+specific response cause open. [GRV-Issue-152](issue-tracker.md#grv-issue-152)
+owns the pure 2D investigation. Keep the passing 3D support results and the
+planar failure distinct in later duration and solver comparisons.
+
 ### Aligned Long-Chain Checkpoint
 
 On `1839af2e` with the new opt-in `verify-quality-chains` command, use
@@ -563,8 +600,166 @@ under ignored `artifacts/physics-quality-phase1/chains`.
 The focused constraint suites passed 90 Release and 86 ReleaseLean tests.
 Both existing long-chain BenchmarkDotNet rows completed a Dry smoke run.
 
-The next Phase 1 checkpoint is resting/contact ragdolls. Mixed-response
-parity, angular limits and controlled gravity/motor work remain open.
+### Resting And Contact Ragdolls
+
+`verify-quality-ragdolls` reuses the benchmark's six-link torso and limbs
+in both dimensions. The torso is mass 3 with width 1 and height 3/2, and
+the spatial cuboid is 1/2 unit deep. The planar torso uses a rotating
+polygon. The five limbs are mass 1 circles or spheres of radius 1/2. The
+24-unit floor is one unit thick with its top at −1/2. Joints start with
+coincident midpoint anchors. The planar pins have ±10° limits and the
+spatial joints have 10° cone and twist limits. Linked neighbors suppress
+collision and each link remains free to translate and rotate.
+
+The drop uses the original benchmark centers. The supported-start control
+places the links directly on the floor at X coordinates `(0, 3, −2, 2,
+−1, 1)` in torso-to-limb order and registers the midpoint anchors there.
+Both start still and use 256 complete steps at 60 Hz, six iterations,
+gravity 10 units/s², static/dynamic friction 1/2 and 1/3, zero restitution,
+and zero aerodynamic drag and angular damping. The supported-start case
+uses 1/20 unit/s and 1/20 rad/s sleep speed thresholds with the existing
+16-step quiet window. Both apply a 3/16 angular impulse to the last link
+before step 193. There are no motors.
+
+The verifier records retained solver depth across all pairs, pair-scoped
+contact ID changes, and retained upward floor pairs. It measures
+floor-normal penetration from the published shape bounds while each link
+remains inside the floor footprint. It separately reconstructs the
+published anchor gap and reads the latest prepared anchor and angular
+limit error. The one-unit limb diameter is the length scale. The
+provisional bounds are 1/8 peak and 1/16 final floor depth, 1/4 peak and
+1/16 final anchor gap, 10° peak and 3° final prepared limit error, and one
+unit peak lateral drift. The supported-start case also expects all six
+links to sleep before the impulse, wake on the kick step, and return to
+sleep by the final frame.
+
+| Case | Peak / final floor depth | Peak / final anchor gap | Peak / final prepared limit error | Final floor pairs | Asleep before kick / awake after / asleep at end |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2D drop | 0.010000 / 0.010000 | 0.790916 / 0.790916 | 7.8408° / 6.9186° | 4 | 0 / 6 / 0 |
+| 3D drop | 0.011283 / 0.010862 | 0.837215 / 0.837215 | 7.2683° / 6.4339° | 4 | 0 / 6 / 0 |
+| 2D supported start | 0.010000 / 0.010000 | 0.015389 / 0.015031 | 0° / 0° | 6 | 6 / 6 / 2 |
+| 3D supported start | 0.010696 / 0.010696 | 0.018521 / 0.016577 | 0° / 0° | 6 | 6 / 6 / 5 |
+
+Both drops retain upward floor pairs from frame 13 through frame 256 and
+exceed the joint-gap and final prepared-limit bounds. Neither sleeps.
+The supported-start cases meet the geometric bounds and show connected
+wake on frame 193. They miss the all-links resettled bound at frame 256.
+They log 26 sleep and 24 wake transitions in 2D, and 29 sleep and 24 wake
+transitions in 3D. Contact IDs change on 244 drop frames and 81
+supported-start frames in each dimension. A changed row ID can occur
+while a pair continues to provide support.
+
+The energy samples track translational and rotational kinetic energy,
+potential energy relative to the floor, signed gravity work as potential
+decrease, and work from the angular impulse as the instantaneous kinetic
+change of the kicked link. In the supported-start cases, impulse work is
+0.140625 in 2D and 0.175781 in 3D. Both finish below their initial
+mechanical energy with friction, inelastic contact, and joint stabilization
+in effect. The drop and supported-start replays match their repeats and
+the terminal state of the observation-free control. Across frames 65–256,
+the drop cases allocate 3,440 B in 2D and 7,704 B in 3D. The supported-start
+cases allocate 312 B in 2D and 0 B in 3D. The largest individual step
+allocations are 1,912 B on 2D drop frame 146, 3,608 B on 3D drop frame 124,
+and 312 B on 2D supported-start frame 194.
+
+### Focused Mixed-Response Parity
+
+`verify-quality-mixed` runs four centered, frictionless impacts for 16
+complete steps at 60 Hz. The moving radius-1/2 circle or sphere begins
+7/8 unit from the target center, with normal speed 1/4 unit/s. The dynamic
+participants have unit mass, zero restitution, and no gravity, drag,
+angular damping or sleep. Coordinates and speeds stay below two units
+and two units/s. The one-unit combined reach provides an independent
+centerline penetration measurement.
+
+- The side impact compares a mixed sphere against an embedded circle
+  with two pure 2D circles. Both cases share the initial momentum equally,
+  giving each body normal speed 0.125 unit/s after the first solve.
+- The vertical impact compares the sphere over a dynamic embedded 4-by-4
+  planar box of half-thickness 1/2 with the same sphere over a bodyless
+  4-by-1-by-4 spatial cuboid. Both spheres stop. The embedded body keeps
+  its exact planar position, velocity, rotation, spin and embedding height.
+
+Both mixed impacts report the intended dimensional pair, the expected
+axis normal and one applied impulse on frame 1. The pure controls each
+produce one fresh contact row. The shared-speed or stop tolerance is
+1/128 unit/s, and the terminal residual depth bound is 1/32 unit.
+All four finish at 0.010000 unit residual. Peak depth after position
+publication is 0.033833 unit in both mixed cases and the pure 3D control,
+and 0.010000 unit in pure 2D. This comparison establishes the expected
+velocity response under the embedding rule. The dimensions use their own
+positional correction policy.
+
+Repeated traces and terminal hashes match, including an observation-free
+control for each case. Release and ReleaseLean produce identical results.
+
+### Controlled Work, Energy, And Angular Limits
+
+`verify-quality-work-energy` advances each case for 120 complete steps at
+60 Hz. It uses radius-1/2, mass-2 circles or spheres, frictionless material,
+manual grounding, and disabled sleep, drag and environmental damping.
+Position and velocity magnitudes stay below 4 units and 4 units/s in the
+translation cases. Rotors stay at their fixed joint center with angular
+speed magnitude below 4 rad/s and angle magnitude below one radian.
+The fixtures check for contact-free motion. Length and time are in
+simulation units and seconds, and work and energy use mass × length²/s².
+
+- The conservation control applies a central linear impulse of magnitude 1
+  to the body at rest, then coasts in zero gravity. The expected input
+  work `J²/(2m)` and measured kinetic energy both equal 0.25 exactly at
+  every sample. Position follows the fixed-step linear trajectory.
+- The gravity control applies the same impulse from height 2 with gravity
+  1 unit/s². It compares signed gravity work `m g (h₀ − h)` with the kinetic
+  energy gain after accounting for semi-implicit Euler integration. The
+  integrator contribution is `−m (g Δt)² n/2` after `n` steps. Both dimensions
+  end at kinetic energy 4.250000, potential energy −0.033333, and gravity
+  work +4.033333. The observed discrete energy change is −0.033333 and the
+  trajectory and work residuals stay within 1/4096 in their respective units.
+- The centered rotor uses one solve iteration to isolate a single motor row
+  with target 1/2 radian, strength 4, damping 1/2 and impulse cap 1/64. The
+  stationary anchor supplies no angular work. The verifier compares the
+  measured momentum change with the row's impulse magnitude, assigns its
+  direction from the change, and multiplies by midpoint angular speed.
+  It sums energy supplied and energy removed separately. The cumulative
+  signed work tracks kinetic energy within 1/4096. The final angle must
+  stay within 1/16 radian of the target.
+- The passive limit case disables the motor, starts the centered rotor at
+  3/4 radian, and imposes a ±1/2-radian limit. It requires a correcting
+  first-step spin, checks the prepared 1/4-radian violation, and samples
+  the published angle independently. Peak violation must stay within the
+  initial 1/4 radian plus rounding tolerance. The terminal stress bound
+  is 3/16 radian. The reported residual still exceeds the authored limit.
+
+| Dimension | Motor positive / negative work | Final motor angle (rad) | Peak / final passive violation (rad) |
+| --- | ---: | ---: | ---: |
+| 2D | +0.183803 / −0.183600 | 0.500410 | 0.250000 / 0.150833 |
+| 3D | +0.179049 / −0.179035 | 0.499861 | 0.250000 / 0.168028 |
+
+These energy checks isolate their work inputs. Stack, chain, and ragdoll
+curves include contact, stabilization, and any configured damping or
+friction in their stated budgets.
+
+### Phase 1 Verification
+
+Validated against `50c5d555` plus the Phase 1 fixture additions with released
+packages on Windows x64 using SDK 10.0.302 and runtime 10.0.10. Release and
+ReleaseLean match for `verify-quality-stacks`, `verify-quality-stack-support`,
+`verify-quality-chains`, `verify-quality-ragdolls`, `verify-quality-mixed`,
+and `verify-quality-work-energy`. The stack, 3D support, and chain captures
+also match the pre-change outputs. The new commands are opt-in. The existing
+resting ragdoll BenchmarkDotNet rows both completed a Dry smoke run.
+
+The full suites passed 8,403 Release and 8,332 ReleaseLean tests. Each
+configuration reached 53,967 / 53,967 lines, 22,100 / 22,100 branches, and
+5,635 / 5,635 methods with the repository coverage filters. The solution
+build covers `netstandard2.1` and `net10.0`. The raw replay, frame samples,
+and coverage reports are in ignored `artifacts/physics-quality-phase1/closeout`.
+
+Phase 1 completes the fixture and measurement checklist. Carry the
+100:1 matched-speed chain and the ragdoll drop and supported-start cases
+into duration and iteration comparisons with the same physical bounds.
+The planar support failure remains active under
+[GRV-Issue-152](issue-tracker.md#grv-issue-152).
 
 ## Phase 2: Duration And Continuation
 

@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-152`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-153`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -55,7 +55,33 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-No active issues.
+<a id="grv-issue-152"></a>
+
+#### GRV-Issue-152 — Top-heavy planar stacks lose floor support
+
+**Opened** 2026-11-09. **Priority** High. **Owner** Gravitas pure 2D contact
+generation and island response.
+
+On `50c5d555` with released dependencies, run `verify-quality-stacks` from
+the Release benchmark DLL with `GRAVITAS_QUALITY_FRAME_CSV=1`. The 10:1 and
+100:1 top-loaded planar polygons peak at 0.508188 and 0.518161 units of
+residual overlap across all pairs. Both finish with the upper body on the
+floor and the original lower-floor support absent. Release and ReleaseLean
+match. This is a freely moving 60 Hz fixture using six iterations, 2-by-1
+polygons, 1/32-unit starting clearances, 1/64-unit lateral offset, gravity
+9.8, and zero restitution.
+
+The [matched controls](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#current-stack-baseline-and-planar-support-follow-up)
+separate the two support interfaces. At 100:1, removing the offset still
+allows the lower COM to reach the floor plane on frame 34. Swapping the
+same masses retains both supports with peak lower-floor depth near 0.0101
+unit. The centered control uses the same fixture with upper X set to zero.
+For the swap, set the lower mass to 100 and the upper mass to 1.
+
+Next isolate the fresh floor and lower-upper rows, normal velocity response
+and positional correction from frame 8 through frame 12 against the swap.
+Verify a focused reproducer and preserve replay and warm allocations before
+accepting a runtime change.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 

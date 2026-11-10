@@ -218,24 +218,33 @@ public class Constraint2DBenchmarks
             joints[i] = runtime.GetJoint(i);
     }
 
-    private static void CreateRagdoll(
+    internal static LSCollider2D CreateRagdoll(
         GravitasWorldContext context,
         Vector2d offset,
         out SolidBody2D[] bodies,
         out Joint2D[] joints,
-        bool sleepEnabled)
+        bool sleepEnabled,
+        Fixed64 angularLimit = default,
+        ReadOnlySpan<int> supportedX = default)
     {
-        CreateStaticFloor(context, offset);
-        bodies = new[]
+        LSCollider2D floor = CreateStaticFloor(context, offset);
+        var links = new[]
         {
-            CreateBox(context, offset + new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 2)), sleepEnabled),
+            CreateBox(context, offset + new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 2)), sleepEnabled,
+                rotate: angularLimit > Fixed64.Zero),
             CreateCircle(context, offset + new Vector2d(Fixed64.Zero, (Fixed64)3), dynamic: true, sleepEnabled: sleepEnabled),
             CreateCircle(context, offset + new Vector2d((Fixed64)(-2), Fixed64.FromFraction(3, 2)), dynamic: true, sleepEnabled: sleepEnabled),
             CreateCircle(context, offset + new Vector2d((Fixed64)2, Fixed64.FromFraction(3, 2)), dynamic: true, sleepEnabled: sleepEnabled),
             CreateCircle(context, offset + new Vector2d(Fixed64.FromFraction(-3, 4), Fixed64.FromFraction(1, 4)), dynamic: true, sleepEnabled: sleepEnabled),
             CreateCircle(context, offset + new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.FromFraction(1, 4)), dynamic: true, sleepEnabled: sleepEnabled)
         };
+        for (int i = 0; i < supportedX.Length; i++)
+        {
+            Fixed64 centerY = links[i].Position.Y + floor.Bounds.Max.Y - links[i].Collider.Bounds.Min.Y;
+            links[i].SetPosition(new Vector2d(offset.X + supportedX[i], centerY));
+        }
 
+        bodies = links;
         RagdollRuntime2D runtime = context.Constraints2D.RegisterRagdoll(new RagdollDefinition2D(
             new[]
             {
@@ -248,16 +257,28 @@ public class Constraint2DBenchmarks
             },
             new[]
             {
-                RagdollJoint(0, 1, new Vector2d(Fixed64.Zero, Fixed64.One), new Vector2d(Fixed64.Zero, -Fixed64.One)),
-                RagdollJoint(0, 2, -Vector2d.Right, Vector2d.Right),
-                RagdollJoint(0, 3, Vector2d.Right, -Vector2d.Right),
-                RagdollJoint(0, 4, new Vector2d(-Fixed64.Half, -Fixed64.One), new Vector2d(Fixed64.Zero, Fixed64.One)),
-                RagdollJoint(0, 5, new Vector2d(Fixed64.Half, -Fixed64.One), new Vector2d(Fixed64.Zero, Fixed64.One))
+                Connection(1, new Vector2d(Fixed64.Zero, Fixed64.One), new Vector2d(Fixed64.Zero, -Fixed64.One)),
+                Connection(2, -Vector2d.Right, Vector2d.Right),
+                Connection(3, Vector2d.Right, -Vector2d.Right),
+                Connection(4, new Vector2d(-Fixed64.Half, -Fixed64.One), new Vector2d(Fixed64.Zero, Fixed64.One)),
+                Connection(5, new Vector2d(Fixed64.Half, -Fixed64.One), new Vector2d(Fixed64.Zero, Fixed64.One))
             },
             RagdollSelfCollisionPolicy.SuppressAdjacentLinks));
         joints = new Joint2D[runtime.JointCount];
         for (int i = 0; i < joints.Length; i++)
             joints[i] = runtime.GetJoint(i);
+        return floor;
+
+        RagdollJointDefinition2D Connection(int limb, Vector2d frameA, Vector2d frameB)
+        {
+            if (angularLimit == Fixed64.Zero)
+                return RagdollJoint(0, limb, frameA, frameB);
+
+            Vector2d midpoint = (links[limb].Position - links[0].Position) * Fixed64.Half;
+            return new RagdollJointDefinition2D(0, limb, JointType2D.Pin, LocalFrame(midpoint), LocalFrame(-midpoint),
+                JointLimit2D.Angular(-angularLimit, angularLimit),
+                JointMotor2D.Disabled, JointCollisionPolicy.SuppressLinked);
+        }
     }
 
     private static RagdollDefinition2D CreateLineRagdoll(SolidBody2D[] bodies)
@@ -305,9 +326,15 @@ public class Constraint2DBenchmarks
     private static SolidBody2D CreateBox(
         GravitasWorldContext context,
         Vector2d position,
-        bool sleepEnabled)
+        bool sleepEnabled,
+        bool rotate)
     {
-        var collider = new LSAABBoxCollider2D(new Vector2d(Fixed64.One, Fixed64.FromFraction(3, 2)));
+        Fixed64 width = Fixed64.Half;
+        Fixed64 height = Fixed64.FromFraction(3, 4);
+        LSCollider2D collider = rotate
+            ? new LSPolygonCollider2D(new Vector2d(-width, -height), new Vector2d(width, -height),
+                new Vector2d(width, height), new Vector2d(-width, height))
+            : new LSAABBoxCollider2D(new Vector2d(Fixed64.One, Fixed64.FromFraction(3, 2)));
         return CreateBody(context, collider, position, dynamic: true, sleepEnabled: sleepEnabled, mass: (Fixed64)3);
     }
 
@@ -332,7 +359,7 @@ public class Constraint2DBenchmarks
         return body;
     }
 
-    private static void CreateStaticFloor(GravitasWorldContext context, Vector2d offset)
+    private static LSCollider2D CreateStaticFloor(GravitasWorldContext context, Vector2d offset)
     {
         var collider = new LSAABBoxCollider2D(new Vector2d((Fixed64)24, Fixed64.One));
         var agent = new BenchmarkMatterAgent(
@@ -345,6 +372,7 @@ public class Constraint2DBenchmarks
         body.Initialize(
             offset + new Vector2d(Fixed64.Zero, -Fixed64.One),
             motionType: PhysicsMobilityType.Static);
+        return collider;
     }
 
     private static RagdollLinkDefinition2D Link(int id, SolidBody2D body) =>

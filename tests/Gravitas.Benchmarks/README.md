@@ -325,6 +325,25 @@ The command runs separately from base tests and BenchmarkDotNet selections.
 The [Phase 1 chain checkpoint](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#aligned-long-chain-checkpoint)
 records the setup and measured bounds.
 
+### Opt-in ragdoll, mixed-response, and energy quality
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-ragdolls
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-mixed
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll verify-quality-work-energy
+```
+
+Run these after the same package-backed benchmark build. Ragdoll cases use
+the existing torso-and-limb scenes to track contacts, joint errors, and
+sleep/wake. The mixed cases compare centered side and vertical impacts
+with pure-dimensional controls. The work and energy cases isolate a
+central impulse, gravity, single-axis motor work, and passive angular
+limits in both dimensions. These commands are separate from the base test
+suite and BenchmarkDotNet selections. Set `GRAVITAS_QUALITY_FRAME_CSV=1`
+for per-frame ragdoll and work/energy output. The
+[Phase 1 record](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-1-physical-fixtures-and-metrics)
+describes each case's settings, bounds, and observed limits.
+
 ### Opt-in curved-contact step envelopes
 
 ```bash

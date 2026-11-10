@@ -208,15 +208,17 @@ public class Constraint3DBenchmarks
             joints[i] = runtime.GetJoint(i);
     }
 
-    private static void CreateRagdoll(
+    internal static LSCollider CreateRagdoll(
         GravitasWorldContext context,
         Vector3d offset,
         out SolidBody[] bodies,
         out Joint3D[] joints,
-        bool sleepEnabled)
+        bool sleepEnabled,
+        Fixed64 angularLimit = default,
+        ReadOnlySpan<int> supportedX = default)
     {
-        CreateStaticFloor(context, offset);
-        bodies = new[]
+        LSCollider floor = CreateStaticFloor(context, offset);
+        var links = new[]
         {
             CreateCuboid(context, offset + new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 2), Fixed64.Zero), sleepEnabled),
             CreateSphere(context, offset + new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero), dynamic: true, sleepEnabled: sleepEnabled),
@@ -225,7 +227,13 @@ public class Constraint3DBenchmarks
             CreateSphere(context, offset + new Vector3d(Fixed64.FromFraction(-3, 4), Fixed64.FromFraction(1, 4), Fixed64.Zero), dynamic: true, sleepEnabled: sleepEnabled),
             CreateSphere(context, offset + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.FromFraction(1, 4), Fixed64.Zero), dynamic: true, sleepEnabled: sleepEnabled)
         };
+        for (int i = 0; i < supportedX.Length; i++)
+        {
+            Fixed64 centerY = links[i].Position3d.Y + floor.BoundsMax.Y - links[i].Collider.BoundsMin.Y;
+            links[i].SetPosition(new Vector3d(offset.X + supportedX[i], centerY, offset.Z));
+        }
 
+        bodies = links;
         RagdollRuntime3D runtime = context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
             new[]
             {
@@ -238,16 +246,27 @@ public class Constraint3DBenchmarks
             },
             new[]
             {
-                RagdollJoint(0, 1, Vector3d.Up, -Vector3d.Up),
-                RagdollJoint(0, 2, -Vector3d.Right, Vector3d.Right),
-                RagdollJoint(0, 3, Vector3d.Right, -Vector3d.Right),
-                RagdollJoint(0, 4, new Vector3d(-Fixed64.Half, -Fixed64.One, Fixed64.Zero), Vector3d.Up),
-                RagdollJoint(0, 5, new Vector3d(Fixed64.Half, -Fixed64.One, Fixed64.Zero), Vector3d.Up)
+                Connection(1, Vector3d.Up, -Vector3d.Up),
+                Connection(2, -Vector3d.Right, Vector3d.Right),
+                Connection(3, Vector3d.Right, -Vector3d.Right),
+                Connection(4, new Vector3d(-Fixed64.Half, -Fixed64.One, Fixed64.Zero), Vector3d.Up),
+                Connection(5, new Vector3d(Fixed64.Half, -Fixed64.One, Fixed64.Zero), Vector3d.Up)
             },
             RagdollSelfCollisionPolicy.SuppressAdjacentLinks));
         joints = new Joint3D[runtime.JointCount];
         for (int i = 0; i < joints.Length; i++)
             joints[i] = runtime.GetJoint(i);
+        return floor;
+
+        RagdollJointDefinition3D Connection(int limb, Vector3d frameA, Vector3d frameB)
+        {
+            if (angularLimit == Fixed64.Zero)
+                return RagdollJoint(0, limb, frameA, frameB);
+
+            Vector3d midpoint = (links[limb].Position3d - links[0].Position3d) * Fixed64.Half;
+            return new RagdollJointDefinition3D(0, limb, JointType3D.ConeTwist, LocalFrame(midpoint), LocalFrame(-midpoint),
+                JointLimit3D.ConeTwist(angularLimit, angularLimit), JointMotor3D.Disabled, JointCollisionPolicy.SuppressLinked);
+        }
     }
 
     private static RagdollDefinition3D CreateLineRagdoll(SolidBody[] bodies)
@@ -323,11 +342,12 @@ public class Constraint3DBenchmarks
         return body;
     }
 
-    private static void CreateStaticFloor(GravitasWorldContext context, Vector3d offset)
+    private static LSCollider CreateStaticFloor(GravitasWorldContext context, Vector3d offset)
     {
         var floor = new LSCuboidCollider { Size = new Vector3d((Fixed64)24, Fixed64.One, (Fixed64)24) };
         var agent = new BenchmarkMatterAgent(context, offset + new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.Zero));
         floor.InitializeWithNoBody(agent);
+        return floor;
     }
 
     private static RagdollLinkDefinition3D Link(int id, SolidBody body) =>
