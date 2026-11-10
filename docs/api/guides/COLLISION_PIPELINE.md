@@ -487,6 +487,16 @@ frame, delivers notifications, and clears per-step impulses. It does not enable
 cross-frame mixed warm starts. Pure 2D and mixed response revalidate pending
 pairs after contact callbacks.
 
+In pure 3D, an isolated flat cuboid patch can solve its normal rows together
+when a free body approaches a fixed support with only normal motion. The
+finite patch must admit a load distribution that stops the body at the
+ordinary solver tolerance. The rows must have a common depth, so the first
+row owns the position correction. Sliding, spinning, rebounding, and
+overhanging contacts continue through the ordinary row solver.
+The two-contact 3D cuboid seed can also carry a lighter or equal load through two
+flat patches with a shared support axis when both bodies can come to rest
+and both position corrections are representable.
+
 In pure 2D, a two-contact convex island can solve its normal load together
 when a freely moving body carries a heavier one over a fixed support.
 The unilateral solve includes each contact's linear and angular response

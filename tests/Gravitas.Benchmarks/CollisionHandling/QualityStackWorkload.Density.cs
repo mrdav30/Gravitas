@@ -28,9 +28,8 @@ internal static partial class QualityStackWorkload
         var upper = new LSCuboidCollider[count];
         var loads = new[] { new StackLoad(100, 1, true), new StackLoad(100, 1, false),
             new StackLoad(1, 100, true), new StackLoad(1, 1, false) };
-        FixedQuaternion rotation = mixedLoads
-            ? FixedQuaternion.FromAxisAngle(Vector3d.Up, TiltRadians)
-            : FixedQuaternion.Identity;
+        // Author rotation so the stress case does not depend on numerical tilt during settling.
+        FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, TiltRadians);
         int columns = count == 4 ? 2 : 4;
         int pitchX = 16 / columns;
         int pitchZ = 16 / (count / columns);
@@ -50,7 +49,7 @@ internal static partial class QualityStackWorkload
         }
 
         var trace = new ChronicleHashWriter();
-        trace.WriteSection("quality-stack-density-v1", 1);
+        trace.WriteSection("quality-stack-density-v2", 1);
         var elapsed = new long[Frames - WarmupFrames];
         long totalBytes = 0, maxBytes = 0;
         int freshRows = 0, rotatedSupports = 0, overruns = 0;
@@ -92,7 +91,7 @@ internal static partial class QualityStackWorkload
         Require(rotatedSupports == count * 2 * elapsed.Length, Frames,
             "density workload lost a rotated support");
         ChronicleHash terminal = context.ComputeReplayHash();
-        Console.WriteLine($"density-v1 stacks {count}, mixed {mixedLoads}, warm frames {elapsed.Length}, active supports per frame {count * 2}, fresh rows {freshRows}, rotated support samples {rotatedSupports}, bytes {totalBytes}, max bytes {maxBytes}, terminal {terminal}");
+        Console.WriteLine($"density-v2 stacks {count}, mixed {mixedLoads}, warm frames {elapsed.Length}, active supports per frame {count * 2}, fresh rows {freshRows}, rotated support samples {rotatedSupports}, bytes {totalBytes}, max bytes {maxBytes}, terminal {terminal}");
         if (verify)
             Console.WriteLine($"trace {trace.ToHash()}");
         else

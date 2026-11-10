@@ -904,9 +904,10 @@ positional correction failure addressed in [GRV-Issue-153](issue-tracker.md#grv-
 The spatial 100:1 stack reaches the floor with its upper body in the no-pulse
 controls at 2.344 and 4.817 s. The impulses shift onset to 2.313 and 5.033 s.
 This places the 60 Hz failure beyond the 256-frame Phase 1 capture. Both
-rates later lose original support. [GRV-Issue-154](issue-tracker.md#grv-issue-154)
-tracks this support topology failure. These heavy spatial cases each allocate
-2,944 B in one warm step. The other stack cases allocate 0 B.
+rates later lose original support. This baseline exposed the support topology
+failure addressed in [GRV-Issue-154](issue-tracker.md#grv-issue-154). These heavy
+spatial cases each allocate 2,944 B in one warm step. The other stack cases
+allocate 0 B.
 
 #### GRV-Issue-153 Implementation
 
@@ -962,6 +963,102 @@ launch ranges of 529–933 us and 542–1,007 us. The measurements did not resol
 the latency cost of the correction.
 
 On 2026-11-10 the full suites passed 8,424 `Release` and 8,353 `ReleaseLean`
+tests with 100% reachable line, branch, and method coverage in both profiles.
+Both target frameworks built and DocFX passed with warnings treated as errors.
+
+#### GRV-Issue-154 Implementation
+
+The Phase 2 centered 100:1 no-pulse fixtures reproduced upper-floor contact
+on `5e653703` at frames 75 and 289 with released dependencies. The focused
+host-step regressions exercise these exact cases. In a per-row trace, the
+first perfectly flat floor impact (frame 3 at 32 Hz and frame 5 at 60 Hz)
+ended with lateral motion and spin from the sequential normal and friction
+sweep. The 1:1 and 100:1 cases shared this first perturbation. By the first
+load contact the small tilt gave the exact cuboid SAT an edge axis, with one
+row and roughly one unit of tangent separation between its anchors. One step
+later the coupled translation corrected the oblique load by moving the light
+lower body sideways before the velocity sweeps.
+
+| Rate | First floor-only spin X/Y/Z, rad/s | First two-support frame | Lower-body sideways translation from the coupled correction on the following frame |
+| --- | --- | ---: | ---: |
+| 32 Hz | +0.000616 / +0.000152 / -0.000257 | 4 | 0.1240 units |
+| 60 Hz | -0.000316 / +0.000318 / +0.000045 | 7 | 0.0294 units |
+
+Restricting the lower position correction along the floor normal removed the
+initial jumps in a diagnostic build. The 60 Hz control passed, while the 32 Hz
+control reached the floor on frame 30. Admitting nearby face patches delayed
+failure. Preserving the symmetry of the initial floor response kept both
+supports through eight seconds in all four 100:1 cases. This isolated the
+initial floor response as a sufficient fix for the authored centered stack.
+
+The isolated 3D response now uses the existing coupled normal solve for a
+four-row axis-aligned cuboid patch over a fixed support. It requires incoming
+motion along the shared normal, zero spin, no rebound target or retained
+tangential load, equal depths, and a feasible stop at the ordinary solver
+tolerance. The first row's correction is applied before the seed is published.
+A finite overhang that cannot stop without tipping stays on the ordinary
+response path. The implementation reuses the two-pair normal matrix and
+velocity preparation.
+
+The isolated-patch change by itself increased offset heavy-bottom warm cost.
+The same 9,216 normal rows entered the exact fallback 3,264 times on the
+baseline and 6,144 times after that change. The first flat patch stayed
+symmetric until load contact, after which the sequential two-pair solve let
+it tilt again. The equal-mass offset controls also became slower in
+controlled timings. The two-pair seed now accepts lighter or equal loads
+through two flat patches when both bodies are moving only along their common
+support axis and both can stop with feasible position corrections. The
+instrumented offset and aligned heavy-bottom cases kept all support rows
+with zero exact normal fallbacks and zero rotated face clips in the measured
+window. Rotated lighter-load and equal-mass stacks keep their prior two-pair
+admission.
+
+`verify-quality-stack-duration --strict` retained both supports once formed
+and kept the upper body clear of the floor in all four centered 100:1 cases.
+The measured lateral drift and rotation stayed zero at capture precision.
+
+| Spatial 100:1 case | Peak floor / load depth, units | Replay trace |
+| --- | ---: | --- |
+| 32 Hz, no pulses | 0.013234 / 0.011914 | `29ba9da65c07fd267196a7be61773cb7` |
+| 32 Hz, pulses | 0.013234 / 0.011977 | `8cf118c45136037f984a7df176cbeb5b` |
+| 60 Hz, no pulses | 0.010681 / 0.010544 | `c53099d0ff014a081b0e10a4f2ffbebe` |
+| 60 Hz, pulses | 0.010681 / 0.010833 | `adafa34eebf4b9708e9d392801889cc4` |
+
+The frame CSV and stack support replay matched between `Release` and
+`ReleaseLean` with released dependencies. The planar cases and the
+1,024-actor spatial replay matched the baseline. The corrected spatial
+supported continuation traces changed with the new approach trajectory.
+Both rates still reproduced the cold checkpoint and all restored suffix steps
+exactly, with 4 positive normal rows before load and 0 immediately after it.
+
+`measure-quality-stack-support` kept both supports for all eight cases across
+192 measured awake steps per case, with 0 B total and peak in every launch.
+Each case kept 1,536 fresh support rows. In three launches per variant in
+`A B B A A B` order with tiered compilation disabled, the medians of launch
+means across the eight cases ranged from 1.024–1.797 ms on `5e653703` and
+0.194–0.218 ms with the correction. The offset heavy-bottom case moved from
+1.380 to 0.207 ms. All planar and spatial duration cases measured 0 B in
+their warm windows.
+
+The rotated density benchmark now authors 15-degree yaw for the heavy-bottom
+cases. Its first version relied on numerical tilt to turn initially flat
+contacts into rotated ones. With the fix, that version failed its rotation
+assertion while retaining support. The v2 fixture preserves the strict
+rotation check and uses a new trace identity. All four v2 cases produced
+identical traces, support rows, and allocations across both build profiles
+and `5e653703` with only the fixture change applied. The Phase 3 rotated
+density work uses v2. The v1 timings remain the historical measurements.
+One v2 timing launch recorded 20 of 192 overruns with eight heavy-bottom
+stacks and 192 of 192 with sixteen against the 60 Hz interval. Both cases
+remain on the Phase 3 checklist.
+
+The centered 100:1 stacks regain quiet support after the pulses. They still
+alternate individual sleep and wake transitions, so the pulses in these
+fixtures start awake. A stationary, exactly aligned two-box control on
+`5e653703` reproduced this with staggered sleep timers independently of the
+drift. [GRV-Issue-156](issue-tracker.md#grv-issue-156) records that reproducer.
+
+On 2026-11-10 the full suites passed 8,437 `Release` and 8,366 `ReleaseLean`
 tests with 100% reachable line, branch, and method coverage in both profiles.
 Both target frameworks built and DocFX passed with warnings treated as errors.
 
@@ -1078,8 +1175,9 @@ use these same workloads and bounds.
       Retain the #151 support bounds when assessing lower iteration counts.
 - [ ] Resolve the eight- and sixteen-stack awake heavy-bottom budget limits
       from the [density closeout](done/2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure).
-      Keep the four-stack control and compare each setting against the six-
-      iteration baseline. Check support and per-setting replay, and report
+      Use the v2 density fixture with authored rotation. Keep the four-stack
+      control and compare each setting against the six-iteration baseline.
+      Check support and per-setting replay, and report
       complete physics-step p95, maximum, and 60 Hz overruns across repeated
       launches. For each density, identify a setting that meets the support
       bounds and the host's reserved physics budget, or record the remaining

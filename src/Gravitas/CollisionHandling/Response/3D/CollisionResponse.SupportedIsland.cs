@@ -11,9 +11,64 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
-/// <content>Seeds the normal load of a two-body cuboid support island.</content>
+/// <content>Seeds coupled normal loads for cuboid support.</content>
 public static partial class CollisionResponse
 {
+    private static bool TrySeedFlatSupportNormals(CollisionPair pair)
+    {
+        if (!IsFlatCuboidPatch(pair))
+            return false;
+
+        SolidBody? a = pair.ColliderA.Body, b = pair.ColliderB.Body;
+        bool firstIsSupport = IsFixedIslandSupport(a);
+        SolidBody? body = firstIsSupport ? b : IsFixedIslandSupport(b) ? a : null;
+        if (body == null || !HasUnconstrainedIslandMobility(body))
+            return false;
+
+        Vector3d normal = pair.Manifold.GetGroup(0)[0].Normal;
+        Vector3d outward = firstIsSupport ? normal : -normal;
+        if (!HasOnlyNormalMotion(body, outward)
+            | !Vector3d.TryDot(body.LinearVelocity, outward, out Fixed64 approach) | approach >= Fixed64.Zero)
+            return false;
+
+        Span<IslandNormal> rows = stackalloc IslandNormal[ContactManifold.MaxContactsPerGroup];
+        if (!TryReadIslandNormals(pair, body, null, rows) || !HasFlatNormalRows(rows, normal))
+            return false;
+
+        Span<Fixed64> speeds = stackalloc Fixed64[ContactManifold.MaxContactsPerGroup];
+        Span<Fixed64> impulses = stackalloc Fixed64[ContactManifold.MaxContactsPerGroup];
+        if (!TryPrepareIslandNormalVelocities(rows, body, null, speeds, impulses, requireRest: true,
+                out IslandMotion state, out _))
+            return false;
+
+        // Equal depths make the first row the ordinary correction owner.
+        ref readonly ContactResponseSnapshot snapshot = ref pair.ResponseSnapshot;
+        _ = TryCreateContact(pair, ResponseBody3D.Create(pair.ColliderA), ResponseBody3D.Create(pair.ColliderB),
+            snapshot.CenterA, snapshot.CenterB, 0, 0, out SolverContact3D correction);
+        ApplyPositionCorrection(correction, Fixed64.One);
+        StoreIslandNormals(pair, rows, speeds, impulses);
+        body.ApplyCollisionVelocityState(state.Linear, state.Angular);
+        return true;
+    }
+
+    private static bool IsFlatCuboidPatch(CollisionPair pair) => pair.ColliderA.Shape == ColliderType.AABox
+        & pair.ColliderB.Shape == ColliderType.AABox & pair.Manifold.GroupCount == 1
+        & pair.Manifold.Count == ContactManifold.MaxContactsPerGroup;
+
+    private static bool HasOnlyNormalMotion(SolidBody body, Vector3d normal) => body.AngularVelocity == Vector3d.Zero
+        & Vector3d.TryCross(body.LinearVelocity, normal, out Vector3d tangent) & tangent == Vector3d.Zero;
+
+    private static bool HasFlatNormalRows(ReadOnlySpan<IslandNormal> rows, Vector3d normal)
+    {
+        foreach (IslandNormal row in rows)
+        {
+            if (row.Normal != normal | row.Depth != rows[0].Depth
+                | row.Tangent != Fixed64.Zero | row.SecondaryTangent != Fixed64.Zero)
+                return false;
+        }
+        return true;
+    }
+
     internal static bool TrySeedSupportedIslandNormals(CollisionPair first, CollisionPair second, out bool correctedPositions)
     {
         correctedPositions = false;
@@ -29,12 +84,53 @@ public static partial class CollisionResponse
             & TryReadIslandNormals(second, lower, upper, rows[firstCount..count])))
             return false;
 
-        Span<Fixed64> matrix = stackalloc Fixed64[SmallContactNormalSolver.MaxRows * SmallContactNormalSolver.MaxRows];
+        bool requireRest = upper.Mass <= lower.Mass;
+        if (requireRest)
+        {
+            bool floorFirst = rows[0].Upper.Linear == Vector3d.Zero;
+            Vector3d supportAxis = (floorFirst ? rows[0] : rows[firstCount]).Lower.Linear;
+            Vector3d loadAxis = (floorFirst ? rows[firstCount] : rows[0]).Upper.Linear;
+            if (!(supportAxis == loadAxis & HasOnlyNormalMotion(lower, supportAxis) & HasOnlyNormalMotion(upper, loadAxis)
+                & HasFlatNormalRows(rows[..firstCount], rows[0].Normal)
+                & HasFlatNormalRows(rows[firstCount..count], rows[firstCount].Normal)))
+                return false;
+        }
+
         Span<Fixed64> speeds = stackalloc Fixed64[SmallContactNormalSolver.MaxRows];
         Span<Fixed64> impulses = stackalloc Fixed64[SmallContactNormalSolver.MaxRows];
+        if (!TryPrepareIslandNormalVelocities(rows[..count], lower, upper, speeds[..count], impulses[..count], requireRest,
+                out IslandMotion lowerState, out IslandMotion upperState))
+            return false;
+
+        correctedPositions = TryPrepareIslandPositions(rows[..firstCount], rows[firstCount..count], lower, upper,
+            out Vector3d lowerPosition, out Vector3d upperPosition);
+        if (requireRest & !correctedPositions)
+            return false;
+
+        // Commit only after both endpoints and every normal impulse were prepared.
+        // The subsequent row sweep refines friction against the new normal loads.
+        if (correctedPositions)
+        {
+            lower.ApplyCollisionPositionState(lowerPosition);
+            upper.ApplyCollisionPositionState(upperPosition);
+        }
+        StoreIslandNormals(first, rows[..firstCount], speeds[..firstCount], impulses[..firstCount]);
+        StoreIslandNormals(second, rows[firstCount..count], speeds[firstCount..count], impulses[firstCount..count]);
+        lower.ApplyCollisionVelocityState(lowerState.Linear, lowerState.Angular);
+        upper.ApplyCollisionVelocityState(upperState.Linear, upperState.Angular);
+        return true;
+    }
+
+    private static bool TryPrepareIslandNormalVelocities(Span<IslandNormal> rows, SolidBody lower,
+        SolidBody? upper, Span<Fixed64> speeds, Span<Fixed64> impulses, bool requireRest,
+        out IslandMotion lowerState, out IslandMotion upperState)
+    {
+        int count = rows.Length;
+        Span<Fixed64> matrix = stackalloc Fixed64[count * count];
+        lowerState = upperState = default;
         var lowerMobility = new IslandMobility(lower);
-        var upperMobility = new IslandMobility(upper);
-        bool preparedSystem = TryPrepareIslandFriction(rows[..count], lowerMobility, upperMobility,
+        var upperMobility = upper == null ? default : new IslandMobility(upper);
+        bool preparedSystem = TryPrepareIslandFriction(rows, lowerMobility, upperMobility,
             out IslandMotion lowerFriction, out IslandMotion upperFriction);
         for (int i = 0; i < count; i++)
         {
@@ -56,30 +152,19 @@ public static partial class CollisionResponse
 
         if (!preparedSystem)
             return false;
-        if (!SmallContactNormalSolver.TrySolve(count, matrix[..(count * count)], speeds[..count], impulses[..count]))
+        if (!SmallContactNormalSolver.TrySolve(count, matrix, speeds, impulses))
             return false;
-        bool preparedVelocities = TryPrepareIslandVelocity(lower, rows[..count], impulses[..count], lowerFriction,
-                isLower: true, out IslandMotion lowerState)
-            & TryPrepareIslandVelocity(upper, rows[..count], impulses[..count], upperFriction,
-                isLower: false, out IslandMotion upperState);
-        if (!preparedVelocities || !ArePreparedIslandNormalsFeasible(rows[..count], impulses[..count], lowerState, upperState))
+        Fixed64 deadband = lower.Context.Environment.MinSpeed;
+        if (requireRest)
+            deadband = FixedMath.Min(deadband, PhysicsEnvironment.DefaultMinSpeed);
+        bool preparedVelocities = TryPrepareIslandVelocity(lower, rows, impulses, lowerFriction,
+                isLower: true, deadband, out lowerState)
+            & (upper == null || TryPrepareIslandVelocity(upper, rows, impulses, upperFriction,
+                isLower: false, deadband, out upperState));
+        if (requireRest && (lowerState.Linear != Vector3d.Zero | lowerState.Angular != Vector3d.Zero
+            | upperState.Linear != Vector3d.Zero | upperState.Angular != Vector3d.Zero))
             return false;
-
-        correctedPositions = TryPrepareIslandPositions(rows[..firstCount], rows[firstCount..count], lower, upper,
-            out Vector3d lowerPosition, out Vector3d upperPosition);
-
-        // Commit only after both endpoints and every normal impulse were prepared.
-        // The subsequent row sweep refines friction against the new normal loads.
-        if (correctedPositions)
-        {
-            lower.ApplyCollisionPositionState(lowerPosition);
-            upper.ApplyCollisionPositionState(upperPosition);
-        }
-        StoreIslandNormals(first, rows[..firstCount], speeds[..firstCount], impulses[..firstCount]);
-        StoreIslandNormals(second, rows[firstCount..count], speeds[firstCount..count], impulses[firstCount..count]);
-        lower.ApplyCollisionVelocityState(lowerState.Linear, lowerState.Angular);
-        upper.ApplyCollisionVelocityState(upperState.Linear, upperState.Angular);
-        return true;
+        return preparedVelocities && ArePreparedIslandNormalsFeasible(rows, impulses, lowerState, upperState);
     }
 
     private static bool TryGetSupportedBodies(CollisionPair support, CollisionPair load,
@@ -99,7 +184,9 @@ public static partial class CollisionResponse
         // Two contacts in this connected island must share the only moving support endpoint.
         System.Diagnostics.Debug.Assert(load.ColliderA.Body == supported || load.ColliderB.Body == supported);
         SolidBody? loaded = load.ColliderA.Body == supported ? load.ColliderB.Body : load.ColliderA.Body;
-        if (loaded == null || loaded.Mass <= supported.Mass || !HasUnconstrainedIslandMobility(loaded))
+        if (loaded == null || !HasUnconstrainedIslandMobility(loaded))
+            return false;
+        if (loaded.Mass <= supported.Mass && !(IsFlatCuboidPatch(support) & IsFlatCuboidPatch(load)))
             return false;
         lower = supported;
         upper = loaded;
@@ -111,14 +198,14 @@ public static partial class CollisionResponse
     private static bool HasUnconstrainedIslandMobility(SolidBody body) => body.IsDynamic
         && body.FreezeAxes == BodyFreezeAxes3D.None && body.CanTranslate && body.CanRotate;
 
-    private static bool TryReadIslandNormals(CollisionPair pair, SolidBody lower, SolidBody upper, Span<IslandNormal> rows)
+    private static bool TryReadIslandNormals(CollisionPair pair, SolidBody lower, SolidBody? upper, Span<IslandNormal> rows)
     {
         if (!pair.ResponseSnapshot.IsValid)
             return false;
         ResponseBody3D a = ResponseBody3D.Create(pair.ColliderA);
         ResponseBody3D b = ResponseBody3D.Create(pair.ColliderB);
         ref readonly ContactResponseSnapshot snapshot = ref pair.ResponseSnapshot;
-        bool lowerIsA = a.Body == lower, upperIsA = a.Body == upper, upperIsB = b.Body == upper;
+        bool lowerIsA = a.Body == lower, upperIsA = upper != null & a.Body == upper, upperIsB = upper != null & b.Body == upper;
         for (int i = 0; i < rows.Length; i++)
         {
             bool contactPrepared = TryCreateContact(pair, a, b, snapshot.CenterA, snapshot.CenterB, 0, i,
@@ -180,7 +267,7 @@ public static partial class CollisionResponse
     }
 
     private static bool TryPrepareIslandVelocity(SolidBody body, ReadOnlySpan<IslandNormal> rows,
-        ReadOnlySpan<Fixed64> impulses, IslandMotion friction, bool isLower, out IslandMotion state)
+        ReadOnlySpan<Fixed64> impulses, IslandMotion friction, bool isLower, Fixed64 deadband, out IslandMotion state)
     {
         state = default;
         Vector3d linear = friction.Linear, angular = friction.Angular;
@@ -196,8 +283,8 @@ public static partial class CollisionResponse
         prepared &= body.TryPrepareCollisionVelocityState(linear, angular, out linear, out angular);
         PhysicsEnvironment environment = body.Context.Environment;
         Fixed64 linearSpeed = linear.Magnitude, angularSpeed = angular.Magnitude;
-        state = new IslandMotion(linearSpeed <= environment.MinSpeed ? Vector3d.Zero : linear,
-            angularSpeed <= environment.MinSpeed ? Vector3d.Zero : angular);
+        state = new IslandMotion(linearSpeed <= deadband ? Vector3d.Zero : linear,
+            angularSpeed <= deadband ? Vector3d.Zero : angular);
         return prepared & (linearSpeed <= environment.MaxSpeed) & (angularSpeed <= environment.MaxSpeed);
     }
 

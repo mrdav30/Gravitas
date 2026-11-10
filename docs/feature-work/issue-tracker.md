@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-156`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-157`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -55,25 +55,6 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-<a id="grv-issue-154"></a>
-
-#### GRV-Issue-154 — Spatial top-heavy support drifts into direct upper-floor contact
-
-**Opened** 2026-11-09. **Priority** High. **Owner** 3D convex support geometry
-and discrete island response.
-
-Run `verify-quality-stack-duration --strict` with released dependencies on
-`aef5995f` plus the [Phase 2 fixture](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#stack-settling-and-disturbance).
-The centered `quality-3d-stack-m100-32hz-control-v1` and
-`quality-3d-stack-m100-60hz-control-v1` rows reach direct upper-floor contact
-on frames 75 and 289 without an applied impulse. Both subsequently lose an
-original support. The 60 Hz onset is beyond the earlier 256-frame support
-capture. The equal-mass cases retain both supports through the full duration.
-
-Trace lateral and angular drift against the equal-mass control before the
-upper-floor contact forms. A fix must preserve both original supports and
-upper-floor clearance through the full no-pulse and disturbance runs.
-
 <a id="grv-issue-155"></a>
 
 #### GRV-Issue-155 — Contact ragdoll drops accumulate large joint anchor error
@@ -93,6 +74,27 @@ Compare the drop's first contact and joint response against the supported
 start, and determine how the error depends on solver iteration count. Keep
 the floor support and connected wake checks with any focused correction.
 
+<a id="grv-issue-156"></a>
+
+#### GRV-Issue-156 — Quiet 3D contact islands can alternate sleep and wake
+
+**Opened** 2026-11-10. **Priority** Medium. **Owner** Spatial body sleep and
+contact island wake propagation.
+
+On `5e653703`, place a bodyless 16 × 1 × 16 floor at Y = -0.5 and two
+2 × 1 × 2 free cuboids with masses 1 and 100 at Y = 0.5 and 1.5. Use identity
+rotations, manual grounding, zero gravity, air density, drag and damping,
+32 Hz, six solver iterations, and sleep thresholds of four frames. With
+sleep enabled on both from the start, both fall asleep on step 4 and stay
+asleep through step 20. Enabling only the upper body's sleep after step 1
+gives steps 4–7 as lower asleep, upper asleep, both awake, both awake,
+repeating with both bodies stationary and both support contacts present.
+
+The corrected centered 100:1 [duration fixture](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-154-implementation)
+also cycles individual bodies through sleep with both supports quiet. Trace
+how per-body quiet counters interact with connected wake propagation and
+verify that an external wake still reaches the complete island.
+
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
@@ -108,6 +110,7 @@ validation, tradeoffs and links to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                                                                                         | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="grv-issue-154"></a>GRV-Issue-154 | 2026-11-10 | Fixed. Coupled flat cuboid response preserves both original supports and upper-floor clearance in the centered 100:1 spatial stacks at 32 and 60 Hz. | [Trace, regressions, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-154-implementation) |
 | <a id="grv-issue-153"></a>GRV-Issue-153 | 2026-11-10 | Fixed. Coupled positional translation keeps both planar support depths within bounds during settling and connected wakes at 32 and 60 Hz. | [Trace, regressions, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-153-implementation) |
 | <a id="grv-issue-152"></a>GRV-Issue-152 | 2026-11-09 | Fixed. Coupled normal loads preserve both planar support interfaces for centered and offset 10:1 and 100:1 top loads. | [Reproduction, implementation, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-152-implementation) |
 | <a id="grv-issue-151"></a>GRV-Issue-151 | 2026-11-09 | Fixed. Finite cuboid face witnesses and coupled support response preserve both interfaces under the 100:1 top load. | [Implementation and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-151-implementation) |

@@ -40,10 +40,11 @@ public static partial class CollisionResponse
     public static void CalculateImpulse(CollisionPair pair)
     {
         PrepareSolve(pair);
+        bool seededNormals = TrySeedFlatSupportNormals(pair);
         int iterations = pair.Manifold.Count > 1 ? pair.Context.Settings.DiscreteSolverIterations : 1;
         for (int iteration = 0; iteration < iterations; iteration++)
-            CalculateImpulse(pair, applyCachedImpulse: iteration == 0,
-                applyPositionCorrection: iteration == 0);
+            CalculateImpulse(pair, applyCachedImpulse: iteration == 0 && !seededNormals,
+                applyPositionCorrection: iteration == 0 && !seededNormals);
         pair.ResponseSnapshot = default;
     }
 
