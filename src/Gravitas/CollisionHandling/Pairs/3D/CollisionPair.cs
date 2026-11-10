@@ -624,7 +624,7 @@ public partial class CollisionPair
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool BoundsOverlapInclusive(LSCollider colliderA, LSCollider colliderB)
+    internal static bool BoundsOverlapInclusive(LSCollider colliderA, LSCollider colliderB)
     {
         return colliderA.BoundsMin.X <= colliderB.BoundsMax.X
             && colliderA.BoundsMax.X >= colliderB.BoundsMin.X

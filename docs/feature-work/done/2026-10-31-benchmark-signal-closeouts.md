@@ -16,6 +16,7 @@ queue, experimental signals and compact
 
 | Signal                                                                                                                                                                 | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-035 — Warm Pair Growth In Rotated Cuboid Stacks](#grv-benchmark-035) | Closed | 2026-11-09 | Inclusive bounds reject fresh separated pairs before acquisition. Remaining warm growth belongs to real voxel membership and candidate scratch. |
 | [GRV-Benchmark-034 — Rotated Cuboid Support Step Cost](#grv-benchmark-034) | Closed | 2026-11-09 | Shared-frame exact lever reduction lowers complete-step cost. Dense awake support remains a documented solver-budget limit. |
 | [GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost](#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost)                                             | Closed | 2026-11-01 | Ordinary whole-mesh convex patch/prism contacts reuse native SAT/witness/reduction owners; full-step, physical and compatibility evidence follows.                                                                                                                                              |
 | [GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost](#grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost)                             | Closed | 2026-11-01 | Exact unit-basis planar sampling removes redundant decomposition while preserving transform freshness and fixed-point rounding; matched host/refresh controls and limits follow.                                                                                                                |
@@ -47,6 +48,85 @@ queue, experimental signals and compact
 | GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                                                                                                       | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
 | GRV-Benchmark-003 — 3D full-runtime CCD allocation                                                                                                                     | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
 | GRV-Benchmark-004 — Grounding raycast probe allocation                                                                                                                 | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+<a id="grv-benchmark-035"></a>
+
+### GRV-Benchmark-035 — Warm Pair Growth In Rotated Cuboid Stacks
+
+**Discovered** 2026-11-09 during the
+[GRV-Benchmark-034 density capture](#sustained-support-at-scene-density).
+**Owner** Gravitas 3D partition refresh and collision-pair acquisition.
+**Closed** 2026-11-09. Fresh pair acquisition rejects disjoint bounds.
+Membership and scratch still grow when the workload first reaches new occupancy.
+
+Run `measure-quality-stack-density` with released packages. The mixed-load
+case allocated 66,032 B across the 192 warm steps after removing constraint
+sort boxing. The `dff545e8` baseline probe placed the excess above its
+48 B per-step sort cost on frames 235 and 236. On that baseline,
+`CreatePair` accounted for 55,040 B across 20 calls, within 58,368 B in
+collision distribution. Partition preparation and corrected position
+publication accounted for another 1,224 B and 6,440 B. Exact normal and
+friction response allocated 0 B in the stage probe.
+
+All 20 acquisitions were on frame 236 with pooling enabled and the
+3D pair cache empty. The keys linked actors from separate stacks, including
+`1/5`, `1/13`, and `26/29`. The acquisition probe on `c26e2117`
+confirmed all 20 had disjoint bounds before the first collision update.
+
+The 3D pair service now checks those bounds when both owner lookups
+miss, before pool rent or construction. The pair's existing inclusive
+predicate still admits exact touch. Retained pairs keep their update
+and notification path. The focused full-step regression begins with
+separated colliders in one voxel, then checks zero-depth touch, the
+same pair on separation, and one exit. The old build failed the initial
+check with one owned pair.
+
+Compared with `c26e2117`, the sixteen-stack mixed-load case retained
+23,716 fresh support rows across 192 warm steps. It created none of the
+20 disjoint pairs. Warm allocation fell from 66,032 B to 7,752 B, and
+the largest measured step allocation fell from 59,592 B to 6,440 B.
+The remaining bytes came from 6,440 B in partition membership on frame
+235, then 1,224 B in membership and 88 B in the dynamic ID scratch
+list on frame 236. The four-, eight- and sixteen-stack heavy-bottom
+controls remained at 0 B. Reopen the allocation investigation if actual
+membership or scratch growth recurs in a representative host workload.
+
+Three uninstrumented Windows x64 Release launches per build ran in
+`A B B A A B` order with the same released packages, SDK 10.0.302 and
+runtime 10.0.10. The table reports medians of launch statistics.
+
+| Workload | Step p50, ms | Step p95, ms | Overruns / 192 |
+| --- | ---: | ---: | ---: |
+| 4 heavy-bottom stacks | 6.268 → 6.263 | 7.920 → 7.607 | 0 → 0 |
+| 8 heavy-bottom stacks | 15.214 → 14.608 | 16.314 → 15.811 | 5 → 0 |
+| 16 heavy-bottom stacks | 25.431 → 24.976 | 28.291 → 27.791 | 192 → 192 |
+| 16 mixed-load stacks | 15.504 → 15.418 | 19.637 → 18.331 | 46 → 36 |
+
+One eight-stack candidate launch still overran seven times. The
+[Phase 3 density checks](../2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-3-quality-versus-cost)
+retain both heavy-bottom budget cases.
+
+A disposable comparison matched raw body positions, rotations and
+velocities, along with the support row IDs, depths and normals oriented
+toward the upper endpoint, on all 256 frames of each of the four density
+cases. Full digests change across builds because they include separated
+pair records and cull state. Delaying acquisition can change the initial
+pair lead or callback order across versions. The eight authoritative
+digests in `mixed-lifecycle-v1` were refreshed after its body, event
+and query observations matched. The other seven shared fixtures
+retained their expected digests.
+
+Two `measure-quality-stack-density verify` launches per configuration
+matched across Release and ReleaseLean, including warm allocation and
+support counts. `verify-quality-stacks` and `verify-quality-stack-support`
+also matched between configurations. Both 1,024-actor strategy workloads
+kept their work counts and first completed all chains on frame 67. The
+2D replay digest stayed at `7bece61d4c37790c1c14a89a2fa3db51`. The updated
+3D digest matched in both configurations at `ed6d25408c327fbe8522ff6a2fd09c08`.
+
+The full suites passed 8,403 Release and 8,332 ReleaseLean tests. Both
+reached 100% line, branch and method coverage (53,967 lines, 22,100
+branches and 5,635 methods). DocFX passed with warnings treated as errors.
 
 <a id="grv-benchmark-034"></a>
 

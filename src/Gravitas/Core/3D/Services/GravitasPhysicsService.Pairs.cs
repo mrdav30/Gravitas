@@ -33,6 +33,9 @@ public sealed partial class GravitasPhysicsService
         if (!collider1.TryGetCollisionPair(collider2.Id, out CollisionPair? pair)
             && !collider2.TryGetCollisionPair(collider1.Id, out pair))
         {
+            if (!CollisionPair.BoundsOverlapInclusive(collider1, collider2))
+                return null;
+
             pair = CreatePair(collider1, collider2);
             pair.ColliderA.TryAddCollisionPair(pair.ColliderB.Id, pair);
             pair.ColliderB.TryAddCollisionPairHolder(pair.ColliderA.Id);

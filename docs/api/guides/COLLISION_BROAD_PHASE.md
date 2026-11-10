@@ -195,6 +195,11 @@ repeated contact notifications.
 
 ## Pair Culling
 
+New 3D discrete pairs require inclusive overlap of the current collider
+bounds. Exact touching remains eligible for narrow phase. Retained pairs
+still run through their normal update and retirement paths so separation
+and exit notifications can reach both endpoints.
+
 Pair culling may delay checks only for non-colliding retained pairs according to
 stable distance, velocity, age, and size scores. It must not skip active
 contacts or nearby candidate pairs because a host considers an object less

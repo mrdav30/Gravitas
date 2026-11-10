@@ -65,30 +65,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-<a id="grv-benchmark-035"></a>
-
-### GRV-Benchmark-035 — Warm Pair Growth In Rotated Cuboid Stacks
-
-**Discovered** 2026-11-09 during the
-[GRV-Benchmark-034 density capture](done/2026-10-31-benchmark-signal-closeouts.md#sustained-support-at-scene-density).
-**Owner** Gravitas 3D partition refresh and collision-pair acquisition.
-**Status** Active. Repeatable warm growth on two frames in the sixteen-stack
-mixed-load case.
-
-Run `measure-quality-stack-density` with released packages. The mixed-load
-case allocated 66,032 B across the 192 warm steps after removing constraint
-sort boxing. The `dff545e8` baseline probe placed the excess above its
-48 B per-step sort cost on frames 235 and 236. On that baseline,
-`CreatePair` accounted for 55,040 B across 20 calls, within 58,368 B in
-collision distribution. Partition preparation and corrected position
-publication accounted for another 1,224 B and 6,440 B. Exact normal and
-friction response allocated 0 B in the stage probe.
-
-All 20 acquisitions were on frame 236 with pooling enabled and the
-3D pair cache empty. The keys linked actors from separate stacks, including
-`1/5`, `1/13`, and `26/29`. Check whether those candidate pairs can be
-rejected before acquiring state. Compare with the same trajectories and
-support rows before changing pair admission or reservation policy.
+No active ordered signals.
 
 ## Experimental Signals
 
@@ -341,6 +318,7 @@ signal anchors remain on the rows below.
 
 | Signal                                                                                                                                                                                                    | Closed     | Outcome                                                                                                                                                                                    | Evidence                                                                                                                                 |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| <a id="grv-benchmark-035"></a>GRV-Benchmark-035 — Warm pair growth in rotated cuboid stacks | 2026-11-09 | Rejects all 20 disjoint acquisitions in the mixed-load stack capture and cuts warm allocation from 66,032 B to 7,752 B. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-035) |
 | <a id="grv-benchmark-034"></a><a id="grv-benchmark-034--rotated-cuboid-support-step-cost"></a>GRV-Benchmark-034 — Rotated cuboid support step cost | 2026-11-09 | Shared-frame exact levers reduce step cost with matching replay and allocations. The dense stress case remains above the 60 Hz interval. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-034) |
 | <a id="grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost"></a>GRV-Benchmark-031 — Ordinary open-mesh mixed full step                                                                             | 2026-11-01 | Certified patch/prism contacts reduce the ordinary step from 4.52 ms to 115 us at zero warm allocation; exit/group selection and small-control limits retained.                            | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost)                     |
 | <a id="grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost"></a>GRV-Benchmark-030 — Pure 2D static population refresh                                                                      | 2026-11-01 | Exact unit-basis sampling cuts 64-static 2D full-step time by 46–52% at zero warm allocation; transform freshness and small-control limits retained.                                       | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-030--pure-2d-bodyless-static-population-refresh-cost)             |

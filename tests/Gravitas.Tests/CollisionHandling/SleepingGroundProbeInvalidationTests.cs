@@ -2,6 +2,7 @@ using System;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Diagnostics;
 using Gravitas.Materials;
 using Gravitas.Support;
@@ -212,27 +213,38 @@ public sealed class SleepingGroundProbeInvalidationTests
     [Fact]
     public void PositivePairCulling_ShouldRetainBroadPhaseFreshnessInAuthoritativeHash()
     {
-        using var uninterrupted = new SupportedProbe(bodyless: false, mixed: false);
-        using var restored = new SupportedProbe(bodyless: false, mixed: false);
-        uninterrupted.Context.Environment.CullTimeStep = restored.Context.Environment.CullTimeStep = 1;
-        uninterrupted.Context.Environment.CullTimeMax = restored.Context.Environment.CullTimeMax = 8;
-        var firstPair = uninterrupted.Context.Physics.GetCollisionPair(uninterrupted.Floor.Id, uninterrupted.Body.Collider.Id)!;
-        var secondPair = restored.Context.Physics.GetCollisionPair(restored.Floor.Id, restored.Body.Collider.Id)!;
-        firstPair.UpdateCollision();
-        secondPair.UpdateCollision();
+        using var uninterrupted = PhysicsScenarioBuilder.Create();
+        using var restored = PhysicsScenarioBuilder.Create();
+        var (firstBody, firstPair) = CreateCulledPair(uninterrupted);
+        var (secondBody, secondPair) = CreateCulledPair(restored);
         firstPair.Manifold.HasContact.Should().BeFalse();
         firstPair.CullCounter.Should().BeGreaterThan(0);
         secondPair.CullCounter.Should().Be(firstPair.CullCounter);
         restored.Context.ComputeReplayHash().Should().Be(uninterrupted.Context.ComputeReplayHash());
-        object payload = GravitasSerializationHarness.Serialize(uninterrupted.Body, GravitasSerializationTransport.Json);
+        object payload = GravitasSerializationHarness.Serialize(firstBody, GravitasSerializationTransport.Json);
 
         // Loading republishes identical geometry. A pending cull makes its
         // freshness meaningful: it determines whether the next check is deferred.
-        GravitasSerializationHarness.Populate(restored.Body, payload, GravitasSerializationTransport.Json);
+        GravitasSerializationHarness.Populate(secondBody, payload, GravitasSerializationTransport.Json);
 
-        restored.Body.Position3d.Should().Be(uninterrupted.Body.Position3d);
+        secondBody.Position3d.Should().Be(firstBody.Position3d);
         secondPair.CullCounter.Should().Be(firstPair.CullCounter);
         restored.Context.ComputeReplayHash().Should().NotBe(uninterrupted.Context.ComputeReplayHash());
+
+        static (SolidBody Body, CollisionPair Pair) CreateCulledPair(PhysicsScenarioBuilder scene)
+        {
+            scene.Context.Environment.Gravity = Fixed64.Zero;
+            scene.Context.Environment.CullTimeStep = 1;
+            scene.Context.Environment.CullTimeMax = 8;
+            var body = scene.CreateSphere(Vector3d.Zero);
+            Fixed64 offset = Fixed64.FromFraction(3, 4);
+            // The diagonal offset overlaps the boxes and separates the spheres.
+            var other = scene.CreateStaticSphere(new Vector3d(offset, Fixed64.Zero, offset));
+            CollisionPair pair = scene.Context.Physics.GetCollisionPair(body.Collider.Id, other.Id)!;
+            scene.Context.Simulate();
+            scene.Context.LateSimulate();
+            return (body.Body, pair);
+        }
     }
 
     [Theory]

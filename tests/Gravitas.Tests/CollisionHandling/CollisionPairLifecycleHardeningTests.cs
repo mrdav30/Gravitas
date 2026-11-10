@@ -12,6 +12,43 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class CollisionPairLifecycleHardeningTests
 {
+    [Fact]
+    public void FullStep_ShouldAcquirePairAtInclusiveTouchAndNotifyExitAfterSeparation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.Gravity = Fixed64.Zero;
+        Fixed64 radius = Fixed64.FromFraction(1, 8);
+        var start = new Vector3d(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Quarter);
+        var separated = start + Vector3d.Right * Fixed64.Half;
+        var touching = start + Vector3d.Right * Fixed64.Quarter;
+        var shape = ColliderShapeDefinition.Sphere(radius);
+        var first = scenario.CreateBody(new LSSphereCollider(shape), start, FixedQuaternion.Identity);
+        var second = scenario.CreateBody(new LSSphereCollider(shape), separated, FixedQuaternion.Identity, immovable: true);
+        first.Body.UseManualGrounding();
+        int enters = 0, exits = 0;
+        first.Collider.OnContactEnter += _ => enters++;
+        first.Collider.OnContactExit += _ => exits++;
+
+        Step(scenario.Context);
+        Assert.Contains(first.Collider.PartitionCoordinates!,
+            coordinate => second.Collider.PartitionCoordinates!.Contains(coordinate));
+        Assert.Equal(0, first.Collider.CollisionPairCount + second.Collider.CollisionPairCount);
+        Assert.Equal(0, enters);
+
+        first.Body.SetPosition(touching);
+        Step(scenario.Context);
+        CollisionPair pair = GetPair(first.Collider, second.Collider);
+        Assert.True(pair.Manifold.HasContact);
+        Assert.Equal(Fixed64.Zero, pair.Manifold.PrimaryContact.Depth);
+        Assert.Equal(1, enters);
+
+        first.Body.SetPosition(start);
+        Step(scenario.Context);
+        Assert.Same(pair, GetPair(first.Collider, second.Collider));
+        Assert.False(pair.Manifold.HasContact);
+        Assert.Equal(1, exits);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -156,7 +193,7 @@ public sealed class CollisionPairLifecycleHardeningTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
-        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * Fixed64.Half);
 
         scenario.Context.Physics.GetCollisionPair(-1, second.Collider.Id).Should().BeNull();
         scenario.Context.Physics.GetCollisionPair(first.Collider.Id, -1).Should().BeNull();
@@ -234,7 +271,7 @@ public sealed class CollisionPairLifecycleHardeningTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var first = scenario.CreateSphere(Vector3d.Zero);
-        var second = scenario.CreateSphere(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        var second = scenario.CreateSphere(Vector3d.Right * Fixed64.Half);
         CollisionPair pair = scenario.Context.Physics.GetCollisionPair(first.Collider.Id, second.Collider.Id)!;
         pair.Deactivate();
 
@@ -250,11 +287,11 @@ public sealed class CollisionPairLifecycleHardeningTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.Settings.PoolingEnabled = true;
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
-        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * Fixed64.Half);
         CollisionPair cached = scenario.Context.Physics.GetCollisionPair(first.Collider.Id, second.Collider.Id)!;
         scenario.Context.Physics.FullDeactivateCollisionPair(cached);
         scenario.Context.Settings.PoolingEnabled = false;
-        ScenarioBody<LSSphereCollider> third = scenario.CreateSphere(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> third = scenario.CreateSphere(Vector3d.Left * Fixed64.Half);
 
         CollisionPair unpooled = scenario.Context.Physics.GetCollisionPair(first.Collider.Id, third.Collider.Id)!;
 

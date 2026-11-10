@@ -524,8 +524,15 @@ repair their owning layer before calling an affected configuration acceptable.
 - [ ] Compare current default solver settings with a lower/higher iteration
       setting, initially 2/6/12 iterations where supported. Add tuning
       dimensions only when a fixture identifies a meaningful sensitivity.
-      Include the awake heavy-bottom density cases and retain the #151
-      support bounds when assessing lower iteration counts.
+      Retain the #151 support bounds when assessing lower iteration counts.
+- [ ] Resolve the eight- and sixteen-stack awake heavy-bottom budget limits
+      from the [density closeout](done/2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure).
+      Keep the four-stack control and compare each setting against the six-
+      iteration baseline. Check support and per-setting replay, and report
+      complete physics-step p95, maximum, and 60 Hz overruns across repeated
+      launches. For each density, identify a setting that meets the support
+      bounds and the host's reserved physics budget, or record the remaining
+      capacity limit and the next solver change to evaluate.
 - [ ] Report quality and measured complete-step time together at each setting,
       including awake population, contact/island counts and relevant CCD work.
       Changing frame rate requires equal simulated duration, not equal frame

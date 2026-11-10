@@ -50,7 +50,7 @@ public sealed class TerrainChunkMigrationTests
         maxHeightDifference.Should().Be(Fixed64.Zero);
         migrated.Position3d.X.Should().Be((Fixed64)(-1));
         peakControlPairs.Should().Be(1);
-        peakChunkPairs.Should().Be(2, "nearby chunks retain distinct broad-phase pair identities even before the seam");
+        peakChunkPairs.Should().Be(1, "the body never overlaps the neighboring chunk's bounds");
         _output.WriteLine($"capsule={capsule}; peak pairs={peakControlPairs}/{peakChunkPairs}; max height difference={maxHeightDifference}");
     }
 
