@@ -103,7 +103,7 @@ runtime 10.0.10. The table reports medians of launch statistics.
 | 16 mixed-load stacks | 15.504 → 15.418 | 19.637 → 18.331 | 46 → 36 |
 
 One eight-stack candidate launch still overran seven times. The
-[Phase 3 density checks](../2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-3-quality-versus-cost)
+[Phase 3 density checks](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-3-quality-versus-cost)
 retain both heavy-bottom budget cases.
 
 A disposable comparison matched raw body positions, rotations and
@@ -149,7 +149,7 @@ window and 0 B of per-thread step allocation. The stock and corrected
 scenes exercise different trajectories. In the separate replay capture,
 the two support interfaces averaged two fresh rows per warm frame on
 stock and 7.16–8.00 on the candidate, depending on the case.
-[GRV-Issue-151 evidence](../2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-151-implementation)
+[GRV-Issue-151 evidence](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-151-implementation)
 
 In the 2026-11-09 attribution capture, disposable timing scopes recorded
 inclusive elapsed time inside the same eight warm workloads. Scope
@@ -342,7 +342,7 @@ uncovered lines, branches or methods in both configurations.
 
 Close the focused optimization with the finite support rows and exact
 fallback intact. Carry the remaining density limit into
-[Phase 3 solver tuning](../2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-3-quality-versus-cost).
+[Phase 3 solver tuning](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-3-quality-versus-cost).
 Reopen this signal for an equivalent-work regression or when a
 representative host workload exceeds its reserved physics budget at
 settings that meet its support and replay requirements.

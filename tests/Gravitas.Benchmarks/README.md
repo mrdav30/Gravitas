@@ -285,7 +285,7 @@ separately from replay and fixture validity.
 
 Set `GRAVITAS_QUALITY_FRAME_CSV=1` for per-frame observations. This
 verifier is separate from base tests and BenchmarkDotNet selections.
-The [Phase 1 checkpoint](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#free-stack-and-tilted-capsule-checkpoint)
+The [Phase 1 checkpoint](../../docs/feature-work/done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#free-stack-and-tilted-capsule-checkpoint)
 records the setup, bounds, and measured results.
 
 ```powershell
@@ -302,7 +302,7 @@ COM crossing. With
 `GRAVITAS_QUALITY_FRAME_CSV=1`, it also prints both COM heights, lower vertical
 velocity, and each pair's published-pose overlap, residual depth, and fresh
 manifold row counts, including the upward-facing subset. The row counts
-describe contact geometry. The [matched controls](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#3d-high-mass-support-controls)
+describe contact geometry. The [matched controls](../../docs/feature-work/done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#3d-high-mass-support-controls)
 record the results and their limits.
 
 Append `2d` to `verify-quality-stack-support` for the planar support matrix.
@@ -331,7 +331,7 @@ bounds are reported separately from replay and fixture validity.
 
 Set `GRAVITAS_QUALITY_FRAME_CSV=1` to include frame 0 and each post-step sample.
 The command runs separately from base tests and BenchmarkDotNet selections.
-The [Phase 1 chain checkpoint](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#aligned-long-chain-checkpoint)
+The [Phase 1 chain checkpoint](../../docs/feature-work/done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#aligned-long-chain-checkpoint)
 records the setup and measured bounds.
 
 ### Opt-in ragdoll, mixed-response, and energy quality
@@ -350,7 +350,7 @@ central impulse, gravity, single-axis motor work, and passive angular
 limits in both dimensions. These commands are separate from the base test
 suite and BenchmarkDotNet selections. Set `GRAVITAS_QUALITY_FRAME_CSV=1`
 for per-frame ragdoll and work/energy output. The
-[Phase 1 record](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-1-physical-fixtures-and-metrics)
+[Phase 1 record](../../docs/feature-work/done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-1-physical-fixtures-and-metrics)
 describes each case's settings, bounds, and observed limits.
 
 ### Opt-in duration and continuation quality
@@ -372,8 +372,26 @@ warm physics. Set `GRAVITAS_QUALITY_FRAME_CSV=1` for per-frame samples.
 The default duration commands report physical bounds separately from replay
 and fixture validity. Append `--strict` to the stack or ragdoll duration
 command to fail on a support or geometry bound miss, respectively. The
-[Phase 2 record](../../docs/feature-work/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-2-duration-and-continuation)
-identifies the scenarios that currently exceed those bounds.
+[duration and tuning record](../../docs/feature-work/done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#phase-3-measurements)
+records the accepted bounds, the six-pass baseline, and the 2/6/12 pass sweep.
+Use `measure-quality-stack-density verify` for replay and support checks in
+the awake rotated-stack controls, then use `measure-quality-stack-density`
+for the complete-step timings.
+
+### Legacy constraint contact rows
+
+The resting and two-ragdoll rows in `Constraint2DBenchmarks` and
+`Constraint3DBenchmarks` are finite, strained-anchor controls. Setup warms
+their twelve-pass contexts for 80 steps. Invocations continue advancing
+the same world, and the returned joint row total can stay constant while
+the contact population changes. The planar two-ragdoll fixture can move
+beyond its authored floor during a sustained run.
+
+Use `verify-quality-ragdoll-duration --strict` as the supported duration
+reference. Before using a legacy row for a sustained capacity claim, establish
+its valid contact window, floor and grid coverage, body motion, and contact
+population. A sustained replacement needs a bounded scene or an explicit
+reset policy. [Benchmark validity record](../../docs/feature-work/done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-benchmark-037-disposition)
 
 ### Opt-in curved-contact step envelopes
 

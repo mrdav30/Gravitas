@@ -65,14 +65,25 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
+No active signals.
+
+## Experimental Signals
+
+| Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-036 — First dynamic membership in a planar floor partition](#grv-benchmark-036--first-dynamic-membership-in-a-planar-floor-partition) | Evidence-gated. First-use allocation reproduced, representative burst frequency open. | First-touch membership allocation exceeds a representative scene’s reserved allocation or frame budget |
+| [GRV-Benchmark-033 — 1,024-actor 3D partition cost and first-wake spike](#grv-benchmark-033) | Capacity-sensitive. Sustained cost profiled, first-wake allocation owner open. | An equivalent workload exceeds the host's reserved budget or the first-use burst recurs in a target scene |
+| [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental. Synthetic step costs measured, representative frequency open. | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
+| GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
+
 ### GRV-Benchmark-036 — First Dynamic Membership In A Planar Floor Partition
 
-**Discovered 2026-11-10.** Low-priority allocation signal from the corrected
-six-link planar ragdoll drop in
-[GRV-Issue-155](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-155-implementation).
-Build the package-backed Release benchmark on `2273ea72` plus that correction
-and run `verify-quality-ragdoll-duration --strict`. Each eight-second planar
-drop allocates 384 B after the verifier's one-second warmup: frame 40 at
+**Discovered 2026-11-10.** Evidence-gated first-use allocation signal from
+the corrected six-link planar ragdoll drop in
+[GRV-Issue-155](done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-155-implementation).
+Build the package-backed Release benchmark on `d749e815` and run
+`verify-quality-ragdoll-duration --strict`. Each eight-second planar drop
+allocates 384 B after the verifier's one-second warmup, on frame 40 at
 32 Hz and frame 238 at 60 Hz, consistently across repeated and observation-free
 controls. The supported planar cases and all spatial ragdolls measure zero.
 The prior planar drops allocated 8,096/4,896 B.
@@ -83,56 +94,12 @@ The left arm, collider 4, first enters a floor-only `PhysicsPartition2D`.
 voxel attachment, tracing and joint solving allocate zero in that frame.
 This is cold role storage reached during otherwise warmed simulation.
 
-**Next isolation:** Compare first dynamic-role entry with repeated entry in
-the same partitions at representative floor coverage. Measure retained memory
-and frame cost before choosing any reservation policy; eagerly allocating
-dynamic sets for every static floor voxel expands cold memory. Preserve
-local-membership scaling, deterministic reuse, replay and the existing zero
-warm supported-contact baseline. This signal does not relax a failing
-steady-state allocation guard.
-
-### GRV-Benchmark-037 — Finite Duration Of Legacy Constraint Contact Benchmarks
-
-**Discovered 2026-11-10.** Benchmark validity and capacity signal from the
-`Constraint2DBenchmarks` / `Constraint3DBenchmarks` resting and two-ragdoll
-rows during [#155 validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-155-implementation).
-The original ragdolls used a grid beginning at -4 while their 24-unit floors
-at X offsets +/-2 extended to -14. The planar benchmark configured context
-gravity but left per-body `SolidBody2D.Gravity` at zero. The current fixture
-assigns planar gravity and uses grid padding 16 for these BDN ragdoll contexts;
-other callers retain padding 4.
-
-The original 64-second ABBA timings are excluded from supported-workload
-claims. Their unchanged joint row counts concealed different contact work.
-The spatial leg first falls outside the original grid at X approximately
--5.95, while still inside authored floor geometry. With complete grid
-coverage, the same corrected two-ragdoll scene stays above the floor through
-2,384 steps. The corresponding planar control with gravity keeps a single
-ragdoll supported, but the two-ragdoll case first crosses a finite floor edge
-on step 497, before the first below-floor center on step 837. Neither result
-establishes tunneling through admitted, covered support.
-
-These legacy ball-socket inputs also begin with strained anchors: a half-unit
-head gap and approximately 0.79-unit leg gaps. They differ from the initially
-coincident, limited joints in the opt-in quality scenes. Stronger correction
-changes their motion and newly visited partition roles. Counting rows or
-reporting a small terminal gap alone does not validate a resting workload.
-
-**Next isolation:** Use the plan's eight-second, physically checked workloads
-for Phase 3 quality/cost comparisons. Before reusing a legacy contact row for
-long-duration capacity claims, record its valid contact window, floor and
-grid coverage, body motion and contact population. A sustained benchmark
-requires a deliberate bounded scene or documented reset policy; preserve
-the original strained input as a separate control. Do not enlarge geometry
-or alter anchors solely to hide a cost or escape.
-
-## Experimental Signals
-
-| Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| [GRV-Benchmark-033 — 1,024-actor 3D partition cost and first-wake spike](#grv-benchmark-033) | Capacity-sensitive. Sustained cost profiled, first-wake allocation owner open. | An equivalent workload exceeds the host's reserved budget or the first-use burst recurs in a target scene |
-| [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental. Synthetic step costs measured, representative frequency open. | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
-| GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
+**Revisit when** a representative scene touches enough cold partitions in a
+single step to exceed its allocation or time budget. Compare first dynamic-role
+entry with repeated entry in the same partitions. Measure retained memory and
+frame cost before choosing a reservation policy. Eagerly allocating dynamic
+sets for every static floor voxel expands cold memory. Preserve local-membership
+scaling, deterministic reuse, replay and the zero warm supported-contact baseline.
 
 ### GRV-Benchmark-024 — Curved-Contact Workload Frequency And Step Cost
 
@@ -377,7 +344,8 @@ signal anchors remain on the rows below.
 
 | Signal                                                                                                                                                                                                    | Closed     | Outcome                                                                                                                                                                                    | Evidence                                                                                                                                 |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| <a id="grv-benchmark-038"></a><a id="grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz"></a>GRV-Benchmark-038 — Supported ragdoll full-step tails at 60 Hz | 2026-11-11 | Factored, bounded exact rounding removes the recurring spatial ragdoll overruns at 32/60 Hz in the matched host runs. Rounding, replay and warm allocations match. | [Closeout](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-benchmark-038-closeout) |
+| <a id="grv-benchmark-037"></a><a id="grv-benchmark-037--finite-duration-of-legacy-constraint-contact-benchmarks"></a>GRV-Benchmark-037 — Finite duration of legacy constraint contact benchmarks | 2026-11-11 | Documented the legacy rows as finite, strained-anchor controls and established the checked duration fixtures as the supported workload reference. | [Disposition](done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-benchmark-037-disposition) |
+| <a id="grv-benchmark-038"></a><a id="grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz"></a>GRV-Benchmark-038 — Supported ragdoll full-step tails at 60 Hz | 2026-11-11 | Factored, bounded exact rounding removes the recurring spatial ragdoll overruns at 32/60 Hz in the matched host runs. Rounding, replay and warm allocations match. | [Closeout](done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-benchmark-038-closeout) |
 | <a id="grv-benchmark-035"></a>GRV-Benchmark-035 — Warm pair growth in rotated cuboid stacks | 2026-11-09 | Rejects all 20 disjoint acquisitions in the mixed-load stack capture and cuts warm allocation from 66,032 B to 7,752 B. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-035) |
 | <a id="grv-benchmark-034"></a><a id="grv-benchmark-034--rotated-cuboid-support-step-cost"></a>GRV-Benchmark-034 — Rotated cuboid support step cost | 2026-11-09 | Shared-frame exact levers reduce step cost with matching replay and allocations. The dense stress case remains above the 60 Hz interval. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-034) |
 | <a id="grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost"></a>GRV-Benchmark-031 — Ordinary open-mesh mixed full step                                                                             | 2026-11-01 | Certified patch/prism contacts reduce the ordinary step from 4.52 ms to 115 us at zero warm allocation; exit/group selection and small-control limits retained.                            | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost)                     |

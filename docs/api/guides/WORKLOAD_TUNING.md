@@ -105,6 +105,61 @@ exceed the crowded p99 target.
   produces no contact. Count dispatch and expensive-path work before using
   observed final contacts to explain cost. [Query Services](QUERY_SERVICES.md)
 
+## Compare Tick Rates And Solver Passes
+
+Start with the default six `PhysicsSettings.DiscreteSolverIterations`.
+Compare settings on the same authored scene, keeping masses, geometry,
+materials, and commands fixed. At different tick rates, run for equal
+simulated time and apply disturbances at the same simulated times. Include
+settled support, repeated wake and recovery, and any drops or impacts your
+host expects. Use a fresh context for each run.
+
+Measure the errors the scene must tolerate. For stacks, check both support
+interfaces, residual penetration, drift, and whether a body reaches an
+unintended surface. For jointed scenes, record anchor separation, limit
+error, and body displacement independently. A tip can move about a pinned
+root while its anchors remain close. For supported groups, verify that the
+group sleeps between disturbances and wakes together. Compare replay within
+each setting and use complete-step timings to check the host's reserved
+physics budget. [Collision Response](COLLISION_RESPONSE.md)
+
+In an eight-second 60 Hz pass sweep on a Windows x64 Core i7-9700K with
+.NET 10 Release, the same spatial fixtures produced these ranges of
+per-launch full-step p95 values after the first second:
+
+| Fixture | 2 passes | 6 passes | 12 passes | Physical result |
+| --- | ---: | ---: | ---: | --- |
+| Centered 100:1 top-loaded stack with repeated pulses | 0.23–0.24 ms | 0.31–0.32 ms | 0.45–0.50 ms | Both supports held, residual depth stayed within 1/16 unit, and both bodies woke on all three pulses. |
+| Contact-free chain with a 100:1 heavy tip | 1.59–1.66 ms | 3.13–3.35 ms | 5.49–6.55 ms | At six and twelve passes, anchor gaps met the bounds and tip displacement stayed near 1.15 units, above the one-unit target. |
+
+Two passes also preserved the measured homogeneous heavy-bottom supports,
+while the sixteen-stack mixed-load control lost a support at that setting.
+The homogeneous sixteen-stack case exceeded 16.67 ms on every measured
+six-pass step. Raising the pass count can change which exact response
+paths execute, so cost can move in either direction. Measure representative
+load mixes before applying a setting to the whole context.
+
+Six passes met the geometry and connected-wake checks for the matched
+planar and spatial ragdoll suite at 32 and 60 Hz. Two passes failed the
+supported planar wake check and several drop geometry checks. In the
+six-pass supported spatial control, four launches per rate had zero
+full-interval overruns, with worst steps of 21.53 ms at 32 Hz and
+16.62 ms at 60 Hz. The 60 Hz result leaves about 0.04 ms before any
+additional host work. Measure the recovery frames and the host reserve
+when choosing a rate.
+
+## Check Save And Populate Continuation
+
+For hosts that populate existing bodies from saves, record a checkpoint
+after real simulation steps. Exercise both free motion and awake support,
+and continue with the same ordered commands. Compare exact replay against
+a control with the same clock, registrations, retained pair history, and
+cache invalidation as the populated world. Also compare physical recovery
+against an uninterrupted run with warm contact impulses. Clearing warm
+impulses on population can change the active-contact trace, so check
+support and measure position, velocity, and rotation deltas over the
+continuation window. [Serialization And Replay](SERIALIZATION.md#replay-workflow)
+
 ## Check Long-Session Memory
 
 Run repeated equal-envelope churn in the same context. Record startup,
@@ -116,3 +171,7 @@ outside timed frames. Record process working set separately because it includes
 runtime and native memory. A plateau applies to the measured envelope and
 duration. Repeat the comparison when actor policy, geometry, target hardware,
 or package versions change materially.
+
+A warmed context can still visit a partition's dynamic or awake membership
+for the first time. Count distinct first touches per step and compare them
+with repeated visits before reserving storage for large static floors.

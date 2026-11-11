@@ -28,18 +28,6 @@ instead of burying it in notes.
 
 ## Active Coordination
 
-- **Lockstep Conformance And Workload Guidance**
-  - Approved follow-up sequence after the confirmed benchmark signals close:
-    strengthen complete-loop replay evidence, characterize an evolving strategy
-    scene, then publish long-duration physical quality versus configuration
-    cost. Full-lifecycle replay conformance is complete across the eight native
-    platform/profile lanes, upstream develop CI alignment is complete, and
-    strategy capacity and soak guidance is available.
-  - [`Long-Duration Physics Quality And Tuning`](2026-10-06-long-duration-physics-quality-and-tuning-plan.md)
-    follows initial workload evidence. Reuse existing stack/chain/ragdoll tests
-    and telemetry to measure drift, penetration, energy behavior, sleep/wake and
-    supported restore continuation alongside solver cost. Lasting configuration
-    guidance is a deliverable shared with the capacity plan.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve cross-stack issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
@@ -64,6 +52,14 @@ instead of burying it in notes.
     [representation gates](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#later-terrain-and-heightfield-gates).
 
 ## Recently Completed
+
+- [`Long-Duration Physics Quality And Tuning`](done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md)
+  - Completed the lockstep conformance and workload guidance sequence.
+    Measured stack, chain, ragdoll and save/populate continuation at 32 and
+    60 Hz, compared solver pass counts, and resolved the recurring spatial
+    ragdoll recovery tails. The
+    [tuning guide](../api/guides/WORKLOAD_TUNING.md#compare-tick-rates-and-solver-passes)
+    records supported settings, quality limits and host budget checks.
 
 - [`Evolving Game Capacity And Soak`](done/2026-10-06-evolving-game-capacity-and-soak-plan.md)
   - Verified two actor tiers in 2D and 3D, measured the X/Z cell-size

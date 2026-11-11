@@ -817,4 +817,4 @@ matched host conditions.
 
 Host capacity still depends on the application's tick reserve and workload.
 Solver iteration, grounding, and frame-rate quality curves belong to the
-[Long-Duration Physics Quality And Tuning plan](../2026-10-06-long-duration-physics-quality-and-tuning-plan.md).
+[Long-Duration Physics Quality And Tuning plan](2026-10-06-long-duration-physics-quality-and-tuning-plan.md).

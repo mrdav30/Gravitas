@@ -1,7 +1,7 @@
 # Long-Duration Physics Quality And Tuning Plan
 
 **Date:** 2026-10-06  
-**Status:** Phases 1–3 complete. Guidance and release validation remain.  
+**Status:** Completed 2026-11-11. Phases 1–3 verified and tuning guidance added.  
 **Owner:** Gravitas contact/constraint quality and configuration guidance.
 
 ## Goal
@@ -15,15 +15,15 @@ that the current solver needs replacement.
 ## Existing Foundation
 
 The completed
-[discrete-response plan](done/2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
+[discrete-response plan](2026-06-21-discrete-response-and-contact-quality-hardening-plan.md)
 and
-[3D stress plan](done/2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
+[3D stress plan](2026-07-02-3d-constraint-solver-stress-and-tuning-hardening-plan.md)
 cover warm starts, islands, resting contacts, chain/ragdoll stress and
 deterministic joint metrics. Reuse
-[`Constraint3DStressTests`](../../tests/Gravitas.Tests/Constraints/Constraint3DStressTests.cs),
+[`Constraint3DStressTests`](../../../tests/Gravitas.Tests/Constraints/Constraint3DStressTests.cs),
 the dimensional constraint tests, sleep tests and
-[`Constraint3DBenchmarks`](../../tests/Gravitas.Benchmarks/Core/Constraint3DBenchmarks.cs).
-The [capacity/soak plan](done/2026-10-06-evolving-game-capacity-and-soak-plan.md)
+[`Constraint3DBenchmarks`](../../../tests/Gravitas.Benchmarks/Core/Constraint3DBenchmarks.cs).
+The [capacity/soak plan](2026-10-06-evolving-game-capacity-and-soak-plan.md)
 owns frame-time/memory collection; share its measurement contract rather than
 add a second runner or generic physics-quality framework.
 
@@ -55,7 +55,7 @@ scale-aware bounds; an unstable baseline does not become correct by definition.
 
 ### Free-Stack And Tilted-Capsule Checkpoint
 
-The opt-in [quality verifier](../../tests/Gravitas.Benchmarks/README.md#opt-in-physics-quality-stacks)
+The opt-in [quality verifier](../../../tests/Gravitas.Benchmarks/README.md#opt-in-physics-quality-stacks)
 runs eight small fixtures on the released LSF packages. The first capture
 used Gravitas `3f1a83fb` with the benchmark changes below, .NET SDK 10.0.302
 and runtime 10.0.10 on Windows x64. Each fixture advances 256 complete steps
@@ -136,7 +136,7 @@ work checkpoints remain in Phase 1.
 
 ### 3D High-Mass Support Controls
 
-The [opt-in support verifier](../../tests/Gravitas.Benchmarks/README.md#opt-in-physics-quality-stacks)
+The [opt-in support verifier](../../../tests/Gravitas.Benchmarks/README.md#opt-in-physics-quality-stacks)
 reuses the 3D cuboid stack, step settings, and replay checks from the
 checkpoint above. This capture used `d7ffa17b` plus the support verifier,
 .NET SDK 10.0.302, and runtime 10.0.10 on Windows x64 with released LSF
@@ -248,7 +248,7 @@ upward correction in both cases, but integrated downward by more. This
 establishes an early velocity support deficit and shows how correction is
 distributed. The floor-row trace below isolates the initial mechanism and
 tracks the remaining runtime work under
-[GRV-Issue-151](issue-tracker.md#grv-issue-151).
+[GRV-Issue-151](../issue-tracker.md#grv-issue-151).
 
 Release and ReleaseLean produced identical traces and measurements. Each
 of the eight cases matched both instrumented repeats exactly, including
@@ -478,11 +478,11 @@ measured 0.351–0.790 ms stock and 0.822–1.995 ms corrected. The contact
 geometry and physical trajectories differ between revisions, so these are
 scenario costs rather than equivalent-work kernel timings. The isolated
 step cost and the remaining attribution work are tracked under
-[GRV-Benchmark-034](benchmark-signal-hardening-backlog.md#grv-benchmark-034).
+[GRV-Benchmark-034](../benchmark-signal-hardening-backlog.md#grv-benchmark-034).
 
 The package-backed library built for `net10.0` and `netstandard2.1` in both
 configurations. The complete suites and strict coverage gate passed on the
-same runtime snapshot. The resolved [issue record](issue-tracker.md#grv-issue-151)
+same runtime snapshot. The resolved [issue record](../issue-tracker.md#grv-issue-151)
 links back to these measurements.
 
 | Configuration | Passing tests | Covered lines | Covered branches | Covered methods |
@@ -490,11 +490,11 @@ links back to these measurements.
 | Release | 8,393 | 54,012 / 54,012 | 22,080 / 22,080 | 5,634 / 5,634 |
 | ReleaseLean | 8,322 | 54,010 / 54,010 | 22,080 / 22,080 | 5,633 / 5,633 |
 
-[GRV-Benchmark-034](benchmark-signal-hardening-backlog.md#grv-benchmark-034)
+[GRV-Benchmark-034](../benchmark-signal-hardening-backlog.md#grv-benchmark-034)
 closed after reducing the exact response cost of sustained cuboid support.
-The [density closeout](done/2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure)
+The [density closeout](2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure)
 preserves the four-, eight-, and sixteen-stack replay and budget evidence.
-[GRV-Benchmark-035](benchmark-signal-hardening-backlog.md#grv-benchmark-035)
+[GRV-Benchmark-035](../benchmark-signal-hardening-backlog.md#grv-benchmark-035)
 closed after rejecting disjoint cross-stack pairs before acquisition.
 
 ### Current Stack Baseline And Planar Support Follow-Up
@@ -530,7 +530,7 @@ The lower COM of the centered 100:1 case first reached the floor plane on
 frame 34 and was at or below it on six sampled frames. The same-total-mass
 swap stayed within the floor-depth bound at both alignments. This isolates
 the support loss to top-heavy loading in these fixtures. The result was
-recorded as [GRV-Issue-152](issue-tracker.md#grv-issue-152) and traced to
+recorded as [GRV-Issue-152](../issue-tracker.md#grv-issue-152) and traced to
 the planar response below.
 
 #### GRV-Issue-152 Implementation
@@ -667,7 +667,7 @@ mass-100 matched-speed case allocated 4,536 B on frame 227. A disposable
 partition probe measured 1,080 B in partition rental and 3,456 B in voxel
 membership, with no pair acquisitions or joint-solver allocation in that
 frame. This is first-use growth of the kind recorded in the
-[#035 closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-035).
+[#035 closeout](2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-035).
 Keep the measured burst visible when extending the workload. Captures are
 under ignored `artifacts/physics-quality-phase1/chains`.
 
@@ -846,7 +846,7 @@ supplies the planar top-heavy baseline for Phase 2.
       Verify the scene still contains the intended dynamic bodies and contacts.
 - [x] Compare repeated command traces, then supported save/populate continuation
       into host-created matching shells and a matching clock timeline.
-- [x] Respect the [serialization contract](../api/guides/SERIALIZATION.md): body
+- [x] Respect the [serialization contract](../../api/guides/SERIALIZATION.md): body
       records do not restore a world, arbitrary host/coroutine state or solver
       caches. Compare exact traces only where continuation state is equivalent.
       If population invalidates caches, use an equivalently cold-cache control
@@ -899,13 +899,13 @@ in 16 or 30 steps after each pulse. Penetration grows across those episodes.
 The no-pulse 32 Hz case already exceeds the depth bound at 0.25 s, and the
 60 Hz no-pulse case settles within the bound. The disturbed 60 Hz case
 first exceeds it on its first kick step. This baseline exposed the planar
-positional correction failure addressed in [GRV-Issue-153](issue-tracker.md#grv-issue-153).
+positional correction failure addressed in [GRV-Issue-153](../issue-tracker.md#grv-issue-153).
 
 The spatial 100:1 stack reaches the floor with its upper body in the no-pulse
 controls at 2.344 and 4.817 s. The impulses shift onset to 2.313 and 5.033 s.
 This places the 60 Hz failure beyond the 256-frame Phase 1 capture. Both
 rates later lose original support. This baseline exposed the support topology
-failure addressed in [GRV-Issue-154](issue-tracker.md#grv-issue-154). These heavy
+failure addressed in [GRV-Issue-154](../issue-tracker.md#grv-issue-154). These heavy
 spatial cases each allocate 2,944 B in one warm step. The other stack cases
 allocate 0 B.
 
@@ -1056,7 +1056,7 @@ The centered 100:1 stacks regain quiet support after the pulses. They still
 alternate individual sleep and wake transitions, so the pulses in these
 fixtures start awake. A stationary, exactly aligned two-box control on
 `5e653703` reproduced this with staggered sleep timers independently of the
-drift. [GRV-Issue-156](issue-tracker.md#grv-issue-156) records that reproducer.
+drift. [GRV-Issue-156](../issue-tracker.md#grv-issue-156) records that reproducer.
 
 On 2026-11-10 the full suites passed 8,437 `Release` and 8,366 `ReleaseLean`
 tests with 100% reachable line, branch, and method coverage in both profiles.
@@ -1096,7 +1096,7 @@ resettle.
 
 The drops exceed the Phase 1 joint geometry bounds. The supported-start
 cases meet those bounds at 60 Hz and exceed the 1/16-unit terminal gap
-bound at 32 Hz. [GRV-Issue-155](issue-tracker.md#grv-issue-155) tracks the
+bound at 32 Hz. [GRV-Issue-155](../issue-tracker.md#grv-issue-155) tracks the
 drop anchor error with the supported starts as controls. The heavy-tip chain
 remains a measured high-load tuning case for Phase 3. Supported starts
 allocate 0 B in the warm window. The 2D drops allocate 8,096 B at 32 Hz
@@ -1167,7 +1167,7 @@ All eight original duration cases pass `verify-quality-ragdoll-duration
 drops retain two floor supports at the end. Supported starts retain six.
 Both dimensions wake all six links on the first pulse from six sleeping
 links. Later settling remains distinct from the geometry acceptance;
-[GRV-Issue-156](issue-tracker.md#grv-issue-156) recorded quiet island
+[GRV-Issue-156](../issue-tracker.md#grv-issue-156) recorded quiet island
 sleep/wake cycling. It was discovered while validating #154's newly retained
 stack supports and reproduced independently on the earlier `5e653703` build
 with stationary boxes and staggered sleep timers.
@@ -1198,7 +1198,7 @@ partition storage, outside joint response; the repeated solver and supported
 contact guards retain their zero-allocation requirement. Preparing all roles
 for every static floor partition would expand cold memory and is outside
 this correction.
-[GRV-Benchmark-036](benchmark-signal-hardening-backlog.md#grv-benchmark-036--first-dynamic-membership-in-a-planar-floor-partition)
+[GRV-Benchmark-036](../benchmark-signal-hardening-backlog.md#grv-benchmark-036--first-dynamic-membership-in-a-planar-floor-partition)
 retains the concrete first-use allocation for follow-up. Raw captures and
 isolated counterexamples are under
 `artifacts/physics-quality-phase2/issue-155`; the scenario settings and
@@ -1242,7 +1242,7 @@ with changed recovery duty cycle. This is not proof of zero kernel overhead.
 Later complete rest and connected sleep propagation remain relevant when
 interpreting throughput. The spatial 60 Hz supported maxima are 22.8986 and
 23.3886 ms across the two launches, despite zero warm allocation and a lower
-mean. [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz)
+mean. [GRV-Benchmark-038](../benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz)
 retains that Phase 3 tail signal.
 
 An earlier 64-second comparison of the legacy BDN constraint rows is retained
@@ -1257,7 +1257,7 @@ BDN ragdoll contexts now cover their authored floors and assign planar
 gravity, while the specialized quality inputs retain their original domain.
 Their initially strained, unrestricted ball sockets remain distinct from
 the quality scenes' coincident, limited joints.
-[GRV-Benchmark-037](benchmark-signal-hardening-backlog.md#grv-benchmark-037--finite-duration-of-legacy-constraint-contact-benchmarks)
+[GRV-Benchmark-037](../benchmark-signal-hardening-backlog.md#grv-benchmark-037--finite-duration-of-legacy-constraint-contact-benchmarks)
 records the finite-window acceptance boundary. No supported-workload speedup
 is claimed from the rejected captures.
 
@@ -1382,7 +1382,7 @@ fix launches still peak at 30.43 and 32.26 ms against a 16.67 ms frame.
 Absolute times vary across launches, including a 114.77 ms outlier in an
 unchanged baseline drop control. An earlier candidate run also peaked
 at 62.90 ms in the spatial 32 Hz supported case, versus 37.82 ms before.
-Retain [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz)
+Retain [GRV-Benchmark-038](../benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz)
 for Phase 3 active-step and tail attribution. Raw logs and payload hashes
 are under `artifacts/physics-quality-phase2/issue-156/timing-*.txt` and
 `timing-*-payload.csv`.
@@ -1452,7 +1452,7 @@ position in units, velocity in units/s and rotation in degrees.
 | 32 Hz | 0.000008148 / 0.000002542 | 0.000137051 / 0 | 0.000347353 / 0.000347353 | 0.000002335 |
 | 60 Hz | 0.000059131 / 0.000059131 | 0.002844395 / 0 | 0.001898659 / 0.001898633 | 0.000002702 |
 
-The [serialization guide](../api/guides/SERIALIZATION.md#replay-workflow)
+The [serialization guide](../../api/guides/SERIALIZATION.md#replay-workflow)
 describes the distinction between body payloads and replay-relevant live
 state. The exact active-contact check uses matched clocks and pair history.
 The uninterrupted comparison measures the effect of clearing warm state.
@@ -1483,11 +1483,11 @@ workloads and original bounds; its tuning checklist remains separate.
       dimensions only when a fixture identifies a meaningful sensitivity.
       Retain the #151 support bounds when assessing lower iteration counts.
 - [x] Attribute the supported spatial ragdoll's 60 Hz full-step tails from
-      [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz).
+      [GRV-Benchmark-038](../benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz).
       Preserve its eight-second physical checks and measure active-frame
       cost with #156's coordinated sleep before choosing settings.
 - [x] Resolve the eight- and sixteen-stack awake heavy-bottom budget limits
-      from the [density closeout](done/2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure).
+      from the [density closeout](2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure).
       Use the v2 density fixture with authored rotation. Keep the four-stack
       control and compare each setting against the six-iteration baseline.
       Check support and per-setting replay, and report
@@ -1787,21 +1787,99 @@ owner. Independent review checked denominator factorization, scratch
 width, clipping and signed midpoint behavior. The benchmark signal is
 closed on this evidence. Guidance and publication remain in the checklist.
 
+### GRV-Benchmark-037 Disposition
+
+**Discovered 2026-11-10.** Benchmark validity and capacity signal from the
+`Constraint2DBenchmarks` / `Constraint3DBenchmarks` resting and two-ragdoll
+rows during [#155 validation](#grv-issue-155-implementation).
+The original ragdolls used a grid beginning at -4 while their 24-unit floors
+at X offsets +/-2 extended to -14. The planar benchmark configured context
+gravity but left per-body `SolidBody2D.Gravity` at zero. The current fixture
+assigns planar gravity and uses grid padding 16 for these BDN ragdoll contexts;
+other callers retain padding 4.
+
+The original 64-second ABBA timings are excluded from supported-workload
+claims. Their unchanged joint row counts concealed different contact work.
+The spatial leg first falls outside the original grid at X approximately
+-5.95, while still inside authored floor geometry. With complete grid
+coverage, the same corrected two-ragdoll scene stays above the floor through
+2,384 steps. The corresponding planar control with gravity keeps a single
+ragdoll supported, but the two-ragdoll case first crosses a finite floor edge
+on step 497, before the first below-floor center on step 837. Neither result
+establishes tunneling through admitted, covered support.
+
+These legacy ball-socket inputs also begin with strained anchors: a half-unit
+head gap and approximately 0.79-unit leg gaps. They differ from the initially
+coincident, limited joints in the opt-in quality scenes. Stronger correction
+changes their motion and newly visited partition roles. Counting rows or
+reporting a small terminal gap alone does not validate a resting workload.
+
+**Disposition 2026-11-11.** The [benchmark README](../../../tests/Gravitas.Benchmarks/README.md#legacy-constraint-contact-rows)
+records these as finite, strained-anchor controls. The eight-second,
+physically checked opt-in scenes supply supported duration guidance. Reopen
+if a published or maintained BenchmarkDotNet result needs a sustained
+supported workload. First verify its contact window, floor and grid coverage,
+body motion and contact population. Use a bounded scene or an explicit
+reset policy and retain the strained input as a comparison control.
+
 ## Completion And Publication
 
-- [ ] Publish reproducible settings and quality/time curves, limitations and
-      recommended usage boundaries. Feed lasting guidance into the relevant wiki
-      pages without plan links, capture paths or dated implementation history.
-- [ ] Preserve current public contracts unless an intentional redesign is
+- [x] Publish reproducible settings and quality/time curves, limitations and
+      recommended usage boundaries. Put lasting guidance in the API guides
+      without plan links, capture paths or dated implementation history.
+- [x] Preserve current public contracts unless an intentional redesign is
       justified. Follow normal ownership and dependency release order if an
       upstream change is required.
-- [ ] Run focused quality/replay/allocation/resource checks, full Release/Lean
+- [x] Run focused quality/replay/allocation/resource checks, full Release/Lean
       suites, both target-framework builds and exact 100% reachable line/branch/
       method coverage in every changed library. Validate unreleased siblings
       with MSBuild and inherited `UseLocalLsfStack=true`; validate released
       packages before release.
-- [ ] Archive completed evidence in `done/`; retain only concrete unresolved
+- [x] Archive completed evidence in `done/`; retain only concrete unresolved
       issues or explicitly evidence-gated follow-ups in coordination documents.
+
+The [Workload And Tuning guide](../../api/guides/WORKLOAD_TUNING.md#compare-tick-rates-and-solver-passes)
+uses six passes as the starting point and pairs the 2/6/12 sweep with
+physical limits. It describes active-contact continuation, recovery-frame
+headroom, and first-use memory measurement. Benchmark commands and the
+legacy contact-window limit are in the
+[benchmark README](../../../tests/Gravitas.Benchmarks/README.md#opt-in-duration-and-continuation-quality).
+The closeout changes documentation. The measured settings and public
+contracts carry forward from the verified runtime.
+
+[GRV-Benchmark-036](../benchmark-signal-hardening-backlog.md#grv-benchmark-036--first-dynamic-membership-in-a-planar-floor-partition)
+remains evidence-gated. The measured planar drop touches a cold dynamic
+membership in an otherwise warm context. Revisit when repeated first
+touches in a representative scene exceed its frame or allocation budget.
+The heavy-tip chain drift and the sixteen-stack budget limit are documented
+workload boundaries.
+
+### Final Closeout Verification
+
+Verified on committed runtime `d749e815` with released LSF packages
+(`UseLocalLsfStack=false`), SDK 10.0.302 and .NET 10.0.10 on Windows x64.
+Both profiles built `netstandard2.1` and `net10.0` with zero warnings.
+
+| Profile | Passing tests | Focused resource tests | Visited sequence points | Visited branches | Visited methods |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Release | 8,495 | 201 | 54,283 / 54,283 | 22,464 / 22,464 | 5,695 / 5,695 |
+| ReleaseLean | 8,424 | 200 | 54,281 / 54,281 | 22,464 / 22,464 | 5,694 / 5,694 |
+
+The short stack, chain and ragdoll checks, three duration commands,
+continuation, mixed response, work/energy and rotated density replay
+outputs matched across profiles. All 12 strict stack cases and all eight
+strict ragdoll cases passed at 32 and 60 Hz. The four heavy-tip chain cases
+reproduced the recorded drift limit with their energy checks intact.
+Both 1,024-actor verifiers matched their replay, work and allocation output.
+The focused resource filter covered retired pair and planar grounding
+references, awake membership and partition reuse. The repository replay
+comparator passed the two Windows x64 lanes against all eight shared
+fixtures. The full native matrix remains a release check.
+
+DocFX built with warnings treated as errors, and all 4,041 local links
+across 215 generated pages resolved. The archive and its incoming links
+were checked against their targets. Raw logs, coverage and replay
+captures are under `artifacts/physics-quality-closeout`.
 
 Offline mass-property tooling and richer diagnostic/publication platforms retain
 their existing separate plans. This work does not activate those deferred
