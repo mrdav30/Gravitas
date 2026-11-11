@@ -155,13 +155,21 @@ control also exceeded its 31.25 ms interval in both launches, peaking at
 [#156 record](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-156-implementation)
 retains both matched timing passes and the baseline launch variability.
 
-**Next isolation:** In Phase 3, correlate the long steps with awake population,
-contact rows, exact-response work and pulse/recovery phase. Attribute the
-per-active-step cost with coordinated sleep, preserving the original support and
-replay bounds. Compare 2/6/12 passes against the host's reserved physics
-budget; do not infer a portable frame-time guarantee from the mean or p95.
-The existing plan retains the settings, commands, raw-capture locations and
-balanced before/after measurements.
+**Phase 3 attribution, 2026-11-11.** On committed `88bd5d29`, six fresh
+six-pass runs overran on the same 11 recovery frames with all six bodies
+awake and all six floor supports retained. The separate stage captures
+attribute the recurring cost to exact friction, with medians of 17.79 ms
+in the exact friction path and 13.53 ms within signed radical and rational
+sum rounding. Two passes fit the interval for the isolated supported
+spatial scene. The planar and drop controls fail at that setting, and
+twelve passes increase the supported spatial cost. The
+[Phase 3 attribution](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#supported-spatial-ragdoll-tail-attribution)
+records the frame IDs, controls, and stage and complete-step measurements.
+
+**Next isolation:** Evaluate a tighter certified rounding search in
+`TryGetSignedRadicalAndRationalSum` on the six-pass recovery frames.
+Preserve exact output, warm-start state, replay, geometry and warm
+allocations. Recheck the complete-step tails in fresh processes.
 
 ## Experimental Signals
 

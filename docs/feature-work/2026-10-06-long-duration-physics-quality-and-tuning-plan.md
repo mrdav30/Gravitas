@@ -1,7 +1,7 @@
 # Long-Duration Physics Quality And Tuning Plan
 
 **Date:** 2026-10-06  
-**Status:** Phases 1 and 2 complete. Phase 3 quality versus cost is next.  
+**Status:** Phases 1–3 complete. Guidance and release validation remain.  
 **Owner:** Gravitas contact/constraint quality and configuration guidance.
 
 ## Goal
@@ -1478,15 +1478,15 @@ workloads and original bounds; its tuning checklist remains separate.
 
 ## Phase 3: Quality Versus Cost
 
-- [ ] Compare current default solver settings with a lower/higher iteration
+- [x] Compare current default solver settings with a lower/higher iteration
       setting, initially 2/6/12 iterations where supported. Add tuning
       dimensions only when a fixture identifies a meaningful sensitivity.
       Retain the #151 support bounds when assessing lower iteration counts.
-- [ ] Attribute the supported spatial ragdoll's 60 Hz full-step tails from
+- [x] Attribute the supported spatial ragdoll's 60 Hz full-step tails from
       [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz).
       Preserve its eight-second physical checks and measure active-frame
       cost with #156's coordinated sleep before choosing settings.
-- [ ] Resolve the eight- and sixteen-stack awake heavy-bottom budget limits
+- [x] Resolve the eight- and sixteen-stack awake heavy-bottom budget limits
       from the [density closeout](done/2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure).
       Use the v2 density fixture with authored rotation. Keep the four-stack
       control and compare each setting against the six-iteration baseline.
@@ -1495,20 +1495,198 @@ workloads and original bounds; its tuning checklist remains separate.
       launches. For each density, identify a setting that meets the support
       bounds and the host's reserved physics budget, or record the remaining
       capacity limit and the next solver change to evaluate.
-- [ ] Report quality and measured complete-step time together at each setting,
+- [x] Report quality and measured complete-step time together at each setting,
       including awake population, contact/island counts and relevant CCD work.
       Changing frame rate requires equal simulated duration, not equal frame
       count.
-- [ ] Separate contact and joint metrics; distinguish physical effects from
+- [x] Separate contact and joint metrics; distinguish physical effects from
       partition/query cost and presentation interpolation. Keep engine adapters
       outside the experiment.
-- [ ] Retain a solver change only with a reproduced physical improvement,
+- [x] Retain a solver change only with a reproduced physical improvement,
       deterministic ordering/rounding, bounded resource behavior, benchmark
       comparison and no unexplained regression in other dimensions/features.
 
 Exit: a small set of measured, usable configurations or a scoped proposal for
 the demonstrated solver limitation. Do not add named public presets, compliance
 APIs, clamping or alternate penetration kernels solely to fill a tuning table.
+
+### Phase 3 Measurements
+
+Measured 2026-11-11 on committed `88bd5d29`, Windows x64, Core i7-9700K,
+SDK 10.0.302 and .NET 10.0.10. The Release benchmark used released
+Chronicler 1, FixedMathSharp 8, SwiftCollections 8 and GridForge 10
+(`UseLocalLsfStack=false`). The ordinary binaries supplied the six-pass
+reference via `verify-quality-ragdoll-duration --strict` and
+`measure-quality-stack-density` with and without `verify`.
+
+Disposable copies reused `verify-quality-stack-duration`,
+`verify-quality-chain-duration`, `verify-quality-ragdoll-duration` and
+`measure-quality-stack-density`. The only simulation input changed was
+`context.Settings.DiscreteSolverIterations` after context setup.
+At each setting, duration workloads retained the same eight simulated
+seconds at 32 and 60 Hz and compared two observed runs and an unobserved
+terminal hash. Density repeated the authoritative-with-solver-caches
+trace in two fresh processes per setting and matched the timed terminal
+hashes and support work counts. Keep the authored rotation, four-stack
+control, grid and centered/offset placements when reproducing.
+
+The timed interval encloses `Simulate` and `LateSimulate`. Duration windows
+exclude the first second (224 or 420 samples). Density excludes the first
+64 steps (192 samples at 60 Hz). Three fresh launches per setting rotate
+pass count. Ragdoll and homogeneous density comparisons use the common
+screening launch order 2/6/12, 6/12/2, 12/2/6. This copy reports every
+ragdoll row before returning failure for a rejected floor or connected
+wake check, and runs the three homogeneous density rows together.
+The original density run also exercises the sixteen-stack mixed-load
+control and preserves its fail-fast support check. Stage attribution
+uses a separate instrumented build. Probe source, payload hashes, raw
+timings and verification logs are under
+`artifacts/physics-quality-phase3`.
+
+### Duration Quality At 2/6/12 Passes
+
+- **Centered stacks.** All twelve cases meet the original support and
+  residual bounds at all three settings. The 100:1 pulsed stacks retain
+  connected wakes and zero warm allocation. This qualifies two passes
+  for these particular support scenes.
+- **Ragdolls.** Six and twelve passes satisfy all eight original geometry
+  checks and all three supported wake pulses at both rates. Two passes
+  fail the supported planar first-pulse admission at both rates and
+  fail drop geometry in planar 32 Hz and spatial 32/60 Hz. The two-pass
+  spatial supported case remains a valid isolated control. The 32 Hz
+  spatial drop reaches a 0.918-unit anchor gap against a 0.25-unit bound.
+- **Heavy-tip chains.** All four cases retain replay, prepared-row counts
+  and energy bounds. At six and twelve passes the gap bounds hold, while
+  tip drift remains about 1.146–1.151 units against the one-unit target.
+  Two passes also miss the gap bounds in the 32 Hz spatial case (0.063
+  peak and final) and reach 2.163 units of tip drift. Raising the pass
+  count reduces anchor error without reliably reducing tip drift.
+
+The table reports the range of launch p95 values and the largest observed
+step. Overruns use the full fixed-frame interval (31.25 or 16.67 ms).
+
+| Spatial supported ragdoll | Passes | Step p95 range (ms) | Worst (ms) | Overruns by launch |
+| --- | ---: | ---: | ---: | --- |
+| 32 Hz | 2 | 2.08–3.88 | 16.24 | 0 / 0 / 0 |
+| 32 Hz | 6 | 8.38–12.66 | 90.95 | 6 / 5 / 7 |
+| 32 Hz | 12 | 31.59–41.35 | 88.32 | 13 / 16 / 12 |
+| 60 Hz | 2 | 1.36–1.70 | 11.06 | 0 / 0 / 0 |
+| 60 Hz | 6 | 3.71–5.26 | 26.93 | 11 / 11 / 11 |
+| 60 Hz | 12 | 8.10–9.96 | 62.55 | 14 / 12 / 12 |
+
+At 60 Hz, the pulsed 100:1 spatial stack's p95 ranges were 0.23–0.24,
+0.31–0.32 and 0.45–0.50 ms at 2/6/12 passes. The contact-free spatial
+heavy-tip chain's corresponding ranges were 1.59–1.66, 3.13–3.35 and
+5.49–6.55 ms. The chain prepares 44,640 rows across its 480 steps at every
+setting. Planar chains had zero warm allocation. The spatial chain at six
+passes retained its 3,024 B first-use burst at both rates. These discrete
+workloads use no continuous-collision mode.
+
+### Supported Spatial Ragdoll Tail Attribution
+
+At 60 Hz and six passes, all six fresh launches overran on the same
+11 frames (123–126, 128, 246–247 and 365–368). The three impulses occur on
+steps 121, 241 and 361. Each overrun has all six bodies awake, all six
+floor supports and one solved island. Each of the 11 frames visits 60–72
+manifold rows and makes 30 joint solver calls. The 312 warm frames with no island
+solve have all six bodies asleep and a 0.031 ms median instrumented step.
+
+The stage build timed `SolveDiscreteResponsePairs` and its contact and joint
+calls separately from partition preparation, collision distribution,
+corrected-position publication and the sleep decision. On the 11 recurring
+frames the median full step was 19.89 ms, including 18.55 ms in contact
+response, 0.84 ms in joint response and 0.26 ms in exact accumulated-normal
+fallback. Partition preparation, collision distribution and position
+publication each took less than 0.13 ms at the median. The median sleep
+decision took less than 0.001 ms. The other 97 solved frames had a
+3.10 ms median full step and 1.82 ms median contact response.
+
+A second stage build timed `TrySolveFrictionImpulseExact` and, within it,
+`TryGetSignedRadicalAndRationalSum`. On the same 11 frames the medians
+were 17.79 ms for exact friction, including 13.53 ms for signed radical
+and rational sum rounding. Those frames made 72–96 rounding calls each.
+At frame 126, 96 calls took 15.65 ms. Neighboring frame 127 made 19
+exact-friction calls and zero signed-sum rounding calls and completed
+in 3.28 ms. Both instrumentation runs reproduced the strict workload's
+replay and warm allocation output. Stage times are inclusive and serve
+attribution. The separate uninstrumented runtime runs supply the budget
+comparison above.
+
+Keep [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz)
+active for a focused experiment in the existing exact rounding owner.
+Evaluate hoisting invariant wide products out of the signed-sum search
+loop or tightening its certified search bracket. Match the exact rounded raw
+output at boundaries, including cancellation, nearest-even ties and
+overflow, and retain the general path for unproven inputs. Require the
+same six-pass pulse traces, support bounds and warm allocations and a
+lower complete-step tail in fresh launches before retaining a change.
+Two passes fit the measured interval for the isolated supported spatial
+fixture, while the planar and drop controls rule out that setting as a
+general ragdoll default.
+
+### Sustained Rotated Stack Density
+
+Every homogeneous case retains both fresh upward supports per stack in all
+192 measured steps, with 6,144 / 12,288 / 24,576 fresh rows for 4/8/16
+stacks, respectively. The largest warm manifold depth across both
+interfaces and settings is 0.013469 units. All three settings allocate
+0 B in each homogeneous case. The 16-stack mixed-load control at two
+passes loses a fresh support on step 220 in both replay launches.
+
+| Heavy-bottom stacks | Passes | Step p95 range (ms) | Worst (ms) | Overruns by launch |
+| --- | ---: | ---: | ---: | --- |
+| 4 | 2 | 5.67–8.68 | 11.35 | 0 / 0 / 0 |
+| 4 | 6 | 6.61–8.59 | 29.33 | 1 / 0 / 0 |
+| 4 | 12 | 5.14–13.12 | 26.83 | 0 / 0 / 3 |
+| 8 | 2 | 4.33–11.03 | 16.97 | 0 / 0 / 1 |
+| 8 | 6 | 10.74–13.74 | 24.81 | 1 / 3 / 0 |
+| 8 | 12 | 7.21–8.76 | 15.64 | 0 / 0 / 0 |
+| 16 | 2 | 7.26–10.24 | 18.04 | 2 / 0 / 0 |
+| 16 | 6 | 22.78–39.71 | 64.05 | 192 / 192 / 192 |
+| 16 | 12 | 13.84–20.47 | 28.32 | 2 / 0 / 44 |
+
+The original six-pass runs also overran on all 576 measured sixteen-stack
+steps, with p95 from 19.15 to 69.89 ms. Their eight-stack runs fit the
+full interval, while the ordinary baseline missed two steps and the
+screening runs missed four. The original mixed-load control retained
+support at six and twelve passes, with p95 of 18.07–18.85 and
+19.12–19.55 ms and warm totals of 7,752 and 7,608 B respectively. These
+figures retain the absolute worst values, including isolated spikes.
+
+At sixteen homogeneous stacks, the spatial stage probe recorded 16 solved
+islands each frame and 49,152 / 147,456 / 294,912 manifold row visits
+across the warm window at 2/6/12 passes. An exact accumulated-normal
+fallback is a call to `TryCalculateAccumulatedDeltaExact`, counted
+inside contact response. Those totals were 1,872 / 64,128 / 0. Six passes
+entered the fallback every warm frame. At twelve passes all 192 warm
+frames stayed off that path despite twice as many row visits. The measured
+median contact stage fell from 16.21 to 10.52 ms, including the exact-normal
+stage falling from 5.40 ms to zero. This comparison measures different
+solver trajectories of the same fixture. It establishes why pass count
+alone is a poor predictor of cost in these heavy-bottom contacts.
+
+**Tuning decision.** Keep six passes as the general starting point.
+Two passes are worth a host-specific trial for homogeneous heavy-bottom
+scenes and centered support with the measured geometry. Twelve passes
+also fit every screened eight-stack step, while the independent
+full-density launches recorded 2 / 1 / 0 overruns at that setting.
+None of the measured sixteen-stack settings fit every launch within
+16.67 ms. Use the host's actual reserved physics budget to admit scene
+density. For a host that needs more margin at sixteen stacks or a varied
+load mix, the next solver experiment is to isolate compact normal
+rejections at six passes on the centered and offset heavy-bottom
+supports. Compare any admissibility improvement against the exact
+velocity deltas, warm-start state, supports and replay at the same
+pass count.
+
+For the heavy-tip chain, compare tip displacement along and across the
+initial chain with actual anchor separation and a zero-input control
+before changing joint correction. The measured drift includes motion
+about the pinned root, so the displacement alone does not localize a
+joint error. Retain the existing one-unit bound during that investigation.
+
+Phase 3 completes the measured settings comparison and scopes the
+remaining solver work. The comparison adds no runtime or public setting.
 
 ## Completion And Publication
 
