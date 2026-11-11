@@ -1612,17 +1612,10 @@ replay and warm allocation output. Stage times are inclusive and serve
 attribution. The separate uninstrumented runtime runs supply the budget
 comparison above.
 
-Keep [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz)
-active for a focused experiment in the existing exact rounding owner.
-Evaluate hoisting invariant wide products out of the signed-sum search
-loop or tightening its certified search bracket. Match the exact rounded raw
-output at boundaries, including cancellation, nearest-even ties and
-overflow, and retain the general path for unproven inputs. Require the
-same six-pass pulse traces, support bounds and warm allocations and a
-lower complete-step tail in fresh launches before retaining a change.
-Two passes fit the measured interval for the isolated supported spatial
-fixture, while the planar and drop controls rule out that setting as a
-general ragdoll default.
+This evidence led to the [GRV-Benchmark-038 follow-up](#grv-benchmark-038-closeout)
+in the exact rounding owner. Two passes fit the measured interval for the
+isolated supported spatial fixture, while the planar and drop controls
+rule out that setting as a general ragdoll default.
 
 ### Sustained Rotated Stack Density
 
@@ -1687,6 +1680,112 @@ joint error. Retain the existing one-unit bound during that investigation.
 
 Phase 3 completes the measured settings comparison and scopes the
 remaining solver work. The comparison adds no runtime or public setting.
+
+### GRV-Benchmark-038 Closeout
+
+Discovered 2026-11-10 in the [#155 duration comparison](#grv-issue-155-implementation).
+[#156](#grv-issue-156-implementation) corrected sleep and preserved the
+recovery tails, which Phase 3 attributed to signed-sum rounding.
+
+The spatial Coulomb disk materializes a signed sum of a radical quotient
+and a rational quotient. Both the linear and angular callers supply the
+same positive rational denominator as a factor of the radical denominator.
+For terms `A/(B*D*sqrt(R)) + N/D` and a trial threshold `c/2`, the
+comparison has the sign of `2*A + (2*N*B - c*B*D)*sqrt(R)`. Cancelling
+the common factor and preparing the invariant products once reduces the
+width and repetition of the exact comparisons.
+
+For ordinary terms, magnitude division and the capped ratio square root
+from released FixedMathSharp 8 obtain the two integer parts. After
+normalizing the sum's sign, the fractional correction is in `(-1, 1)`
+for opposite signs and `[0, 2)` for positive terms. That bounds the floor
+to within one raw unit of the signed integer sum. A `2^62` cap on each
+part leaves room for the signed sum and its margin. Clipped terms use the
+full exact search, including cases where two individually wide terms
+cancel to a representable result. The signed range and nearest-even
+midpoints still use exact comparisons. The solver settings and contact
+order are the same as the baseline.
+
+The direct regressions cover a midpoint after cancelling two wide terms,
+adjacent numerators on opposite sides of an irrational midpoint, and
+cancellation at the integer-part cap. The existing signed-limit tests
+retain positive overflow at the half-unit boundary and negative
+nearest-even acceptance at the minimum. A disposable oracle generates
+8,192 operand sets using seed `0x0382026`, including padded magnitudes,
+individually wide cancelling terms, both signed range boundaries, and
+perfect and nonperfect roots. It compares each sum against half-integers
+with BigInteger products and squares. The committed binary receives
+`B*D` and the candidate receives `B`. Both match the oracle and each
+other on the success flag and raw value (7,324 accepted, 868 overflow).
+The sequence SHA-256 is
+`58014EFBDF803C0166166BE9021ADE331D78E3062B9B8EE20B402099E4C440C6`.
+
+Measured 2026-11-11 on committed `0f2bdf5c` and the candidate on Windows
+x64 (Core i7-9700K, .NET SDK 10.0.302, runtime 10.0.10). Build
+package-backed Release and run `verify-quality-ragdoll-duration --strict`.
+Use the Phase 3 disposable full-step timer and a six-pass setting. Four
+fresh processes per side ran in baseline/candidate/candidate/baseline,
+candidate/baseline/baseline/candidate order. They used the same benchmark
+binary and dependencies, swapping only `Gravitas.dll`. Timing surrounds
+`Simulate` and `LateSimulate` after one second, with 224 or 420 samples
+per case per launch. All eight cases completed in each launch.
+
+| Supported spatial ragdoll | Step p95 (ms), baseline → candidate | Worst step (ms), baseline → candidate | Overruns by launch, baseline → candidate |
+| --- | ---: | ---: | --- |
+| 32 Hz | 7.92–9.84 → 6.70–8.58 | 61.16 → 21.53 | 5 / 4 / 5 / 4 → 0 / 0 / 0 / 0 |
+| 60 Hz | 4.93–6.25 → 4.43–7.12 | 38.42 → 16.62 | 12 / 12 / 14 / 13 → 0 / 0 / 0 / 0 |
+
+Across the 44 samples at the 11 original 60 Hz recovery frame indices,
+the median step fell from 23.94 to 10.13 ms. An earlier four-launch
+comparison before the equivalent fallback-bound cleanup also recorded
+zero candidate overruns at both rates, with a 16.07 ms worst step at
+60 Hz. All eight duration cases
+matched baseline replay, physical checks and warm allocation output
+byte for byte. The supported runs and spatial drops allocated zero
+warm bytes. The two planar drops each retained their 384 B first-use
+partition allocation (GRV-Benchmark-036).
+
+The ordinary quality controls `verify-quality-stack-duration --strict`,
+`verify-quality-continuation`, `verify-quality-mixed` and
+`measure-quality-stack-density verify` also matched their baseline
+outputs. Both 1,024-actor strategy verifiers matched replay and work
+counts, including floor, CCD and connected-chain checks. Their timing
+rows are separate from the comparison above. The raw captures, probe
+source, per-frame timings and payload hashes are under
+`artifacts/benchmark-038`.
+
+The first two-launch density comparison recorded 13 and 6 eight-stack
+overruns on the candidate, versus 0 and 2 before. A separate path count
+found zero calls to the changed projection and rounding paths in all
+three homogeneous controls. The mixed-load control exercised 152
+projection checks and 1,392 signed-sum roundings. A four-launch retake
+per side found overlapping p50 and p95 ranges for all four density
+cases. The eight-stack control recorded five baseline overruns and one
+candidate overrun across 768 steps per side. The sixteen-stack
+homogeneous case exceeded the interval on all 768 steps on both sides.
+Support rows, terminal digests and managed allocations matched in every
+density launch.
+
+The measured 60 Hz worst step leaves about 0.04 ms of the full frame interval.
+Reopen for recurring equivalent-work recovery tails or a representative
+scene where this exact rounding path exceeds the host's reserved physics
+budget. Report the pulse frames, support work, replay and allocation
+evidence with the timing.
+
+Both package-backed profiles build `netstandard2.1` and `net10.0`.
+Ordinary Release and ReleaseLean binaries match the strict ragdoll output
+and each other on all eight shared replay captures and fixture hashes.
+The complete suites reach the following coverage under the repository filters.
+
+| Profile | Passing tests | Visited sequence points | Visited branches | Visited methods |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 8,495 | 54,283 / 54,283 | 22,464 / 22,464 | 5,695 / 5,695 |
+| ReleaseLean | 8,424 | 54,281 / 54,281 | 22,464 / 22,464 | 5,694 / 5,694 |
+
+The change removes 86 net runtime lines from the existing Coulomb disk
+owner. Independent review checked denominator factorization, scratch
+width, clipping and signed midpoint behavior. The benchmark signal is
+closed on this evidence. Guidance and publication remain in the checklist.
 
 ## Completion And Publication
 

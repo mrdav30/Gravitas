@@ -126,51 +126,6 @@ requires a deliberate bounded scene or documented reset policy; preserve
 the original strained input as a separate control. Do not enlarge geometry
 or alter anchors solely to hide a cost or escape.
 
-### GRV-Benchmark-038 — Supported Ragdoll Full-Step Tails At 60 Hz
-
-**Discovered 2026-11-10.** Active duration/cost signal from the corrected
-six-link spatial supported-start workload at six solver passes. Build the
-package-backed Release benchmark on `2273ea72` plus the
-[#155 correction](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-155-implementation),
-then run `verify-quality-ragdoll-duration --strict`. Preserve the original
-eight-second scenario, pulses at two/four/six seconds, 32/60 Hz controls,
-replay and geometry bounds.
-
-Disposable instrumentation timed only `Simulate` plus `LateSimulate` in the
-unobserved control after the first second, with 420 samples per 60 Hz launch.
-Two corrected launches retained all bounds and zero warm allocation, with a
-mean full step of 2.991268 ms and mean per-launch p95 of 5.832350 ms. Their
-maxima were 22.8986 and 23.3886 ms, both above the 16.67 ms frame interval.
-The prior solver measured 12.038256 ms mean and 37.1377 ms worst step, so
-the improvement does not establish that every supported step fits 60 Hz.
-At 32 Hz the corrected p95 was 14.8978 ms and worst step 30.3322 ms.
-These Windows x64 Core i7-9700K / .NET 10.0.10 results are host-specific.
-
-#156 now lets all six links settle between pulses. In the final paired
-retake, both corrected 60 Hz launches kept the same bounds and zero warm
-allocation, with a 1.92 ms mean and 7.00 ms mean launch p95. Their worst
-steps were 30.43 and 32.26 ms, both over the frame interval. The 32 Hz
-control also exceeded its 31.25 ms interval in both launches, peaking at
-62.60 ms. The
-[#156 record](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-156-implementation)
-retains both matched timing passes and the baseline launch variability.
-
-**Phase 3 attribution, 2026-11-11.** On committed `88bd5d29`, six fresh
-six-pass runs overran on the same 11 recovery frames with all six bodies
-awake and all six floor supports retained. The separate stage captures
-attribute the recurring cost to exact friction, with medians of 17.79 ms
-in the exact friction path and 13.53 ms within signed radical and rational
-sum rounding. Two passes fit the interval for the isolated supported
-spatial scene. The planar and drop controls fail at that setting, and
-twelve passes increase the supported spatial cost. The
-[Phase 3 attribution](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#supported-spatial-ragdoll-tail-attribution)
-records the frame IDs, controls, and stage and complete-step measurements.
-
-**Next isolation:** Evaluate a tighter certified rounding search in
-`TryGetSignedRadicalAndRationalSum` on the six-pass recovery frames.
-Preserve exact output, warm-start state, replay, geometry and warm
-allocations. Recheck the complete-step tails in fresh processes.
-
 ## Experimental Signals
 
 | Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
@@ -415,13 +370,14 @@ Dates retain the recorded closure, which may precede the commit or package
 release. Outcomes include verified fixes and documented no-further-change
 decisions; historical validation is not a fresh run or release claim.
 
-Detailed reproducers, measurements, revisions, commands and reopening criteria
-are preserved in the
+The evidence links lead to detailed reproducers, measurements, revisions,
+commands and reopening criteria in the owning plans or
 [archived records](done/2026-10-31-benchmark-signal-closeouts.md). Existing
 signal anchors remain on the rows below.
 
 | Signal                                                                                                                                                                                                    | Closed     | Outcome                                                                                                                                                                                    | Evidence                                                                                                                                 |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| <a id="grv-benchmark-038"></a><a id="grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz"></a>GRV-Benchmark-038 — Supported ragdoll full-step tails at 60 Hz | 2026-11-11 | Factored, bounded exact rounding removes the recurring spatial ragdoll overruns at 32/60 Hz in the matched host runs. Rounding, replay and warm allocations match. | [Closeout](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-benchmark-038-closeout) |
 | <a id="grv-benchmark-035"></a>GRV-Benchmark-035 — Warm pair growth in rotated cuboid stacks | 2026-11-09 | Rejects all 20 disjoint acquisitions in the mixed-load stack capture and cuts warm allocation from 66,032 B to 7,752 B. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-035) |
 | <a id="grv-benchmark-034"></a><a id="grv-benchmark-034--rotated-cuboid-support-step-cost"></a>GRV-Benchmark-034 — Rotated cuboid support step cost | 2026-11-09 | Shared-frame exact levers reduce step cost with matching replay and allocations. The dense stress case remains above the 60 Hz interval. | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-034) |
 | <a id="grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost"></a>GRV-Benchmark-031 — Ordinary open-mesh mixed full step                                                                             | 2026-11-01 | Certified patch/prism contacts reduce the ordinary step from 4.52 ms to 115 us at zero warm allocation; exit/group selection and small-control limits retained.                            | [Closeout](done/2026-10-31-benchmark-signal-closeouts.md#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost)                     |

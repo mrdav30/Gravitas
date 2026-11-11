@@ -129,7 +129,6 @@ internal static partial class ExactContactResponseKernel
         Span<ulong> projectedNumerator =
             stackalloc ulong[MaxCoulombComparisonWords / 2];
         Span<ulong> valueMagnitude = stackalloc ulong[state?.HasTangents == true ? MaxResponseWords : 3];
-        Span<ulong> fixedDenominator = stackalloc ulong[1];
         WideArithmetic.MultiplyMagnitudes(
             directionNumerator,
             radialNumerator,
@@ -138,26 +137,25 @@ internal static partial class ExactContactResponseKernel
             (primary ? state.PrimaryMagnitude : state.SecondaryMagnitude).CopyTo(valueMagnitude);
         else
             SetMagnitude(value, valueMagnitude);
-        fixedDenominator.Clear();
-        fixedDenominator[0] = 1UL;
         int valueSign =
             state?.HasTangents == true ? primary ? state.PrimarySign : state.SecondarySign
                 : value == Fixed64.Zero ? 0 : value < Fixed64.Zero ? -1 : 1;
-        return CompareSignedRadicalAndRationalSumToMagnitude(
+        Span<ulong> valueCoefficient = stackalloc ulong[MaxCoulombComparisonWords];
+        WideArithmetic.MultiplyMagnitudes(valueMagnitude, radialDenominator, valueCoefficient);
+        return WideArithmetic.GetSignedMagnitudeAndSquareRootSign(
                 projectedNumerator,
-                radialDenominator,
-                radicand,
                 directionSign,
-                valueMagnitude,
-                fixedDenominator,
+                valueCoefficient,
                 -valueSign,
-                candidate: 0UL)
+                radicand)
             == 0;
     }
 
+    // The radical denominator is the supplied factor times the rational denominator.
+    // Both factors and the radicand are positive.
     internal static bool TryGetSignedRadicalAndRationalSum(
         ReadOnlySpan<ulong> radicalNumerator,
-        ReadOnlySpan<ulong> radicalDenominator,
+        ReadOnlySpan<ulong> radicalDenominatorFactor,
         ReadOnlySpan<ulong> radicand,
         int radicalSign,
         ReadOnlySpan<ulong> rationalNumerator,
@@ -165,15 +163,25 @@ internal static partial class ExactContactResponseKernel
         int rationalSign,
         out Fixed64 result)
     {
-        int resultSign = CompareSignedRadicalAndRationalSumToMagnitude(
-            radicalNumerator,
-            radicalDenominator,
-            radicand,
-            radicalSign,
-            rationalNumerator,
-            rationalDenominator,
-            rationalSign,
-            candidate: 0UL);
+        radicalNumerator = TrimMagnitude(radicalNumerator);
+        radicalDenominatorFactor = TrimMagnitude(radicalDenominatorFactor);
+        rationalNumerator = TrimMagnitude(rationalNumerator);
+        rationalDenominator = TrimMagnitude(rationalDenominator);
+        radicand = TrimMagnitude(radicand);
+
+        // A/(B*D*sqrt(R)) + N/D compared to c/2 has the sign of
+        // 2*A + (2*N*B - c*B*D)*sqrt(R). Prepare the invariant products once.
+        ReadOnlySpan<ulong> two = stackalloc ulong[] { 2UL };
+        Span<ulong> doubledRadical = stackalloc ulong[radicalNumerator.Length + 1];
+        Span<ulong> doubledCoefficient =
+            stackalloc ulong[rationalNumerator.Length + radicalDenominatorFactor.Length + 1];
+        Span<ulong> denominator =
+            stackalloc ulong[radicalDenominatorFactor.Length + rationalDenominator.Length];
+        WideArithmetic.MultiplyMagnitudes(radicalNumerator, two, doubledRadical);
+        Multiply3(rationalNumerator, radicalDenominatorFactor, two, doubledCoefficient);
+        WideArithmetic.MultiplyMagnitudes(radicalDenominatorFactor, rationalDenominator, denominator);
+        int resultSign = WideArithmetic.GetSignedMagnitudeAndSquareRootSign(
+            doubledRadical, radicalSign, doubledCoefficient, rationalSign, radicand);
         if (resultSign == 0)
         {
             result = Fixed64.Zero;
@@ -186,20 +194,9 @@ internal static partial class ExactContactResponseKernel
             resultSign < 0 ? -rationalSign : rationalSign;
         ulong limit =
             resultSign < 0 ? 1UL << 63 : (ulong)long.MaxValue;
-        Span<ulong> doubledLimit = stackalloc ulong[2];
-        doubledLimit[0] = (limit << 1) | 1UL;
-        doubledLimit[1] = limit >> 63;
         int limitMidpointComparison =
-            CompareSignedRadicalAndRationalSumToMagnitude(
-                radicalNumerator,
-                radicalDenominator,
-                radicand,
-                normalizedRadicalSign,
-                rationalNumerator,
-                rationalDenominator,
-                normalizedRationalSign,
-                doubledLimit,
-                expressionMultiplier: 2UL);
+            ComparePreparedSignedSum(doubledRadical, normalizedRadicalSign, doubledCoefficient,
+                normalizedRationalSign, denominator, radicand, limit, midpoint: true);
         if (limitMidpointComparison > 0
             || (limitMidpointComparison == 0
                 && (limit & 1UL) != 0UL))
@@ -208,28 +205,23 @@ internal static partial class ExactContactResponseKernel
             return false;
         }
 
-        ulong low = 0UL;
-        // Each magnitude is below its power-of-two bound. One more bit
-        // bounds their sum, even if the signed terms cancel.
-        int rationalBits = WideArithmetic.GetMagnitudeBitLength(rationalNumerator)
-            - WideArithmetic.GetMagnitudeBitLength(rationalDenominator) + 1;
-        int bits = Math.Max(0, Math.Max(rationalBits,
-            GetRadialQuotientBitBound(radicalNumerator, radicalDenominator, radicand)) + 1);
-        ulong high = bits < 63 ? (1UL << bits) - 1UL : limit;
+        ulong low = 0UL, high = limit;
+        if (TryGetSignedSumIntegerParts(radicalNumerator, TrimMagnitude(denominator), radicand,
+                normalizedRadicalSign, rationalNumerator, rationalDenominator, normalizedRationalSign,
+                out long integerParts))
+        {
+            // The normalized sum is positive. With opposite signs the fractional
+            // correction is in (-1, 1), and with positive terms it is in [0, 2).
+            low = (ulong)Math.Max(0L, integerParts - 1L);
+            high = (ulong)(integerParts + 1L);
+        }
         while (low < high)
         {
             ulong difference = high - low;
             ulong middle =
                 low + (difference >> 1) + (difference & 1UL);
-            if (CompareSignedRadicalAndRationalSumToMagnitude(
-                    radicalNumerator,
-                    radicalDenominator,
-                    radicand,
-                    normalizedRadicalSign,
-                    rationalNumerator,
-                    rationalDenominator,
-                    normalizedRationalSign,
-                    middle) >= 0)
+            if (ComparePreparedSignedSum(doubledRadical, normalizedRadicalSign, doubledCoefficient,
+                    normalizedRationalSign, denominator, radicand, middle, midpoint: false) >= 0)
             {
                 low = middle;
             }
@@ -240,20 +232,9 @@ internal static partial class ExactContactResponseKernel
         }
 
         ulong quotient = low;
-        Span<ulong> doubledQuotient = stackalloc ulong[2];
-        doubledQuotient[0] = (quotient << 1) | 1UL;
-        doubledQuotient[1] = quotient >> 63;
         int midpointComparison =
-            CompareSignedRadicalAndRationalSumToMagnitude(
-                radicalNumerator,
-                radicalDenominator,
-                radicand,
-                normalizedRadicalSign,
-                rationalNumerator,
-                rationalDenominator,
-                normalizedRationalSign,
-                doubledQuotient,
-                expressionMultiplier: 2UL);
+            ComparePreparedSignedSum(doubledRadical, normalizedRadicalSign, doubledCoefficient,
+                normalizedRationalSign, denominator, radicand, quotient, midpoint: true);
         bool roundUp = midpointComparison > 0
             | (midpointComparison == 0 & (quotient & 1UL) != 0UL);
         if (roundUp & quotient < limit)
@@ -266,6 +247,39 @@ internal static partial class ExactContactResponseKernel
         return true;
     }
 
+    private static bool TryGetSignedSumIntegerParts(
+        ReadOnlySpan<ulong> radicalNumerator,
+        ReadOnlySpan<ulong> radicalDenominator,
+        ReadOnlySpan<ulong> radicand,
+        int radicalSign,
+        ReadOnlySpan<ulong> rationalNumerator,
+        ReadOnlySpan<ulong> rationalDenominator,
+        int rationalSign,
+        out long integerParts)
+    {
+        // Two unclipped parts and a one-unit search margin fit in Int64.
+        const ulong cap = 1UL << 62;
+        Span<ulong> rationalFloor = stackalloc ulong[Math.Max(1, rationalNumerator.Length)];
+        Span<ulong> remainder = stackalloc ulong[rationalDenominator.Length];
+        Span<ulong> division = stackalloc ulong[rationalNumerator.Length + rationalDenominator.Length + 1];
+        WideArithmetic.DivideMagnitudes(rationalNumerator, rationalDenominator, rationalFloor, remainder, division);
+        integerParts = 0;
+        if (rationalFloor[0] >= cap || !WideArithmetic.IsZeroMagnitude(rationalFloor[1..]))
+            return false;
+
+        int words = Math.Max(radicalNumerator.Length * 2, radicalDenominator.Length * 2 + radicand.Length);
+        Span<ulong> squareNumerator = stackalloc ulong[words];
+        Span<ulong> squareDenominator = stackalloc ulong[words];
+        WideArithmetic.MultiplyMagnitudes(radicalNumerator, radicalNumerator, squareNumerator);
+        Multiply3(radicalDenominator, radicalDenominator, radicand, squareDenominator);
+        ulong radicalFloor = WideArithmetic.GetRatioFloorSquareRoot(squareNumerator, squareDenominator, cap);
+        if (radicalFloor >= cap)
+            return false;
+
+        integerParts = radicalSign * (long)radicalFloor + rationalSign * (long)rationalFloor[0];
+        return true;
+    }
+
     private static int GetRadialQuotientBitBound(
         ReadOnlySpan<ulong> numerator,
         ReadOnlySpan<ulong> denominator,
@@ -274,88 +288,24 @@ internal static partial class ExactContactResponseKernel
         - WideArithmetic.GetMagnitudeBitLength(denominator)
         - (WideArithmetic.GetMagnitudeBitLength(radicand) - 1) / 2 + 2;
 
-    private static int CompareSignedRadicalAndRationalSumToMagnitude(
-        ReadOnlySpan<ulong> radicalNumerator,
-        ReadOnlySpan<ulong> radicalDenominator,
-        ReadOnlySpan<ulong> radicand,
+    private static int ComparePreparedSignedSum(
+        ReadOnlySpan<ulong> doubledRadical,
         int radicalSign,
-        ReadOnlySpan<ulong> rationalNumerator,
-        ReadOnlySpan<ulong> rationalDenominator,
+        ReadOnlySpan<ulong> doubledCoefficient,
         int rationalSign,
-        ulong candidate)
-    {
-        Span<ulong> candidateMagnitude = stackalloc ulong[1];
-        candidateMagnitude[0] = candidate;
-        return CompareSignedRadicalAndRationalSumToMagnitude(
-            radicalNumerator,
-            radicalDenominator,
-            radicand,
-            radicalSign,
-            rationalNumerator,
-            rationalDenominator,
-            rationalSign,
-            candidateMagnitude,
-            expressionMultiplier: 1UL);
-    }
-
-    private static int CompareSignedRadicalAndRationalSumToMagnitude(
-        ReadOnlySpan<ulong> radicalNumerator,
-        ReadOnlySpan<ulong> radicalDenominator,
+        ReadOnlySpan<ulong> denominator,
         ReadOnlySpan<ulong> radicand,
-        int radicalSign,
-        ReadOnlySpan<ulong> rationalNumerator,
-        ReadOnlySpan<ulong> rationalDenominator,
-        int rationalSign,
-        ReadOnlySpan<ulong> candidate,
-        ulong expressionMultiplier)
+        ulong candidate,
+        bool midpoint)
     {
-        Span<ulong> multiplier = stackalloc ulong[1];
-        Span<ulong> scaledRadicalNumerator =
-            stackalloc ulong[MaxCoulombComparisonWords];
-        Span<ulong> scaledRationalNumerator =
-            stackalloc ulong[MaxCoulombComparisonWords];
-        Span<ulong> candidateAtDenominator =
-            stackalloc ulong[MaxCoulombComparisonWords];
-        Span<ulong> adjustedRationalNumerator =
-            stackalloc ulong[MaxCoulombComparisonWords];
-        Span<ulong> rationalTerm =
-            stackalloc ulong[MaxCoulombComparisonWords];
-        Span<ulong> radicalCoefficient =
-            stackalloc ulong[MaxCoulombComparisonWords];
-        multiplier[0] = expressionMultiplier;
-        WideArithmetic.MultiplyMagnitudes(
-            radicalNumerator,
-            multiplier,
-            scaledRadicalNumerator);
-        WideArithmetic.MultiplyMagnitudes(
-            rationalNumerator,
-            multiplier,
-            scaledRationalNumerator);
-        WideArithmetic.MultiplyMagnitudes(
-            candidate,
-            rationalDenominator,
-            candidateAtDenominator);
-        AddSignedMagnitudes(
-            scaledRationalNumerator,
-            rationalSign,
-            candidateAtDenominator,
-            -1,
-            adjustedRationalNumerator,
-            out int adjustedRationalSign);
-        WideArithmetic.MultiplyMagnitudes(
-            scaledRadicalNumerator,
-            rationalDenominator,
-            rationalTerm);
-        WideArithmetic.MultiplyMagnitudes(
-            adjustedRationalNumerator,
-            radicalDenominator,
-            radicalCoefficient);
+        ReadOnlySpan<ulong> doubledCandidate =
+            stackalloc ulong[] { (candidate << 1) | (midpoint ? 1UL : 0UL), candidate >> 63 };
+        Span<ulong> threshold = stackalloc ulong[denominator.Length + doubledCandidate.Length];
+        Span<ulong> adjusted = stackalloc ulong[Math.Max(doubledCoefficient.Length, threshold.Length) + 1];
+        WideArithmetic.MultiplyMagnitudes(doubledCandidate, denominator, threshold);
+        AddSignedMagnitudes(doubledCoefficient, rationalSign, threshold, -1, adjusted, out int adjustedSign);
         return WideArithmetic.GetSignedMagnitudeAndSquareRootSign(
-            TrimMagnitude(rationalTerm),
-            radicalSign,
-            TrimMagnitude(radicalCoefficient),
-            adjustedRationalSign,
-            TrimMagnitude(radicand));
+            doubledRadical, radicalSign, adjusted, adjustedSign, radicand);
     }
 
     private static void GetWeightedFixedSum(
@@ -449,14 +399,8 @@ internal static partial class ExactContactResponseKernel
     private static int GetProductSign(Fixed64 first, Fixed64 second) =>
         Math.Sign(first.m_rawValue) * Math.Sign(second.m_rawValue);
 
-    private static ReadOnlySpan<ulong> TrimMagnitude(
-        ReadOnlySpan<ulong> value)
-    {
-        int length = value.Length;
-        while (length > 0 && value[length - 1] == 0UL)
-            length--;
-        return value.Slice(0, length);
-    }
+    private static ReadOnlySpan<ulong> TrimMagnitude(ReadOnlySpan<ulong> value) =>
+        value[..WideArithmetic.GetActiveMagnitudeLength(value)];
 
     private static bool TryGetDiskVelocityDeltas(
         in ExactContactResponseOperand3D primaryFirst,
@@ -661,16 +605,9 @@ internal static partial class ExactContactResponseKernel
             stackalloc ulong[3];
         Span<ulong> fixedScale = stackalloc ulong[1];
         Span<ulong> numerator = stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> denominator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
         SetMagnitude(inverseMass, inverseMassMagnitude);
         fixedScale.Clear();
         fixedScale[0] = (ulong)FixedMath.ONE_L;
-        Multiply3(
-            commonDenominator,
-            fixedScale,
-            fixedScale,
-            denominator);
         if (rational)
         {
             if (combinedSign == 0)
@@ -679,6 +616,8 @@ internal static partial class ExactContactResponseKernel
                 return true;
             }
 
+            Span<ulong> denominator = stackalloc ulong[MaxCoulombComparisonWords / 2];
+            Multiply3(commonDenominator, fixedScale, fixedScale, denominator);
             WideArithmetic.MultiplyMagnitudes(
                 combined,
                 inverseMassMagnitude,
@@ -692,8 +631,6 @@ internal static partial class ExactContactResponseKernel
 
         Span<ulong> scaledNumerator =
             stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> radicalDenominator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
         Span<ulong> cachedCombined = stackalloc ulong[state?.HasTangents == true ? 64 : 3];
         Span<ulong> cachedNumerator = stackalloc ulong[state?.HasTangents == true ? 65 : 4];
         Span<ulong> cachedDenominator = stackalloc ulong[2];
@@ -705,14 +642,6 @@ internal static partial class ExactContactResponseKernel
             numerator,
             radialNumerator,
             scaledNumerator);
-        WideArithmetic.MultiplyMagnitudes(
-            radialDenominator,
-            fixedScale,
-            radicalDenominator);
-        WideArithmetic.MultiplyMagnitudes(
-            radicalDenominator,
-            fixedScale,
-            denominator);
         GetWeightedFixedSum(
             primaryAxis,
             accumulatedPrimaryTangentImpulse,
@@ -730,7 +659,7 @@ internal static partial class ExactContactResponseKernel
             cachedDenominator);
         return TryGetSignedRadicalAndRationalSum(
             scaledNumerator,
-            denominator,
+            radialDenominator,
             radicand,
             combinedSign,
             cachedNumerator,
@@ -881,16 +810,9 @@ internal static partial class ExactContactResponseKernel
         Span<ulong> transformedDenominatorMagnitude =
             stackalloc ulong[11];
         Span<ulong> fixedScale = stackalloc ulong[1];
-        Span<ulong> denominator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
         SetMagnitude(transformedDenominator, transformedDenominatorMagnitude);
         fixedScale.Clear();
         fixedScale[0] = (ulong)FixedMath.ONE_L;
-        Multiply3(
-            transformedDenominatorMagnitude,
-            commonDenominator,
-            fixedScale,
-            denominator);
         if (rational)
         {
             if (combinedSign == 0)
@@ -899,6 +821,8 @@ internal static partial class ExactContactResponseKernel
                 return true;
             }
 
+            Span<ulong> denominator = stackalloc ulong[MaxCoulombComparisonWords / 2];
+            Multiply3(transformedDenominatorMagnitude, commonDenominator, fixedScale, denominator);
             return Fixed64.TryGetSignedRawRatio(
                 combined,
                 denominator,
@@ -908,22 +832,12 @@ internal static partial class ExactContactResponseKernel
 
         Span<ulong> scaledNumerator =
             stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> radicalDenominator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
         Span<ulong> cachedCombined = stackalloc ulong[state?.HasTangents == true ? 64 : 15];
         Span<ulong> cachedDenominator = stackalloc ulong[12];
         WideArithmetic.MultiplyMagnitudes(
             combined,
             radialNumerator,
             scaledNumerator);
-        WideArithmetic.MultiplyMagnitudes(
-            transformedDenominatorMagnitude,
-            radialDenominator,
-            radicalDenominator);
-        WideArithmetic.MultiplyMagnitudes(
-            radicalDenominator,
-            fixedScale,
-            denominator);
         GetWeightedSignedWideSum(
             primary,
             accumulatedPrimaryTangentImpulse,
@@ -937,7 +851,7 @@ internal static partial class ExactContactResponseKernel
             cachedDenominator);
         return TryGetSignedRadicalAndRationalSum(
             scaledNumerator,
-            denominator,
+            radialDenominator,
             radicand,
             combinedSign,
             cachedCombined,

@@ -27,6 +27,41 @@ public sealed partial class ExactContactResponseKernelCoulombTests
         Assert.Equal(Fixed64.FromRaw(expectedRaw), actual);
     }
 
+    [Theory]
+    [InlineData(ulong.MaxValue, ulong.MaxValue, 2UL, 1L)]
+    [InlineData(0UL, 0UL, 3UL, 2L)]
+    [InlineData(1UL, 0UL, 3UL, 2L)]
+    public void CoulombDiskCompositeMaterialization_ShouldRoundAfterWideCancellation(
+        ulong low, ulong middle, ulong high, long expectedRaw)
+    {
+        // B = D = 2^64 and sqrt(R) = 2. Subtract 2^128 from
+        // 2^128 + 3/2 plus or minus one numerator unit.
+        ulong[] radical = [low, middle, high, 0UL, 2UL, 0UL];
+        ulong[] factor = [0UL, 1UL, 0UL];
+        ulong[] rational = [0UL, 0UL, 0UL, 1UL, 0UL];
+        foreach (int sign in new[] { 1, -1 })
+        {
+            Assert.True(ExactContactResponseKernel.TryGetSignedRadicalAndRationalSum(
+                radical, factor, [4UL, 0UL], sign, rational, factor, -sign, out Fixed64 actual));
+            Assert.Equal(Fixed64.FromRaw(sign * expectedRaw), actual);
+        }
+    }
+
+    [Theory]
+    [InlineData(2237965328579243405UL, 0L)]
+    [InlineData(2237965328579243406UL, 1L)]
+    public void CoulombDiskCompositeMaterialization_ShouldDistinguishIrrationalMidpointNeighbors(
+        ulong low, long expectedRaw)
+    {
+        // These adjacent numerators straddle 3 * 2^63 * sqrt(2).
+        foreach (int sign in new[] { 1, -1 })
+        {
+            Assert.True(ExactContactResponseKernel.TryGetSignedRadicalAndRationalSum(
+                [low, 2UL], [1UL], [2UL], sign, [0UL, 1UL], [0UL, 1UL], -sign, out Fixed64 actual));
+            Assert.Equal(Fixed64.FromRaw(sign * expectedRaw), actual);
+        }
+    }
+
     [Fact]
     public void CoulombDiskCompositeMaterialization_ShouldHonorHalfEvenLimits()
     {
@@ -79,6 +114,14 @@ public sealed partial class ExactContactResponseKernelCoulombTests
                 rationalDenominator,
                 rationalSign: 0,
                 out _));
+    }
+
+    [Fact]
+    public void CoulombDiskCompositeMaterialization_ShouldHandleCancellationAtIntegerPartCap()
+    {
+        Assert.True(ExactContactResponseKernel.TryGetSignedRadicalAndRationalSum(
+            [(1UL << 63) - 3UL], [1UL], [4UL], 1, [1UL << 62], [1UL], -1, out Fixed64 actual));
+        Assert.Equal(Fixed64.FromRaw(-2), actual);
     }
 
     [Fact]
