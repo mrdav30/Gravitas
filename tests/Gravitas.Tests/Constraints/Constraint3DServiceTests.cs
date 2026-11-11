@@ -907,6 +907,168 @@ public sealed class Constraint3DServiceTests
         scenario.Context.Constraints3D.RegisteredRagdollCount.Should().Be(0);
     }
 
+    [Theory]
+    [InlineData(32)]
+    [InlineData(60)]
+    public void BallSocketJoint_ShouldCorrectStructuralErrorPerFixedStep(int rate)
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        scenario.Context.SetFrameRate(rate);
+        var first = scenario.CreateSphere(Vector3d.Zero, immovable: true);
+        Fixed64 initialError = Fixed64.FromFraction(1, 16);
+        var second = scenario.CreateSphere(Vector3d.Right * initialError);
+        first.Body.UseManualGrounding();
+        second.Body.UseManualGrounding();
+        scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+
+        Step(scenario.Context, 2);
+
+        Fixed64 expected = initialError * Fixed64.FromFraction(3, 5);
+        Assert.True((second.Body.Position3d.X - expected).Abs() <= Fixed64.FromRaw(4096),
+            $"At {rate} Hz the second step left anchor error {second.Body.Position3d.X}, expected {expected}.");
+        Assert.Equal(Fixed64.Zero, second.Body.Position3d.Y);
+        Assert.Equal(Fixed64.Zero, second.Body.Position3d.Z);
+        Assert.Equal(Vector3d.Zero, second.Body.AngularVelocity);
+    }
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(60)]
+    public void HingeLimit_ShouldCorrectStructuralErrorPerFixedStep(int rate)
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        GravitasWorldContext context = scenario.Context;
+        context.SetFrameRate(rate);
+        SolidBody anchor = scenario.CreateSphere(Vector3d.Zero, immovable: true).Body;
+        SolidBody body = scenario.CreateSphere(Vector3d.Zero,
+            FixedQuaternion.FromAxisAngle(Vector3d.Right, Fixed64.FromFraction(3, 4))).Body;
+        anchor.UseManualGrounding();
+        body.UseManualGrounding();
+        context.Constraints3D.RegisterJoint(new JointDefinition3D(anchor, body,
+            LocalFrame(Vector3d.Zero), LocalFrame(Vector3d.Zero), JointType3D.Hinge,
+            JointLimit3D.Hinge(Fixed64.Half), JointMotor3D.Disabled, JointCollisionPolicy.SuppressLinked));
+        Fixed64 expectedSpin = -Fixed64.Quarter * Fixed64.FromFraction(2, 5) * rate;
+        Fixed64 tolerance = Fixed64.FromFraction(1, 4096);
+
+        Step(context, 1);
+
+        Assert.True((body.AngularVelocity - Vector3d.Right * expectedSpin).Magnitude <= tolerance,
+            $"At {rate} Hz the hinge produced spin {body.AngularVelocity}, expected X={expectedSpin}.");
+        Step(context, 1);
+        // Normalized Euler quaternion integration advances by 2*atan(.1/2), approximately .1 radians.
+        Fixed64 angle = Fixed64.Two * FixedMath.Atan2(body.Rotation.X, body.Rotation.W);
+        Assert.True((angle - Fixed64.FromFraction(13, 20)).Abs() <= tolerance);
+        Assert.Equal(Vector3d.Zero, body.Position3d);
+        Assert.Equal(Vector3d.Zero, body.LinearVelocity);
+        Assert.Equal(Vector3d.Zero, anchor.AngularVelocity);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void JointResponseAtSpeedLimit_ShouldPreserveMomentumAndCacheTheAppliedImpulse(bool reverse)
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        scenario.Context.Settings.DiscreteSolverIterations = 1;
+        Fixed64 limit = Fixed64.FromFraction(1, 10);
+        scenario.Context.Environment.MaxSpeed = limit;
+        var first = scenario.CreateSphere(Vector3d.Zero);
+        var second = scenario.CreateSphere(Vector3d.Right * (Fixed64)3, mass: Fixed64.Two);
+        first.Body.UseManualGrounding();
+        second.Body.UseManualGrounding();
+        first.Body.AddLinearImpulse(Vector3d.Right * Fixed64.FromFraction(9, 100));
+        second.Body.AddLinearImpulse(Vector3d.Right * limit * second.Body.Mass);
+        Vector3d initialMomentum = first.Body.LinearVelocity * first.Body.Mass + second.Body.LinearVelocity * second.Body.Mass;
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(reverse
+            ? CreateBallSocket(second.Body, first.Body) : CreateBallSocket(first.Body, second.Body));
+
+        Step(scenario.Context, 1);
+
+        Fixed64 tolerance = Fixed64.FromRaw(4096);
+        Vector3d momentum = first.Body.LinearVelocity * first.Body.Mass + second.Body.LinearVelocity * second.Body.Mass;
+        Assert.True((momentum - initialMomentum).Magnitude <= tolerance, $"The joint changed total momentum by {momentum - initialMomentum}.");
+        Assert.True((first.Body.LinearVelocity.X - limit).Abs() <= tolerance);
+        Assert.True((second.Body.LinearVelocity.X - Fixed64.FromFraction(19, 200)).Abs() <= tolerance);
+        Assert.True((joint.GetCachedImpulse(0).Abs() - Fixed64.FromFraction(1, 100)).Abs() <= tolerance);
+
+        Step(scenario.Context, 1);
+
+        momentum = first.Body.LinearVelocity * first.Body.Mass + second.Body.LinearVelocity * second.Body.Mass;
+        Assert.True((momentum - initialMomentum).Magnitude <= tolerance);
+        Assert.True((first.Body.LinearVelocity.X - limit).Abs() <= tolerance);
+        Assert.True((second.Body.LinearVelocity.X - Fixed64.FromFraction(19, 200)).Abs() <= tolerance);
+        Assert.True(joint.GetCachedImpulse(0).Abs() <= tolerance);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OffCenterJointAtAngularSpeedLimit_ShouldCacheOneSharedImpulseAndProjectFrozenAxes(bool freezeFirstSpin)
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        scenario.Context.Environment.MaxSpeed = Fixed64.FromFraction(1, 10);
+        SolidBody first = scenario.CreateSphere(Vector3d.Zero, mass: Fixed64.One).Body;
+        SolidBody second = scenario.CreateSphere(Vector3d.Right * (Fixed64)3, mass: Fixed64.Two).Body;
+        first.FreezeAxes = second.FreezeAxes = BodyFreezeAxes3D.PositionY | BodyFreezeAxes3D.PositionZ
+            | BodyFreezeAxes3D.RotationX | BodyFreezeAxes3D.RotationY;
+        if (freezeFirstSpin) first.FreezeAxes |= BodyFreezeAxes3D.RotationZ;
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(new JointDefinition3D(first, second,
+            LocalFrame(Vector3d.Up), LocalFrame(Vector3d.Up), JointType3D.BallSocket,
+            JointLimit3D.Unrestricted, JointMotor3D.Disabled, JointCollisionPolicy.SuppressLinked));
+
+        // Isolate the scalar response before integration rotates the levers and
+        // creates additional coupled rows; the diagonal control below uses a full step.
+        JointSolver3D.Solve(joint, applyCachedImpulse: false, scenario.Context.InvDeltaTime);
+
+        // Radius 1/2 solid spheres have I = m/10. The unit lever limits lambda
+        // to .01 via the first sphere, or .02 via the second when the first cannot spin.
+        Fixed64 impulse = Fixed64.FromFraction(freezeFirstSpin ? 2 : 1, 100);
+        Fixed64 tolerance = Fixed64.FromRaw(4096);
+        Assert.True((joint.GetCachedImpulse(0) + impulse).Abs() <= tolerance);
+        Assert.True((first.LinearVelocity - Vector3d.Right * impulse).Magnitude <= tolerance);
+        Assert.True((second.LinearVelocity + Vector3d.Right * (impulse / Fixed64.Two)).Magnitude <= tolerance);
+        Assert.True((first.LinearVelocity * first.Mass + second.LinearVelocity * second.Mass).Magnitude <= tolerance);
+        Assert.True((first.AngularVelocity - (freezeFirstSpin ? Vector3d.Zero : -Vector3d.Forward * (impulse * 10))).Magnitude <= tolerance);
+        Assert.True((second.AngularVelocity - Vector3d.Forward * (impulse * 5)).Magnitude <= tolerance);
+        Assert.Equal(Fixed64.Zero, joint.GetCachedImpulse(1));
+        Assert.Equal(Fixed64.Zero, joint.GetCachedImpulse(2));
+    }
+
+    [Fact]
+    public void JointNearDiagonalSpeedLimit_ShouldPreserveMomentumAndCacheTheGeometricRemainder()
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        Fixed64 limit = Fixed64.FromFraction(1, 10), transverse = Fixed64.FromFraction(8, 100);
+        scenario.Context.Environment.MaxSpeed = limit;
+        SolidBody first = scenario.CreateSphere(Vector3d.Zero, mass: Fixed64.One).Body;
+        SolidBody second = scenario.CreateSphere(Vector3d.Right * (Fixed64)3, mass: Fixed64.Two).Body;
+        first.UseManualGrounding();
+        second.UseManualGrounding();
+        first.FreezeAxes = second.FreezeAxes = BodyFreezeAxes3D.PositionZ | BodyFreezeAxes3D.Rotation;
+        first.AddLinearImpulse(new Vector3d(Fixed64.FromFraction(59, 1000), transverse, Fixed64.Zero));
+        second.AddLinearImpulse(new Vector3d(Fixed64.FromFraction(6, 100), transverse, Fixed64.Zero) * second.Mass);
+        Vector3d momentum = first.LinearVelocity * first.Mass + second.LinearVelocity * second.Mass;
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first, second));
+
+        scenario.Context.Settings.DiscreteSolverIterations = 1;
+        Step(scenario.Context, 1);
+
+        // sqrt(.1^2 - .08^2) = .06: only .001 remains for the first sphere's X response.
+        Fixed64 tolerance = Fixed64.FromRaw(4096);
+        Assert.True((joint.GetCachedImpulse(0) + Fixed64.FromFraction(1, 1000)).Abs() <= tolerance);
+        Assert.True((first.LinearVelocity.X - Fixed64.FromFraction(6, 100)).Abs() <= tolerance);
+        Assert.True((second.LinearVelocity.X - Fixed64.FromFraction(119, 2000)).Abs() <= tolerance);
+        Assert.True((first.LinearVelocity * first.Mass + second.LinearVelocity * second.Mass - momentum).Magnitude <= tolerance);
+        Assert.Equal(transverse, first.LinearVelocity.Y);
+        Assert.Equal(transverse, second.LinearVelocity.Y);
+        Assert.Equal(Fixed64.Zero, first.LinearVelocity.Z);
+        Assert.Equal(Fixed64.Zero, second.LinearVelocity.Z);
+        Assert.Equal(Vector3d.Zero, first.AngularVelocity);
+        Assert.Equal(Vector3d.Zero, second.AngularVelocity);
+        Assert.True(first.LinearVelocity.Magnitude <= limit);
+        Assert.True(second.LinearVelocity.Magnitude <= limit);
+    }
+
     [Fact]
     public void BallSocketJoint_ShouldReduceAnchorSeparationThroughImpulses()
     {

@@ -32,11 +32,12 @@ public class Constraint3DBenchmarks
         CreateBallSocketLine(_chainContext, LinkCount, out _chainBodies, out _chainJoints);
         Warm(_chainContext, WarmupFrames);
 
-        _ragdollContext = CreateConstraintContext(48, (Fixed64)10, 12);
+        // Cover the complete 24-unit floors at offsets +/-2, including moving shape margins.
+        _ragdollContext = CreateConstraintContext(48, (Fixed64)10, 12, gridPadding: 16);
         CreateRagdoll(_ragdollContext, Vector3d.Zero, out _, out _ragdollJoints, sleepEnabled: false);
         Warm(_ragdollContext, 80);
 
-        _stackContext = CreateConstraintContext(64, (Fixed64)10, 12);
+        _stackContext = CreateConstraintContext(64, (Fixed64)10, 12, gridPadding: 16);
         CreateRagdoll(_stackContext, new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero), out _, out Joint3D[] leftStack, sleepEnabled: false);
         CreateRagdoll(_stackContext, new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero), out _, out Joint3D[] rightStack, sleepEnabled: false);
         _stackJoints = Combine(leftStack, rightStack);
@@ -128,9 +129,10 @@ public class Constraint3DBenchmarks
         return _toggleRagdoll.IsActive;
     }
 
-    internal static GravitasWorldContext CreateConstraintContext(int gridExtent, Fixed64 gravity, int solverIterations)
+    internal static GravitasWorldContext CreateConstraintContext(int gridExtent, Fixed64 gravity, int solverIterations,
+        int gridPadding = BenchmarkPhysicsScene.DefaultGridPadding)
     {
-        GravitasWorldContext context = BenchmarkPhysicsScene.CreateContext(gridExtent, clearAllPools: true);
+        GravitasWorldContext context = BenchmarkPhysicsScene.CreateContext(gridExtent, clearAllPools: true, gridPadding);
         context.Environment.Gravity = gravity;
         context.Environment.AirDensity = Fixed64.Zero;
         context.Environment.DampingFactor = Fixed64.Zero;

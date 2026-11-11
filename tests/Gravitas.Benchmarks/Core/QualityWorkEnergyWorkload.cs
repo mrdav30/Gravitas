@@ -120,13 +120,16 @@ internal static class QualityWorkEnergyWorkload
         Fixed64 priorSpin = Fixed64.Zero, positive = Fixed64.Zero, negative = Fixed64.Zero;
         Fixed64 kinetic = Fixed64.Zero, peakResidual = Fixed64.Zero, peakLimit = Fixed64.Zero, peakPrepared = Fixed64.Zero;
         Fixed64 angle = Fixed64.Zero, limitError = Fixed64.Zero;
+        Fixed64 correctionSpeed = (InitialLimitAngle - AngleBound) * Fixed64.FromFraction(2, 5) * context.InvDeltaTime;
         for (int frame = 0; frame <= Frames; frame++)
         {
             if (frame > 0)
                 Step(context);
             Rotor sample = read();
             angle = sample.Angle;
-            Require(sample.Centered && sample.Spin.Abs() < (Fixed64)4 && angle.Abs() < Fixed64.One,
+            bool spinWithinDomain = motor ? sample.Spin.Abs() < (Fixed64)4
+                : sample.Spin.Abs() <= correctionSpeed + Tolerance;
+            Require(sample.Centered && spinWithinDomain && angle.Abs() < Fixed64.One,
                 frame, $"{id} left its contact-free centered rotor domain");
             kinetic = Fixed64.Half * inertia * sample.Spin * sample.Spin;
             if (motor && frame > 0)
@@ -155,7 +158,8 @@ internal static class QualityWorkEnergyWorkload
             peakLimit = FixedMath.Max(peakLimit, limitError);
             peakPrepared = FixedMath.Max(peakPrepared, sample.PreparedLimitError);
             if (!motor && frame == 1)
-                Require(sample.Spin < Fixed64.Zero && (sample.PreparedLimitError - (InitialLimitAngle - AngleBound)).Abs() <= Tolerance,
+                Require((sample.Spin + correctionSpeed).Abs() <= Tolerance
+                    && (sample.PreparedLimitError - (InitialLimitAngle - AngleBound)).Abs() <= Tolerance,
                     frame, $"{id} did not prepare the authored angular limit violation");
 
             Record(ref trace, context, new WorkSample(kinetic, MotorWork: positive + negative, Angle: angle,

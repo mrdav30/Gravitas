@@ -55,25 +55,6 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-<a id="grv-issue-155"></a>
-
-#### GRV-Issue-155 — Contact ragdoll drops accumulate large joint anchor error
-
-**Opened** 2026-11-09. **Priority** Medium. **Owner** Planar and spatial joint
-response in contact islands.
-
-Run `verify-quality-ragdoll-duration --strict` on `aef5995f` plus the
-[Phase 2 fixture](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#chain-and-ragdoll-recovery).
-Both six-link drops retain floor support at six iterations and develop
-anchor gaps of 1.045442 and 1.098444 units at 32 Hz. At 60 Hz the peak gaps
-are 0.913928 and 0.903113. The Phase 1 peak bound is 1/4 of the one-unit
-limb diameter. Supported-start controls have much smaller gaps, and both
-meet the original geometry bounds at 60 Hz.
-
-Compare the drop's first contact and joint response against the supported
-start, and determine how the error depends on solver iteration count. Keep
-the floor support and connected wake checks with any focused correction.
-
 <a id="grv-issue-156"></a>
 
 #### GRV-Issue-156 — Quiet 3D contact islands can alternate sleep and wake
@@ -94,6 +75,8 @@ The corrected centered 100:1 [duration fixture](2026-10-06-long-duration-physics
 also cycles individual bodies through sleep with both supports quiet. Trace
 how per-body quiet counters interact with connected wake propagation and
 verify that an external wake still reaches the complete island.
+Check the planar counterpart while isolating propagation; #155's planar
+supported recovery also changes its measured active-frame count.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
@@ -110,6 +93,7 @@ validation, tradeoffs and links to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                                                                                         | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="grv-issue-155"></a>GRV-Issue-155 | 2026-11-10 | Fixed. Timestep-aware joint correction and a shared spatial impulse ceiling restore all original six-link ragdoll duration bounds at 32/60 Hz and six passes, with replay and warm allocation checks. | [Regressions, workload results, and cost](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-155-implementation) |
 | <a id="grv-issue-154"></a>GRV-Issue-154 | 2026-11-10 | Fixed. Coupled flat cuboid response preserves both original supports and upper-floor clearance in the centered 100:1 spatial stacks at 32 and 60 Hz. | [Trace, regressions, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-154-implementation) |
 | <a id="grv-issue-153"></a>GRV-Issue-153 | 2026-11-10 | Fixed. Coupled positional translation keeps both planar support depths within bounds during settling and connected wakes at 32 and 60 Hz. | [Trace, regressions, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-153-implementation) |
 | <a id="grv-issue-152"></a>GRV-Issue-152 | 2026-11-09 | Fixed. Coupled normal loads preserve both planar support interfaces for centered and offset 10:1 and 100:1 top loads. | [Reproduction, implementation, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-152-implementation) |

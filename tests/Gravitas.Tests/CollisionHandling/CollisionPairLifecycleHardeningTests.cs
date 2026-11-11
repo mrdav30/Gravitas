@@ -300,6 +300,52 @@ public sealed class CollisionPairLifecycleHardeningTests
         unpooled.Active.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(9, false)]
+    [InlineData(1, true)]
+    [InlineData(9, true)]
+    public void RegisteredPairs_ShouldRetireWithoutAllocatingBeforeTheirFirstQueuedUpdate(int pairCount, bool togglePooling)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        GravitasWorldContext context = scenario.Context;
+        var colliders = new (LSCollider First, LSCollider Second)[pairCount];
+        var pairs = new CollisionPair[pairCount];
+        for (int i = 0; i < pairCount; i++)
+        {
+            Vector3d position = Vector3d.Right * (i * 4);
+            colliders[i] = (scenario.CreateSphere(position).Collider,
+                scenario.CreateSphere(position + Vector3d.Right * Fixed64.Half).Collider);
+        }
+
+        // Registration prepares return capacity while pooling is enabled. Creating
+        // shells with pooling temporarily disabled must preserve that preparation.
+        if (togglePooling)
+            context.Settings.PoolingEnabled = false;
+        for (int i = 0; i < pairCount; i++)
+            pairs[i] = context.Physics.GetCollisionPair(colliders[i].First.Id, colliders[i].Second.Id)!;
+        context.Settings.PoolingEnabled = true;
+
+        long bytes = AllocationTestHelper.MeasureSinglePass(() =>
+        {
+            foreach (CollisionPair pair in pairs)
+                context.Physics.FullDeactivateCollisionPair(pair);
+        });
+
+        Assert.Equal(0, bytes);
+        foreach (CollisionPair pair in pairs)
+        {
+            Assert.False(pair.Active);
+            Assert.Null(pair.ColliderA);
+            Assert.Null(pair.ColliderB);
+        }
+        for (int i = 0; i < pairCount; i++)
+        {
+            CollisionPair? reused = context.Physics.GetCollisionPair(colliders[i].First.Id, colliders[i].Second.Id);
+            Assert.Same(pairs[pairCount - i - 1], reused);
+        }
+    }
+
     [Fact]
     public void Deactivate_WhenExitCallbackRemovesAnotherHolderPair_ShouldClearEveryPairOnce()
     {

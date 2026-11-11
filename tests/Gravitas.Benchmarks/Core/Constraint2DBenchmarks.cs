@@ -33,11 +33,12 @@ public class Constraint2DBenchmarks
         CreatePinLine(_chainContext, LinkCount, out _chainBodies, out _chainJoints);
         Warm(_chainContext, WarmupFrames);
 
-        _ragdollContext = CreateConstraintContext(48, (Fixed64)10, 12);
+        // Cover the complete 24-unit floors at offsets +/-2, including moving shape margins.
+        _ragdollContext = CreateConstraintContext(48, (Fixed64)10, 12, gridPadding: 16);
         CreateRagdoll(_ragdollContext, Vector2d.Zero, out _, out _ragdollJoints, sleepEnabled: false);
         Warm(_ragdollContext, 80);
 
-        _stackContext = CreateConstraintContext(64, (Fixed64)10, 12);
+        _stackContext = CreateConstraintContext(64, (Fixed64)10, 12, gridPadding: 16);
         CreateRagdoll(_stackContext, new Vector2d((Fixed64)(-2), Fixed64.Zero), out _, out Joint2D[] leftStack, sleepEnabled: false);
         CreateRagdoll(_stackContext, new Vector2d((Fixed64)2, Fixed64.Zero), out _, out Joint2D[] rightStack, sleepEnabled: false);
         _stackJoints = Combine(leftStack, rightStack);
@@ -144,9 +145,10 @@ public class Constraint2DBenchmarks
         return _inactiveContext.Constraints2D.EnabledJointCount;
     }
 
-    internal static GravitasWorldContext CreateConstraintContext(int gridExtent, Fixed64 gravity, int solverIterations)
+    internal static GravitasWorldContext CreateConstraintContext(int gridExtent, Fixed64 gravity, int solverIterations,
+        int gridPadding = BenchmarkPhysicsScene.DefaultGridPadding)
     {
-        GravitasWorldContext context = BenchmarkPhysicsScene.CreateContext(gridExtent, clearAllPools: true);
+        GravitasWorldContext context = BenchmarkPhysicsScene.CreateContext(gridExtent, clearAllPools: true, gridPadding);
         context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
         context.Environment.Gravity = gravity;
         context.Environment.AirDensity = Fixed64.Zero;
@@ -350,6 +352,7 @@ public class Constraint2DBenchmarks
         var body = new SolidBody2D(agent, collider)
         {
             Mass = mass,
+            Gravity = new Vector2d(Fixed64.Zero, -context.Environment.Gravity),
             SleepEnabled = sleepEnabled
         };
 

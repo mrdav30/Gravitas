@@ -32,6 +32,36 @@ public sealed class Constraint3DStressTests
     }
 
     [Fact]
+    public void FrozenAxisError_ShouldNotConsumeTheIslandsFeasibleCorrectionBudget()
+    {
+        ReplayConformanceHarness.AssertRepeatedRunsMatch(
+            () => CreateFrozenAxisIsland(impossibleAnchorError: true, out _),
+            frameCount: 32,
+            mode: GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        using GravitasWorldContext control = CreateFrozenAxisIsland(false, out SolidBody[] controlBodies);
+        using GravitasWorldContext frozen = CreateFrozenAxisIsland(true, out SolidBody[] frozenBodies);
+        for (int frame = 0; frame < 32; frame++)
+        {
+            Step(control, 1);
+            Step(frozen, 1);
+            for (int i = 1; i < frozenBodies.Length; i++)
+            {
+                frozenBodies[i].Position3d.Should().Be(controlBodies[i].Position3d);
+                frozenBodies[i].Rotation.Should().Be(controlBodies[i].Rotation);
+                frozenBodies[i].LinearVelocity.Should().Be(controlBodies[i].LinearVelocity);
+                frozenBodies[i].AngularVelocity.Should().Be(controlBodies[i].AngularVelocity);
+                frozenBodies[i].Position3d.X.Should().Be((Fixed64)4);
+            }
+        }
+
+        // The four-unit X error is immovable; the connected Y support still converges normally.
+        (frozenBodies[1].Position3d.X - frozenBodies[0].Position3d.X).Should().Be((Fixed64)4);
+        FixedMath.Abs(frozenBodies[2].Position3d.Y - frozenBodies[1].Position3d.Y)
+            .Should().BeLessThan(Fixed64.FromFraction(1, 1000));
+    }
+
+    [Fact]
     public void HingeChain_WithAlternatingAxes_ShouldStayDeterministicAndReportAngularRows()
     {
         ReplayConformanceHarness.AssertRepeatedRunsMatch(
@@ -227,6 +257,36 @@ public sealed class Constraint3DStressTests
         SumMotorImpulse(motorJoints).Should().BeGreaterThan(Fixed64.Zero);
         SumMotorError(motorJoints).Should().BeGreaterThan(Fixed64.Zero);
         SumClampedRows(motorJoints).Should().BeGreaterThan(0);
+    }
+
+    private static GravitasWorldContext CreateFrozenAxisIsland(bool impossibleAnchorError, out SolidBody[] bodies)
+    {
+        PhysicsScenarioBuilder scenario = CreateConstraintScenario(Fixed64.Zero, solverIterations: 6);
+        scenario.Context.SetFrameRate(60);
+        bodies = new[]
+        {
+            scenario.CreateSphere(new Vector3d(impossibleAnchorError ? 0 : 4, 0, 0), immovable: true).Body,
+            scenario.CreateSphere(new Vector3d(4, 0, 0)).Body,
+            scenario.CreateSphere(new Vector3d((Fixed64)4, Fixed64.FromFraction(1, 10), Fixed64.Zero)).Body
+        };
+        for (int i = 0; i < bodies.Length; i++)
+        {
+            bodies[i].UseManualGrounding();
+            bodies[i].SleepEnabled = false;
+            if (i > 0)
+                bodies[i].FreezeAxes = BodyFreezeAxes3D.PositionX | BodyFreezeAxes3D.Rotation;
+        }
+
+        scenario.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
+            new[] { Link(0, bodies[0]), Link(1, bodies[1]), Link(2, bodies[2]) },
+            new[]
+            {
+                RagdollJoint(0, 1, Vector3d.Zero, Vector3d.Zero),
+                RagdollJoint(1, 2, Vector3d.Zero, Vector3d.Zero)
+            },
+            RagdollSelfCollisionPolicy.SuppressAllLinks));
+        bodies[0].SetMotionType(PhysicsMobilityType.Static);
+        return scenario.Context;
     }
 
     private static GravitasWorldContext CreateLongBallSocketChain(

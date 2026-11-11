@@ -41,7 +41,9 @@ internal struct ColliderPairState<TPair>
 
     public bool TryAddCollisionPair(int otherId, TPair collisionPair)
     {
+        // Prepare both roles at first contact; a later pair can reverse this collider's role.
         _collisionPairs ??= new();
+        _collisionPairHolders ??= new();
         return _collisionPairs.Add(otherId, collisionPair);
     }
 
@@ -63,6 +65,7 @@ internal struct ColliderPairState<TPair>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryAddCollisionPairHolder(int otherId)
     {
+        _collisionPairs ??= new();
         _collisionPairHolders ??= new();
         return _collisionPairHolders.Add(otherId);
     }

@@ -62,8 +62,8 @@
     {
       "FrameCount": 1,
       "LateToken": 1,
-      "Authoritative": "fdf433aa5e6e1a0eb1fa0442431d45b4",
-      "SolverCaches": "f0a9ccbcadda7c7651b8cb5fc7774d0e",
+      "Authoritative": "e5522a511264ad2ca673e4476227433b",
+      "SolverCaches": "71f7666ecf3f16dcd37d5030afe9ab25",
       "Bodies": [
         {
           "Actor": 60,
@@ -79,13 +79,13 @@
             4294967296
           ],
           "VelocityRaw": [
-            -25205704,
+            -403291264,
             0,
-            158204678
+            230399504
           ],
           "AngularVelocityRaw": [
             0,
-            -791023389,
+            -1151997519,
             0
           ],
           "Sleeping": false,
@@ -105,13 +105,13 @@
             4294967296
           ],
           "VelocityRaw": [
-            25205704,
+            403291264,
             0,
-            915537146
+            843342320
           ],
           "AngularVelocityRaw": [
             0,
-            -791023389,
+            -1151997519,
             0
           ],
           "Sleeping": false,
@@ -129,30 +129,30 @@
     {
       "FrameCount": 2,
       "LateToken": 2,
-      "Authoritative": "306f7fc8d3bafda8ef300f4511a71717",
-      "SolverCaches": "69286f1f4f9516c6026db6172cf1ae0e",
+      "Authoritative": "8036d0eebba77dd6cc3e575172c14869",
+      "SolverCaches": "e593c4f2db3044535e7d20226764c81f",
       "Bodies": [
         {
           "Actor": 60,
           "PositionRaw": [
-            -491535979,
+            -501600789,
             17179869184,
-            -17182250833
+            -17170573917
           ],
           "RotationRaw": [
             0,
-            -49435687,
+            -71989730,
             0,
-            4294682781
+            4294363929
           ],
           "VelocityRaw": [
-            152795,
+            -92336068,
             0,
-            158819668
+            209312680
           ],
           "AngularVelocityRaw": [
             0,
-            -791178909,
+            -994509469,
             0
           ],
           "Sleeping": false,
@@ -161,24 +161,24 @@
         {
           "Actor": 70,
           "PositionRaw": [
-            3712761451,
+            3722826261,
             17179869184,
-            -16909052079
+            -16920728995
           ],
           "RotationRaw": [
             0,
-            -49435687,
+            -71989730,
             0,
-            4294682781
+            4294363929
           ],
           "VelocityRaw": [
-            -152795,
+            92336068,
             0,
-            914922156
+            864429144
           ],
           "AngularVelocityRaw": [
             0,
-            -791178909,
+            -994509469,
             0
           ],
           "Sleeping": false,
@@ -194,30 +194,30 @@
     {
       "FrameCount": 3,
       "LateToken": 3,
-      "Authoritative": "703b38ed45616d6d7d6b160b91cfe2f2",
-      "SolverCaches": "4dcd18ffe80d2e0006e0ad650be340d4",
+      "Authoritative": "57bfa6fe0a2bfdd748599778aa207791",
+      "SolverCaches": "415aae2d3843ace5d6c7834331aade5f",
       "Bodies": [
         {
           "Actor": 60,
           "PositionRaw": [
-            -504152122,
+            -513142797,
             17179869184,
-            -17163503474
+            -17144409832
           ],
           "RotationRaw": [
             0,
-            -98874540,
+            -134123795,
             0,
-            4293829048
+            4292872568
           ],
           "VelocityRaw": [
-            12105692,
+            -34633782,
             0,
-            159242486
+            192709149
           ],
           "AngularVelocityRaw": [
             0,
-            -790539789,
+            -893643179,
             0
           ],
           "Sleeping": false,
@@ -226,24 +226,24 @@
         {
           "Actor": 70,
           "PositionRaw": [
-            3725377594,
+            3734368269,
             17179869184,
-            -16793581710
+            -16812675352
           ],
           "RotationRaw": [
             0,
-            -98874540,
+            -134123795,
             0,
-            4293829048
+            4292872568
           ],
           "VelocityRaw": [
-            -12105692,
+            34633782,
             0,
-            914499338
+            881032675
           ],
           "AngularVelocityRaw": [
             0,
-            -790539789,
+            -893643179,
             0
           ],
           "Sleeping": false,
@@ -259,30 +259,30 @@
     {
       "FrameCount": 4,
       "LateToken": 4,
-      "Authoritative": "75a78e4589a62414f75951309a82cf8c",
-      "SolverCaches": "aa874436dd3d35e9af441b680173eaa2",
+      "Authoritative": "ed22a85aadc0ed9deb8bcd0ebc5ce662",
+      "SolverCaches": "c53f4ceba90a2bd3f215eaa11b6356b7",
       "Bodies": [
         {
           "Actor": 60,
           "PositionRaw": [
-            -502672691,
+            -517472020,
             17179869184,
-            -17143601874
+            -17120321188
           ],
           "RotationRaw": [
             0,
-            -148260372,
+            -189933194,
             0,
-            4292407592
+            4290765603
           ],
           "VelocityRaw": [
-            21429859,
+            1570971,
             0,
-            159731093
+            183601846
           ],
           "AngularVelocityRaw": [
             0,
-            -789760249,
+            -832289869,
             0
           ],
           "Sleeping": false,
@@ -291,24 +291,24 @@
         {
           "Actor": 70,
           "PositionRaw": [
-            3723898163,
+            3738697492,
             17179869184,
-            -16679265582
+            -16702546268
           ],
           "RotationRaw": [
             0,
-            -148260372,
+            -189933194,
             0,
-            4292407592
+            4290765603
           ],
           "VelocityRaw": [
-            -21429859,
+            -1570971,
             0,
-            914010731
+            890139978
           ],
           "AngularVelocityRaw": [
             0,
-            -789760249,
+            -832289869,
             0
           ],
           "Sleeping": false,

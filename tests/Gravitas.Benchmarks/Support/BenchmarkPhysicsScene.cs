@@ -11,14 +11,15 @@ namespace Gravitas.Benchmarks;
 
 internal static class BenchmarkPhysicsScene
 {
-    private const int DefaultGridPadding = 4;
+    internal const int DefaultGridPadding = 4;
     private const int DefaultColumns = 8;
     private const int DefaultSpacing = 2;
 
-    public static GravitasWorldContext CreateContext(int gridExtent, bool clearAllPools = false)
+    public static GravitasWorldContext CreateContext(int gridExtent, bool clearAllPools = false,
+        int gridPadding = DefaultGridPadding)
     {
         GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext(clearAllPools);
-        AddGrid(context, gridExtent);
+        AddGrid(context, gridExtent, gridPadding);
         return context;
     }
 
@@ -545,11 +546,11 @@ internal static class BenchmarkPhysicsScene
         return new Vector3d(x * DefaultSpacing, 0, z * DefaultSpacing);
     }
 
-    private static void AddGrid(GravitasWorldContext context, int extent)
+    private static void AddGrid(GravitasWorldContext context, int extent, int padding)
     {
         var configuration = new GridConfiguration(
-            new Vector3d(-DefaultGridPadding, -DefaultGridPadding, -DefaultGridPadding),
-            new Vector3d(extent, DefaultGridPadding, extent));
+            new Vector3d(-padding, -padding, -padding),
+            new Vector3d(extent, padding, extent));
 
         ChronicleGuard.ThrowIfTrue(
             !context.World.TryAddGrid(configuration, out _),

@@ -337,6 +337,11 @@ public sealed partial class GravitasPhysicsService
         collider.BindContext(_context);
 
         int id = _colliders.Register(collider);
+        // Match the 2D registration baseline: returning ordinary contact pairs
+        // should not allocate the pool's first backing array during retirement.
+        // Dense contact graphs may still exceed this collider-count reservation.
+        if (_context.Settings.PoolingEnabled)
+            _cachedCollisionPairs.EnsureCapacity(_colliders.Count);
         RefreshColliderServiceRefreshRegistration(collider);
         return id;
     }

@@ -25,7 +25,8 @@ internal static class JointSolver2D
     private const int CacheLimit = 3;
     private const int CacheMotor = 4;
 
-    private static readonly Fixed64 BiasFactor = Fixed64.One / (Fixed64)5;
+    // Fraction of structural error targeted by the next fixed step.
+    private static readonly Fixed64 BiasFactor = Fixed64.FromFraction(2, 5);
     private static readonly Fixed64 RowEpsilon = Fixed64.Epsilon;
 
     internal static void Solve(Joint2D joint, bool applyCachedImpulse)
@@ -38,7 +39,7 @@ internal static class JointSolver2D
             out Fixed64 angularErrorMagnitude,
             out Fixed64 limitErrorMagnitude,
             out Fixed64 motorErrorMagnitude);
-        if (rowCount == 0)
+        if (rowCount == 0 || !TryPrepareBiasVelocities(joint, rows[..rowCount]))
         {
             joint.LastSolvedRowCount = 0;
             joint.LastSolveMetrics = default;
@@ -103,6 +104,27 @@ internal static class JointSolver2D
             clampedRowCount);
         if (incrementalImpulseMagnitude > Fixed64.Zero)
             joint.Context.Diagnostics.EmitJointImpulse(joint, joint.LastSolveMetrics);
+    }
+
+    private static bool TryPrepareBiasVelocities(Joint2D joint, Span<JointConstraintRow2D> rows)
+    {
+        foreach (ref JointConstraintRow2D row in rows)
+        {
+            // Structural error is corrected per fixed step. Motor gains already target velocity.
+            if (row.Kind != JointConstraintRowKind2D.Motor && !Fixed64.TryMultiplyDivide(
+                    row.BiasVelocity, joint.Context.InvDeltaTime, Fixed64.One, out row.BiasVelocity))
+            {
+                if (ComputeDenominator(joint.BodyA, joint.BodyB, row) <= RowEpsilon)
+                {
+                    row.BiasVelocity = Fixed64.Zero;
+                    continue;
+                }
+                GravitasLogger.Channel.Write(DiagnosticLevel.Error,
+                    "A 2D joint's correction velocity cannot be represented.", nameof(JointSolver2D));
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int BuildRows(

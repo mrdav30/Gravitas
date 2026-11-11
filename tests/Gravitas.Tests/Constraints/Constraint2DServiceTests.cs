@@ -494,12 +494,35 @@ public sealed class Constraint2DServiceTests
         removedJointIds.Should().Equal(joints[3].Id, joints[2].Id, joints[1].Id);
     }
 
-    [Fact]
-    public void DistanceJoint_ShouldReduceAnchorSeparationThroughPlanarImpulses()
+    [Theory]
+    [InlineData(32)]
+    [InlineData(60)]
+    public void PinJoint_ShouldCorrectStructuralErrorPerFixedStep(int rate)
+    {
+        using GravitasWorldContext context = CreateConstraintContext(rate);
+        SolidBody2D first = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * Fixed64.Eighth);
+        first.UseManualGrounding();
+        second.UseManualGrounding();
+        context.Constraints2D.RegisterJoint(CreatePin(first, second));
+
+        Step(context, 2);
+
+        Fixed64 expected = Fixed64.Eighth * Fixed64.FromFraction(3, 5);
+        Assert.True((second.Position.X - expected).Abs() <= Fixed64.FromRaw(4096),
+            $"At {rate} Hz the second step left anchor error {second.Position.X}, expected {expected}.");
+        Assert.Equal(Fixed64.Zero, second.Position.Y);
+        Assert.Equal(Fixed64.Zero, second.AngularVelocity);
+    }
+
+    [Theory]
+    [InlineData(4, 0)]
+    [InlineData(4, 4)]
+    public void DistanceJoint_ShouldReduceAnchorSeparationThroughPlanarImpulses(int x, int y)
     {
         using GravitasWorldContext context = CreateConstraintContext();
         SolidBody2D first = CreateBody(context, Vector2d.Zero);
-        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)4);
+        SolidBody2D second = CreateBody(context, new Vector2d(x, y));
         Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(
             first,
             second,
@@ -561,11 +584,16 @@ public sealed class Constraint2DServiceTests
             JointCollisionPolicy.SuppressLinked));
         Fixed64 frozenY = second.Position.Y;
 
-        Step(context, 12);
+        int clampedRows = 0;
+        for (int frame = 0; frame < 12; frame++)
+        {
+            Step(context);
+            clampedRows += joint.LastSolveMetrics.ClampedRowCount;
+        }
 
         second.Position.Y.Should().Be(frozenY);
         joint.LastSolvedRowCount.Should().BeGreaterThan(0);
-        joint.LastSolveMetrics.ClampedRowCount.Should().BeGreaterThan(0);
+        clampedRows.Should().BeGreaterThan(0);
     }
 
     [Fact]
@@ -610,6 +638,34 @@ public sealed class Constraint2DServiceTests
 
         joint.LastSolveMetrics.LimitErrorMagnitude.Should().Be(Fixed64.Zero);
         second.Position.X.Should().Be(Fixed64.One);
+    }
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(60)]
+    public void AngularLimit_ShouldCorrectStructuralErrorPerFixedStep(int rate)
+    {
+        using GravitasWorldContext context = CreateConstraintContext(rate);
+        SolidBody2D anchor = CreateBody(context, Vector2d.Zero, immovable: true);
+        SolidBody2D body = CreateBody(context, Vector2d.Zero, rotation: Fixed64.FromFraction(3, 4));
+        anchor.UseManualGrounding();
+        body.UseManualGrounding();
+        context.Constraints2D.RegisterJoint(new JointDefinition2D(anchor, body,
+            JointFrame2D.Identity, JointFrame2D.Identity, JointType2D.Pin,
+            JointLimit2D.Angular(-Fixed64.Half, Fixed64.Half), JointMotor2D.Disabled,
+            JointCollisionPolicy.SuppressLinked));
+        Fixed64 expectedSpin = -Fixed64.Quarter * Fixed64.FromFraction(2, 5) * rate;
+        Fixed64 tolerance = Fixed64.FromFraction(1, 4096);
+
+        Step(context);
+
+        Assert.True((body.AngularVelocity - expectedSpin).Abs() <= tolerance,
+            $"At {rate} Hz the limit produced spin {body.AngularVelocity}, expected {expectedSpin}.");
+        Step(context);
+        Assert.True((body.Rotation - Fixed64.FromFraction(13, 20)).Abs() <= tolerance);
+        Assert.Equal(Vector2d.Zero, body.Position);
+        Assert.Equal(Vector2d.Zero, body.LinearVelocity);
+        Assert.Equal(Fixed64.Zero, anchor.AngularVelocity);
     }
 
     [Fact]

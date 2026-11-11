@@ -1102,6 +1102,206 @@ remains a measured high-load tuning case for Phase 3. Supported starts
 allocate 0 B in the warm window. The 2D drops allocate 8,096 B at 32 Hz
 and 4,896 B at 60 Hz. The 3D drops allocate 13,664 B and 10,648 B.
 
+#### GRV-Issue-155 Implementation
+
+The 2026-11-10 investigation uses committed `2273ea72` as its control. Both
+drops first contact the floor on frame 7 at 32 Hz and frame 13 at 60 Hz.
+Floor support survives; the joint rows restore anchor error too slowly after
+the landing and the impulses at two, four and six seconds. Their old bias
+added `0.2 * distance` directly to velocity, omitting inverse step duration.
+The 32/60 Hz regression demonstrates the resulting rate-dependent fraction
+per step. Motor drive gains already have velocity semantics.
+
+Converting structural bias to a per-step rate improves all eight cases, but
+the original 20% fraction still leaves 32 Hz drop terminal gaps of 0.103152
+and 0.113200 at six passes. Twenty-four passes reduce those to 0.050609
+and 0.055925. A 40% correction fraction meets the same bounds at the default
+six passes, preserving the floor, limit-angle, drift and connected-wake checks.
+The impulse-cache ablation did not explain the large gaps and was not retained.
+These iteration ablations isolate bias conversion before the common-scalar
+speed-limit correction below.
+
+The stronger spatial correction exposed an existing speed-ceiling problem:
+clipping the endpoints independently changes the joint's common impulse and
+total momentum. A single unequal-mass row reproduces this on the committed
+solver. The corrected response prepares both endpoints, limits the common
+scalar against both linear and angular speeds, and caches the applied scalar.
+Off-center angular, diagonal-speed and frozen-axis controls check that boundary.
+The body's existing low-speed cutoff remains in force.
+
+The original twelve-body, initially stretched ball-socket chain also needs a
+connected repair budget. Its total correctable anchor distance sets the
+linear rate to `min(InvDeltaTime, MaxSpeed / distanceSum)`. The 40% fraction
+then caps total requested repair at 40% of host speed. Angular structural
+rows retain the fixed-step rate; motors retain their drive gains and per-row,
+per-iteration impulse limit. Shared anchor preparation and the existing
+effective-mass calculation exclude frozen directions with zero response,
+including their rotational lever contribution. The matched frozen-axis
+regression requires unchanged feasible motion despite an impossible orthogonal
+error. Incoming budget preparation precedes contact position correction, so
+checked bias preflight still rejects a subsequently unrepresentable joint
+before publishing any warm row. A deep-overlap maximum-rate regression
+exercises this ordering; replacing the checked scaling with unchecked
+multiplication fails that regression.
+An unrepresentable joint anchor is omitted from the distance sum and rejected
+by its own row preparation, preserving a valid neighbor's correction. An
+unrepresentable aggregate sum conservatively disables linear repair for that
+island rather than wrapping its speed demand.
+Both dimensional preflights ignore an overflowing bias on a zero-response
+row, preserving the other feasible rows. Matched maximum-rate frozen-axis
+controls exercise that boundary.
+
+The original chain's 32-step maximum-gap assertion remains unchanged. The
+common-impulse limiter alone leaves a 2.014686 gap against the two-unit
+initial gap; the connected budget reduces it below that bound. Alternating
+solver order and local row-target caps failed that discriminator and were
+discarded. Raising the host speed limit is not part of the fix.
+
+| Ragdoll case | Corrected 32 Hz peak / final gap | Corrected 60 Hz peak / final gap |
+| --- | ---: | ---: |
+| 2D drop | 0.098505 / 0.050859 | 0.048462 / 0.014713 |
+| 3D drop | 0.124980 / 0.055977 | 0.058961 / 0.015912 |
+
+All eight original duration cases pass `verify-quality-ragdoll-duration
+--strict` at six passes. Drop support starts on the same frames and both
+drops retain two floor supports at the end. Supported starts retain six.
+Both dimensions wake all six links on the first pulse from six sleeping
+links. Later settling remains distinct from the geometry acceptance;
+[GRV-Issue-156](issue-tracker.md#grv-issue-156) still owns quiet spatial
+sleep/wake cycling. It was discovered while validating #154's newly retained
+stack supports and reproduced independently on the earlier `5e653703` build
+with stationary boxes and staggered sleep timers.
+
+The four joint-bearing shared replay fixtures intentionally change their
+expected solver state. Their settings, actor manifests and commands remain
+unchanged. Only actors 60/70 change (56 of 211 body rows); all other 155
+body rows, queries, frame counts, late tokens, sleep flags and CCD counts
+are identical. In the three lifecycle cases, frame-eight reciprocal contacts
+become reciprocal exits as the unit spheres' separation crosses one unit.
+The four fixtures without these joints retain their existing expectations.
+The JSON schema and input scenario versions remain unchanged; recordings
+from the prior physics implementation require their original solver version.
+
+Both-role pair lookup preparation moves a collider's first opposite-role
+allocation to its first contact, retaining lazy storage for untouched
+colliders. Spatial registration also reserves the pair-return stack to
+collider count, matching existing planar policy. One/nine unqueued-pair
+retirement controls verify zero allocation, endpoint release and shell reuse.
+These policies increase initial storage; they do not reserve every possible
+pair in a dense contact graph.
+
+The four supported starts and both spatial drops measure zero warm bytes.
+Each planar drop measures 384 B, down from 8,096/4,896 B: left-arm collider
+4 first enters a floor partition's dynamic role at frame 40/32 Hz or
+238/60 Hz. Two 192 B membership sets are created there. This is first-use
+partition storage, outside joint response; the repeated solver and supported
+contact guards retain their zero-allocation requirement. Preparing all roles
+for every static floor partition would expand cold memory and is outside
+this correction.
+[GRV-Benchmark-036](benchmark-signal-hardening-backlog.md#grv-benchmark-036--first-dynamic-membership-in-a-planar-floor-partition)
+retains the concrete first-use allocation for follow-up. Raw captures and
+isolated counterexamples are under
+`artifacts/physics-quality-phase2/issue-155`; the scenario settings and
+commands above reproduce the behavior without those ignored files.
+
+The work/energy rotor keeps its original 0.75-radian start, 0.5-radian limit
+and energy/angle bounds. At 60 Hz, correcting 40% of its quarter-radian
+violation requests 6 rad/s. Its old coarse 4 rad/s structural-domain guard
+therefore no longer describes the intended response. The verifier now derives
+the structural speed bound and checks the exact signed first-step speed.
+The motor retains its strict 4 rad/s domain and impulse/work checks. Focused
+32/60 Hz angular regressions pass in both dimensions; restoring the old bias
+law makes all four fail with approximately -0.05 rad/s at both rates.
+
+##### Quality And Full-Step Cost
+
+The final comparison uses the existing eight-second ragdoll scenes, six
+passes, one-second warmup and three pulses. Disposable instrumentation times
+only `Simulate` plus `LateSimulate` in the unobserved control: 224 steps per
+32 Hz launch and 420 per 60 Hz launch. Four fresh processes run in ABBA order
+against released dependencies on Windows x64, Core i7-9700K, .NET 10.0.10.
+All 32 expected observations complete successfully. Each revision's repeated
+trace and terminal hashes match, and the corrected cases retain all original
+geometry bounds. Source and loaded payload hashes accompany the captures.
+
+| Case | Prior mean step, ms | Corrected mean step, ms | Corrected mean launch p95, ms | Corrected worst step, ms |
+| --- | ---: | ---: | ---: | ---: |
+| 2D drop, 32 Hz | 0.766252 | 0.616990 | 0.643450 | 0.8333 |
+| 2D drop, 60 Hz | 0.326117 | 0.229224 | 0.241950 | 0.4404 |
+| 2D supported, 32 Hz | 0.643364 | 0.630083 | 0.967100 | 1.3264 |
+| 2D supported, 60 Hz | 0.417664 | 0.454796 | 0.589650 | 0.8007 |
+| 3D drop, 32 Hz | 2.752914 | 1.228650 | 1.323000 | 1.5848 |
+| 3D drop, 60 Hz | 1.303036 | 0.806385 | 0.881700 | 1.1532 |
+| 3D supported, 32 Hz | 7.196152 | 3.525817 | 14.897800 | 30.3322 |
+| 3D supported, 60 Hz | 12.038256 | 2.991268 | 5.832350 | 23.3886 |
+
+Seven means improve. The planar 60 Hz supported aggregate rises 8.89%, with
+360 active measured frames versus the prior 330, a 9.09% increase. Normalizing
+by those active-frame counts gives approximately 0.531/0.531 ms, consistent
+with changed recovery duty cycle. This is not proof of zero kernel overhead.
+Later complete rest and connected sleep propagation remain relevant when
+interpreting throughput. The spatial 60 Hz supported maxima are 22.8986 and
+23.3886 ms across the two launches, despite zero warm allocation and a lower
+mean. [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz)
+retains that Phase 3 tail signal.
+
+An earlier 64-second comparison of the legacy BDN constraint rows is retained
+as rejected acceptance evidence. Its grid began at -4 while authored floors
+extended to -14, and its planar bodies had no gravity. A spatial leg at
+X approximately -5.95 lost broad-phase floor coverage before falling;
+complete grid coverage preserves support through 2,384 steps. The planar
+gravity control keeps a single ragdoll supported but lets the two-ragdoll
+assembly leave its finite floor before falling. Reordering contact and joint
+solves did not fix the narrow-grid symptom and was discarded. The maintained
+BDN ragdoll contexts now cover their authored floors and assign planar
+gravity, while the specialized quality inputs retain their original domain.
+Their initially strained, unrestricted ball sockets remain distinct from
+the quality scenes' coincident, limited joints.
+[GRV-Benchmark-037](benchmark-signal-hardening-backlog.md#grv-benchmark-037--finite-duration-of-legacy-constraint-contact-benchmarks)
+records the finite-window acceptance boundary. No supported-workload speedup
+is claimed from the rejected captures.
+
+The short chain quality cases retain all bounds. The eight-second heavy-tip
+chains retain replay, row counts and their input-work energy envelope, with
+much smaller final gaps: 0.002892/0.002353 at 32 Hz and 0.000324/0.000350
+at 60 Hz (2D/3D). Their roughly 1.15-unit tip drift remains outside the
+original one-unit geometry target. They remain Phase 3 tuning cases, not
+newly passing geometry claims. Planar warm allocation is zero; spatial
+first-use storage is 3,024 B in each duration case, reduced from the prior
+16,632/12,096 B.
+
+Verification on 2026-11-10 uses released Chronicler 1, FixedMathSharp 8,
+SwiftCollections 8 and GridForge 10 packages (`UseLocalLsfStack=false`),
+SDK 10.0.302 and runtime 10.0.10 on Windows x64. Both `netstandard2.1`
+and `net10.0` build in Release and ReleaseLean. The final complete suites
+and exact reachable coverage are:
+
+| Profile | Passing tests | Visited sequence points | Visited branches | Visited methods |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 8,467 | 54,274 / 54,274 | 22,324 / 22,324 | 5,670 / 5,670 |
+| ReleaseLean | 8,396 | 54,272 / 54,272 | 22,324 / 22,324 | 5,669 / 5,669 |
+
+Coverage captures use the final runtime; the final full-suite rerun includes
+the added angular cases. All eight shared replay fixtures match byte for
+byte across ordinary Release/Lean binaries, with matching fixture manifests.
+The nine quality verification commands (short/duration stacks, chains and
+ragdolls, continuation, work/energy and mixed) have byte-identical profile
+outputs. Both `verify-strategy-2d 1024` and `verify-strategy-3d 1024 8`
+retain their replay, work-count, floor, CCD and connected-chain checks in
+both profiles. These functional reruns do not supply new strategy timing
+claims. DocFX builds with zero warnings, and all 215 generated HTML pages
+pass the local-link check.
+
+Independent reviews covered the first shared runtime slice, frozen and
+invalid-geometry counterexamples, replay expectation changes, the final
+source/tests and benchmark admission fixes. No actionable findings remain.
+The runtime grows by 142 net lines across five existing files, with shared
+anchor preparation reused and no new runtime files or dependency changes.
+`GRV-Issue-155` is resolved in source. Quiet-island propagation remains
+`GRV-Issue-156`; Phase 3 retains the original heavy-stack budget work, heavy-tip
+chain drift and the measured ragdoll tail signal. Cross-OS/architecture replay
+and publication remain separate release gates.
+
 ### Command Replay And Body Population
 
 `verify-quality-continuation` uses eight cases across both rates and pure
@@ -1161,11 +1361,11 @@ new workloads are separate from BenchmarkDotNet discovery. DocFX built
 with warnings treated as errors.
 Raw captures are under ignored `artifacts/physics-quality-phase2`.
 
-The opt-in stack and ragdoll `--strict` checks reproduce the measured
-physical failures while preserving the replay and validity checks. Phase 2
-completes the characterization and supported continuation evidence. The
-three tracked physical limits remain open and the Phase 3 comparison can
-use these same workloads and bounds.
+At the Phase 2 closeout, the opt-in stack and ragdoll `--strict` checks
+reproduced the measured physical failures while preserving replay and
+validity checks. The subsequent #153, #154 and #155 implementation records
+retain their corrections and current verification. Phase 3 can use the same
+workloads and original bounds; its tuning checklist remains separate.
 
 ## Phase 3: Quality Versus Cost
 
@@ -1173,6 +1373,10 @@ use these same workloads and bounds.
       setting, initially 2/6/12 iterations where supported. Add tuning
       dimensions only when a fixture identifies a meaningful sensitivity.
       Retain the #151 support bounds when assessing lower iteration counts.
+- [ ] Attribute the supported spatial ragdoll's 60 Hz full-step tails from
+      [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz).
+      Preserve its eight-second physical checks and distinguish active-frame
+      cost from quiet-island sleep/wake propagation before choosing settings.
 - [ ] Resolve the eight- and sixteen-stack awake heavy-bottom budget limits
       from the [density closeout](done/2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure).
       Use the v2 density fixture with authored rotation. Keep the four-stack

@@ -99,6 +99,30 @@ Multi-constraint islands run a bounded number of iterations from
 positional correction are applied on the first island iteration; later
 iterations refine velocity response.
 
+Joint structural rows target 40% of their positional or angular error per
+fixed step. Their bias has velocity units: correction fraction times error
+divided by the step duration. Motor drive gains already target velocity and
+are independent of this conversion.
+
+For 3D joints, the island shares a linear repair rate of
+`min(1 / DeltaTime, MaxSpeed / totalCorrectableAnchorDistance)`. The distance
+sum excludes components with zero effective response, including frozen axes
+that cannot move through either translation or anchor rotation. This limits
+the total requested repair to 40% of `MaxSpeed`, retaining correction headroom
+for a connected chain. Large, stretched islands therefore repair more slowly
+than small errors; the rate depends on the connected topology. Angular rows
+keep the fixed-step rate. If contact position correction makes a subsequent
+joint bias unrepresentable, that joint rejects its rows before applying warm
+impulses. An overflowing error on a zero-response frozen row contributes no
+bias, preserving the joint's feasible rows. Unrepresentable anchors reject
+only that joint, without suppressing a valid neighbor's repair.
+
+A 3D joint speed ceiling limits the common impulse scalar before either endpoint
+is published. Both linear and angular speeds constrain that scalar, and the
+joint caches the impulse actually applied. Frozen-axis projection and the body
+owner's low-speed cutoff still apply. This preserves the shared impulse at the
+speed ceiling without changing motor impulse bounds per row and iteration.
+
 ## Position Correction Limits
 
 Pure 3D, pure 2D and mixed correction preserve the existing correction fraction,
@@ -300,6 +324,12 @@ Grounding callbacks may take manual ownership or replace a body; the old refresh
 must not overwrite that state or continue preparing the old lifetime's motion.
 
 ## Notifications
+
+Unused colliders retain lazy pair-lookup storage. First contact prepares both
+owner and holder lookup roles, so a later role reversal can reuse that storage.
+Spatial registration reserves a return-stack baseline proportional to collider
+count, matching planar registration. Dense pair graphs and first visits to new
+partition roles can still require additional storage.
 
 Collision pairs are queued into the physics service active-pair queue the first
 time they update. During late simulation, active pair maintenance:

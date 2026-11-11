@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-036`.
+  `GRV-Benchmark-039`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -65,7 +65,94 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-No active ordered signals.
+### GRV-Benchmark-036 — First Dynamic Membership In A Planar Floor Partition
+
+**Discovered 2026-11-10.** Low-priority allocation signal from the corrected
+six-link planar ragdoll drop in
+[GRV-Issue-155](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-155-implementation).
+Build the package-backed Release benchmark on `2273ea72` plus that correction
+and run `verify-quality-ragdoll-duration --strict`. Each eight-second planar
+drop allocates 384 B after the verifier's one-second warmup: frame 40 at
+32 Hz and frame 238 at 60 Hz, consistently across repeated and observation-free
+controls. The supported planar cases and all spatial ragdolls measure zero.
+The prior planar drops allocated 8,096/4,896 B.
+
+The left arm, collider 4, first enters a floor-only `PhysicsPartition2D`.
+`AddDynamicObject` creates its dynamic membership set and
+`SetDynamicObjectAwake` creates the awake subset, 192 B each. Partition rent,
+voxel attachment, tracing and joint solving allocate zero in that frame.
+This is cold role storage reached during otherwise warmed simulation.
+
+**Next isolation:** Compare first dynamic-role entry with repeated entry in
+the same partitions at representative floor coverage. Measure retained memory
+and frame cost before choosing any reservation policy; eagerly allocating
+dynamic sets for every static floor voxel expands cold memory. Preserve
+local-membership scaling, deterministic reuse, replay and the existing zero
+warm supported-contact baseline. This signal does not relax a failing
+steady-state allocation guard.
+
+### GRV-Benchmark-037 — Finite Duration Of Legacy Constraint Contact Benchmarks
+
+**Discovered 2026-11-10.** Benchmark validity and capacity signal from the
+`Constraint2DBenchmarks` / `Constraint3DBenchmarks` resting and two-ragdoll
+rows during [#155 validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-155-implementation).
+The original ragdolls used a grid beginning at -4 while their 24-unit floors
+at X offsets +/-2 extended to -14. The planar benchmark configured context
+gravity but left per-body `SolidBody2D.Gravity` at zero. The current fixture
+assigns planar gravity and uses grid padding 16 for these BDN ragdoll contexts;
+other callers retain padding 4.
+
+The original 64-second ABBA timings are excluded from supported-workload
+claims. Their unchanged joint row counts concealed different contact work.
+The spatial leg first falls outside the original grid at X approximately
+-5.95, while still inside authored floor geometry. With complete grid
+coverage, the same corrected two-ragdoll scene stays above the floor through
+2,384 steps. The corresponding planar control with gravity keeps a single
+ragdoll supported, but the two-ragdoll case first crosses a finite floor edge
+on step 497, before the first below-floor center on step 837. Neither result
+establishes tunneling through admitted, covered support.
+
+These legacy ball-socket inputs also begin with strained anchors: a half-unit
+head gap and approximately 0.79-unit leg gaps. They differ from the initially
+coincident, limited joints in the opt-in quality scenes. Stronger correction
+changes their motion and newly visited partition roles. Counting rows or
+reporting a small terminal gap alone does not validate a resting workload.
+
+**Next isolation:** Use the plan's eight-second, physically checked workloads
+for Phase 3 quality/cost comparisons. Before reusing a legacy contact row for
+long-duration capacity claims, record its valid contact window, floor and
+grid coverage, body motion and contact population. A sustained benchmark
+requires a deliberate bounded scene or documented reset policy; preserve
+the original strained input as a separate control. Do not enlarge geometry
+or alter anchors solely to hide a cost or escape.
+
+### GRV-Benchmark-038 — Supported Ragdoll Full-Step Tails At 60 Hz
+
+**Discovered 2026-11-10.** Active duration/cost signal from the corrected
+six-link spatial supported-start workload at six solver passes. Build the
+package-backed Release benchmark on `2273ea72` plus the
+[#155 correction](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-155-implementation),
+then run `verify-quality-ragdoll-duration --strict`. Preserve the original
+eight-second scenario, pulses at two/four/six seconds, 32/60 Hz controls,
+replay and geometry bounds.
+
+Disposable instrumentation timed only `Simulate` plus `LateSimulate` in the
+unobserved control after the first second, with 420 samples per 60 Hz launch.
+Two corrected launches retained all bounds and zero warm allocation, with a
+mean full step of 2.991268 ms and mean per-launch p95 of 5.832350 ms. Their
+maxima were 22.8986 and 23.3886 ms, both above the 16.67 ms frame interval.
+The prior solver measured 12.038256 ms mean and 37.1377 ms worst step, so
+the improvement does not establish that every supported step fits 60 Hz.
+At 32 Hz the corrected p95 was 14.8978 ms and worst step 30.3322 ms.
+These Windows x64 Core i7-9700K / .NET 10.0.10 results are host-specific.
+
+**Next isolation:** In Phase 3, correlate the long steps with awake population,
+contact rows, exact-response work and pulse/recovery phase. Separate sleep
+propagation from per-active-step cost, preserving the original support and
+replay bounds. Compare 2/6/12 passes against the host's reserved physics
+budget; do not infer a portable frame-time guarantee from the mean or p95.
+The existing plan retains the settings, commands, raw-capture locations and
+balanced before/after measurements.
 
 ## Experimental Signals
 

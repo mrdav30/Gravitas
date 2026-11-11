@@ -7,6 +7,7 @@
 
 using System;
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.CollisionHandling;
 
 namespace Gravitas.Constraints;
@@ -17,12 +18,13 @@ namespace Gravitas.Constraints;
 internal static class JointSolver3D
 {
     internal const int MaxRowsPerJoint = 12;
-    private static readonly Fixed64 BiasFactor = Fixed64.One / (Fixed64)5;
+    // Fraction of structural error targeted by the next fixed step.
+    private static readonly Fixed64 BiasFactor = Fixed64.FromFraction(2, 5);
     private static readonly Fixed64 RowEpsilon = Fixed64.Epsilon;
     // 4,096 raw Q32.32 units, approximately 9.536743e-7 radians.
     private static readonly Fixed64 QuaternionTwistVectorEpsilon = Fixed64.FromRaw(4_096);
 
-    internal static void Solve(Joint3D joint, bool applyCachedImpulse)
+    internal static void Solve(Joint3D joint, bool applyCachedImpulse, Fixed64 linearCorrectionRate)
     {
         Span<JointConstraintRow3D> rows = stackalloc JointConstraintRow3D[MaxRowsPerJoint];
         int rowCount = BuildRows(
@@ -31,6 +33,12 @@ internal static class JointSolver3D
             out Fixed64 linearAnchorErrorMagnitude,
             out Fixed64 angularLimitErrorMagnitude,
             out Fixed64 motorErrorMagnitude);
+        if (!TryPrepareBiasVelocities(joint, rows[..rowCount], linearCorrectionRate))
+        {
+            joint.LastSolvedRowCount = 0;
+            joint.LastSolveMetrics = default;
+            return;
+        }
 
         Fixed64 incrementalImpulseMagnitude = Fixed64.Zero;
         Fixed64 motorImpulseMagnitude = Fixed64.Zero;
@@ -40,8 +48,8 @@ internal static class JointSolver3D
             JointConstraintRow3D row = rows[i];
             if (applyCachedImpulse)
             {
-                row.AccumulatedImpulse = joint.GetCachedImpulse(row.CacheIndex);
-                ApplyImpulse(joint.BodyA, joint.BodyB, row, row.AccumulatedImpulse);
+                row.AccumulatedImpulse = ApplyImpulse(joint.BodyA, joint.BodyB, row,
+                    joint.GetCachedImpulse(row.CacheIndex));
             }
 
             Fixed64 impulse = SolveRow(joint.BodyA, joint.BodyB, row, out bool clamped);
@@ -78,6 +86,63 @@ internal static class JointSolver3D
             joint.Context.Diagnostics.EmitJointImpulse(joint, joint.LastSolveMetrics);
     }
 
+    private static bool TryPrepareBiasVelocities(Joint3D joint, Span<JointConstraintRow3D> rows,
+        Fixed64 linearCorrectionRate)
+    {
+        foreach (ref JointConstraintRow3D row in rows)
+        {
+            // Structural error is corrected per fixed step. Motor gains already target velocity.
+            if (row.Kind != JointConstraintRowKind3D.Motor && !Fixed64.TryMultiplyDivide(
+                    row.BiasVelocity,
+                    row.Kind == JointConstraintRowKind3D.Linear ? linearCorrectionRate : joint.Context.InvDeltaTime,
+                    Fixed64.One, out row.BiasVelocity))
+            {
+                if (ComputeDenominator(joint.BodyA, joint.BodyB, row) <= RowEpsilon)
+                {
+                    row.BiasVelocity = Fixed64.Zero;
+                    continue;
+                }
+                GravitasLogger.Channel.Write(DiagnosticLevel.Error,
+                    "A 3D joint's correction velocity cannot be represented.", nameof(JointSolver3D));
+                return false;
+            }
+        }
+        return true;
+    }
+
+    internal static bool TryGetLinearCorrectionDistance(Joint3D joint, out Fixed64 distance)
+    {
+        distance = Fixed64.Zero;
+        if (!TryPrepareAnchors(joint, out Vector3d relativeA, out Vector3d relativeB, out Vector3d error))
+            return false;
+        var row = new JointConstraintRow3D
+        {
+            Kind = JointConstraintRowKind3D.Linear,
+            RelativeAnchorA = relativeA,
+            RelativeAnchorB = relativeB
+        };
+        for (int axis = 0; axis < 3; axis++)
+        {
+            row.Axis = axis == 0 ? Vector3d.Right : axis == 1 ? Vector3d.Up : Vector3d.Forward;
+            // Frozen, unresponsive errors cannot consume the connected island's repair budget.
+            if (ComputeDenominator(joint.BodyA, joint.BodyB, row) <= RowEpsilon)
+                error[axis] = Fixed64.Zero;
+        }
+        return Vector3d.TryGetMagnitude(error, out distance);
+    }
+
+    private static bool TryPrepareAnchors(Joint3D joint, out Vector3d relativeAnchorA,
+        out Vector3d relativeAnchorB, out Vector3d anchorError)
+    {
+        relativeAnchorA = relativeAnchorB = anchorError = default;
+        SolidBody bodyA = joint.BodyA, bodyB = joint.BodyB;
+        return bodyA.Rotation.TryRotate(joint.LocalFrameA.Position, out Vector3d anchorOffsetA)
+            && bodyB.Rotation.TryRotate(joint.LocalFrameB.Position, out Vector3d anchorOffsetB)
+            && bodyA.TryGetOffsetFromCenterOfMass(new ContactAnchor(bodyA.Position3d, anchorOffsetA), out relativeAnchorA)
+            && bodyB.TryGetOffsetFromCenterOfMass(new ContactAnchor(bodyB.Position3d, anchorOffsetB), out relativeAnchorB)
+            && Vector3d.TrySubtractSums(bodyB.Position3d, anchorOffsetB, bodyA.Position3d, anchorOffsetA, out anchorError);
+    }
+
     private static int BuildRows(
         Joint3D joint,
         Span<JointConstraintRow3D> rows,
@@ -93,24 +158,8 @@ internal static class JointSolver3D
 
         FixedQuaternion worldRotationA = (bodyA.Rotation * joint.LocalFrameA.Rotation).Normalized;
         FixedQuaternion worldRotationB = (bodyB.Rotation * joint.LocalFrameB.Rotation).Normalized;
-        if (!bodyA.Rotation.TryRotate(
-                joint.LocalFrameA.Position,
-                out Vector3d anchorOffsetA)
-            || !bodyB.Rotation.TryRotate(
-                joint.LocalFrameB.Position,
-                out Vector3d anchorOffsetB)
-            || !bodyA.TryGetOffsetFromCenterOfMass(
-                new ContactAnchor(bodyA.Position3d, anchorOffsetA),
-                out Vector3d relativeAnchorA)
-            || !bodyB.TryGetOffsetFromCenterOfMass(
-                new ContactAnchor(bodyB.Position3d, anchorOffsetB),
-                out Vector3d relativeAnchorB)
-            || !Vector3d.TrySubtractSums(
-                bodyB.Position3d,
-                anchorOffsetB,
-                bodyA.Position3d,
-                anchorOffsetA,
-                out Vector3d anchorError))
+        if (!TryPrepareAnchors(joint, out Vector3d relativeAnchorA,
+                out Vector3d relativeAnchorB, out Vector3d anchorError))
         {
             linearAnchorErrorMagnitude = Fixed64.Zero;
             GravitasLogger.Channel.Write(
@@ -405,8 +454,7 @@ internal static class JointSolver3D
         if (lambda == Fixed64.Zero)
             return Fixed64.Zero;
 
-        ApplyImpulse(bodyA, bodyB, row, lambda);
-        return lambda;
+        return ApplyImpulse(bodyA, bodyB, row, lambda);
     }
 
     private static Fixed64 ComputeRelativeVelocity(SolidBody bodyA, SolidBody bodyB, JointConstraintRow3D row)
@@ -440,25 +488,66 @@ internal static class JointSolver3D
             + Vector3d.Dot(torqueB, linearAngularB);
     }
 
-    private static void ApplyImpulse(SolidBody bodyA, SolidBody bodyB, JointConstraintRow3D row, Fixed64 lambda)
+    private static Fixed64 ApplyImpulse(SolidBody bodyA, SolidBody bodyB, JointConstraintRow3D row, Fixed64 lambda)
     {
         if (lambda == Fixed64.Zero)
-            return;
+            return Fixed64.Zero;
+        bool negative = lambda < Fixed64.Zero;
+        if (!Fixed64.TryMultiplyDivide(lambda, negative ? -Fixed64.One : Fixed64.One, Fixed64.One, out Fixed64 magnitude))
+            return Fixed64.Zero;
 
-        Vector3d impulse = row.Axis * lambda;
-        if (row.Kind == JointConstraintRowKind3D.Linear)
+        // Limit the shared impulse, then prepare again from that exact scalar before publishing either body.
+        for (int attempt = 0; attempt < 2; attempt++)
         {
-            bodyA.ApplyCollisionLinearVelocityDelta(-impulse * bodyA.GetConstrainedInverseMass(row.Axis));
-            bodyB.ApplyCollisionLinearVelocityDelta(impulse * bodyB.GetConstrainedInverseMass(row.Axis));
+            bool prepared = ContactResponseArithmetic3D.TryScale(row.Axis, lambda, out Vector3d impulse)
+                & Vector3d.TrySubtract(Vector3d.Zero, impulse, out Vector3d opposite);
+            prepared &= TryPrepareImpulseBody(bodyA, row, row.RelativeAnchorA, opposite, out Vector3d linearA, out Vector3d angularA)
+                & TryPrepareImpulseBody(bodyB, row, row.RelativeAnchorB, impulse, out Vector3d linearB, out Vector3d angularB);
+            if (!prepared)
+                return Fixed64.Zero;
 
-            Vector3d angularImpulseA = bodyA.ApplyConstrainedInverseInertia(Vector3d.Cross(row.RelativeAnchorA, -impulse));
-            Vector3d angularImpulseB = bodyB.ApplyConstrainedInverseInertia(Vector3d.Cross(row.RelativeAnchorB, impulse));
-            bodyA.ApplyCollisionAngularVelocityDelta(angularImpulseA);
-            bodyB.ApplyCollisionAngularVelocityDelta(angularImpulseB);
-            return;
+            Fixed64 limit = bodyA.Context.Environment.MaxSpeed;
+            Fixed64 allowed = FixedMath.Min(
+                FixedMath.Min(GetAllowedImpulseMagnitude(bodyA.LinearVelocity, linearA, limit, magnitude),
+                    GetAllowedImpulseMagnitude(bodyB.LinearVelocity, linearB, limit, magnitude)),
+                FixedMath.Min(GetAllowedImpulseMagnitude(bodyA.AngularVelocity, angularA, limit, magnitude),
+                    GetAllowedImpulseMagnitude(bodyB.AngularVelocity, angularB, limit, magnitude)));
+            if (allowed == magnitude)
+            {
+                bodyA.ApplyCollisionVelocityState(linearA, angularA);
+                bodyB.ApplyCollisionVelocityState(linearB, angularB);
+                return lambda;
+            }
+            if (allowed == Fixed64.Zero)
+                return Fixed64.Zero;
+            magnitude = allowed;
+            lambda = negative ? -allowed : allowed;
         }
+        return Fixed64.Zero;
+    }
 
-        bodyA.ApplyCollisionAngularVelocityDelta(bodyA.ApplyConstrainedInverseInertia(-impulse));
-        bodyB.ApplyCollisionAngularVelocityDelta(bodyB.ApplyConstrainedInverseInertia(impulse));
+    private static bool TryPrepareImpulseBody(SolidBody body, JointConstraintRow3D row, Vector3d relativeAnchor,
+        Vector3d impulse, out Vector3d linear, out Vector3d angular)
+    {
+        Vector3d linearDelta = default, torque = impulse;
+        bool prepared = true;
+        if (row.Kind == JointConstraintRowKind3D.Linear)
+            prepared = ContactResponseArithmetic3D.TryScale(impulse, body.GetConstrainedInverseMass(row.Axis), out linearDelta)
+                & Vector3d.TryCross(relativeAnchor, impulse, out torque);
+        prepared &= Fixed3x3.TryTransformDirection(body.GetConstrainedInverseInertiaTensor(), torque, out Vector3d angularDelta);
+        return prepared & body.TryPrepareCollisionVelocityState(linearDelta, angularDelta, out linear, out angular);
+    }
+
+    private static Fixed64 GetAllowedImpulseMagnitude(Vector3d current, Vector3d prepared, Fixed64 limit, Fixed64 magnitude)
+    {
+        // Match the body's rounded speed admission so publication cannot apply a different radial cap.
+        if (current == prepared || prepared.Magnitude <= limit)
+            return magnitude;
+        var bound = new FixedBoundSphere(Vector3d.Zero, limit);
+        var segment = new FixedSegment(current, prepared);
+        if (!segment.TryGetSphereIntersectionDistanceInterval(bound, magnitude, out _, out Fixed64 exit))
+            return Fixed64.Zero;
+        // The interval rounds half to even. Retreat one impulse LSB and recheck the materialized endpoint.
+        return exit > Fixed64.Zero ? exit - Fixed64.FromRaw(1) : Fixed64.Zero;
     }
 }

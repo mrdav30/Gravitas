@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp;
 using Gravitas.CollisionHandling;
 using Gravitas.Constraints;
 
@@ -218,6 +219,7 @@ public sealed partial class GravitasPhysicsService
             && CollisionResponse.TrySeedSupportedIslandNormals(
                 _discreteIslandConstraints[start].Pair, _discreteIslandConstraints[start + 1].Pair,
                 out correctedPositions);
+        Fixed64 linearCorrectionRate = GetJointLinearCorrectionRate(start, end);
         int iterations = _context.Settings.DiscreteSolverIterations;
         for (int iteration = 0; iteration < iterations; iteration++)
         {
@@ -234,7 +236,7 @@ public sealed partial class GravitasPhysicsService
                         applyPositionCorrection && !correctedPositions);
                 }
                 else
-                    JointSolver3D.Solve(constraint.Joint!, applyCachedImpulse);
+                    JointSolver3D.Solve(constraint.Joint!, applyCachedImpulse, linearCorrectionRate);
             }
         }
 
@@ -246,6 +248,27 @@ public sealed partial class GravitasPhysicsService
             if (constraint.Kind == DiscreteIslandConstraintKind.Contact)
                 constraint.Pair.ResponseSnapshot = default;
         }
+    }
+
+    private Fixed64 GetJointLinearCorrectionRate(int start, int end)
+    {
+        Fixed64 distance = Fixed64.Zero;
+        for (int i = start; i < end; i++)
+        {
+            DiscreteIslandConstraint constraint = _discreteIslandConstraints[i];
+            if (constraint.Kind != DiscreteIslandConstraintKind.Joint)
+                continue;
+            if (!JointSolver3D.TryGetLinearCorrectionDistance(constraint.Joint!, out Fixed64 error))
+                continue;
+            if (!Fixed64.TryAdd(distance, error, out distance))
+                return Fixed64.Zero;
+        }
+
+        // Bound the connected chain's total repair demand before individual bodies reach their speed cap.
+        Fixed64 rate = _context.InvDeltaTime;
+        Fixed64 speed = _context.Environment.MaxSpeed;
+        return Fixed64.TryMultiplyDivide(distance, rate, Fixed64.One, out Fixed64 demand) && demand <= speed
+            ? rate : speed / distance;
     }
 
 }
