@@ -239,23 +239,30 @@ public sealed partial class SolidBody2D
 
     private void UpdateSleepState()
     {
-        if (!CanSleep)
-        {
-            _sleepFrameCount = 0;
-            return;
-        }
+        if (AdvanceSleepCounter())
+            Sleep();
+    }
 
-        if (_linearSpeed > SleepLinearSpeedThreshold || _angularSpeed > _sleepAngularSpeedThreshold)
+    private bool CanCountTowardSleep => CanSleep
+        && _linearSpeed <= SleepLinearSpeedThreshold && _angularSpeed <= SleepAngularSpeedThreshold
+        && _deltaAcceleration == Vector2d.Zero && _deltaAngularAcceleration == Fixed64.Zero;
+
+    internal bool ReadyForAutomaticSleep => _sleepFrameCount >= SleepFrameThreshold && CanCountTowardSleep;
+
+    internal bool AdvanceSleepCounter()
+    {
+        if (_isSleeping)
+            return false;
+        if (!CanCountTowardSleep)
         {
             _sleepFrameCount = 0;
-            return;
+            return false;
         }
 
         if (_sleepFrameCount < SleepFrameThreshold)
             _sleepFrameCount++;
 
-        if (_sleepFrameCount >= SleepFrameThreshold)
-            Sleep();
+        return _sleepFrameCount >= SleepFrameThreshold;
     }
 
     private void RefreshLinearSpeed()

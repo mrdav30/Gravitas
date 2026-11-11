@@ -742,12 +742,6 @@ public partial class SolidBody : IRecordable
         }
     }
 
-    internal void UpdateSleepStateAfterPhysicsStep()
-    {
-        if (!IsSleeping)
-            UpdateSleepState();
-    }
-
     private void UpdateKinematicPositionAndRotation()
     {
         EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);

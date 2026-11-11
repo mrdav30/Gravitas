@@ -55,30 +55,8 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-<a id="grv-issue-156"></a>
-
-#### GRV-Issue-156 — Quiet 3D contact islands can alternate sleep and wake
-
-**Opened** 2026-11-10. **Priority** Medium. **Owner** Spatial body sleep and
-contact island wake propagation.
-
-On `5e653703`, place a bodyless 16 × 1 × 16 floor at Y = -0.5 and two
-2 × 1 × 2 free cuboids with masses 1 and 100 at Y = 0.5 and 1.5. Use identity
-rotations, manual grounding, zero gravity, air density, drag and damping,
-32 Hz, six solver iterations, and sleep thresholds of four frames. With
-sleep enabled on both from the start, both fall asleep on step 4 and stay
-asleep through step 20. Enabling only the upper body's sleep after step 1
-gives steps 4–7 as lower asleep, upper asleep, both awake, both awake,
-repeating with both bodies stationary and both support contacts present.
-
-The corrected centered 100:1 [duration fixture](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-154-implementation)
-also cycles individual bodies through sleep with both supports quiet. Trace
-how per-body quiet counters interact with connected wake propagation and
-verify that an external wake still reaches the complete island.
-Check the planar counterpart while isolating propagation; #155's planar
-supported recovery also changes its measured active-frame count.
-
-Remaining measured performance costs are tracked in the benchmark backlog.
+No active ordered issues. Remaining measured performance costs are tracked
+in the benchmark backlog.
 
 ## Resolved Issues
 
@@ -93,6 +71,7 @@ validation, tradeoffs and links to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                                                                                         | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="grv-issue-156"></a>GRV-Issue-156 | 2026-11-10 | Fixed. Connected movable bodies sleep together after their individual quiet thresholds in pure 2D, pure 3D, and coupled mixed contacts. Wake propagation and queued motion remain effective. | [Reproducer, regressions, duration results, and timing](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-156-implementation) |
 | <a id="grv-issue-155"></a>GRV-Issue-155 | 2026-11-10 | Fixed. Timestep-aware joint correction and a shared spatial impulse ceiling restore all original six-link ragdoll duration bounds at 32/60 Hz and six passes, with replay and warm allocation checks. | [Regressions, workload results, and cost](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-155-implementation) |
 | <a id="grv-issue-154"></a>GRV-Issue-154 | 2026-11-10 | Fixed. Coupled flat cuboid response preserves both original supports and upper-floor clearance in the centered 100:1 spatial stacks at 32 and 60 Hz. | [Trace, regressions, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-154-implementation) |
 | <a id="grv-issue-153"></a>GRV-Issue-153 | 2026-11-10 | Fixed. Coupled positional translation keeps both planar support depths within bounds during settling and connected wakes at 32 and 60 Hz. | [Trace, regressions, and validation](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-153-implementation) |

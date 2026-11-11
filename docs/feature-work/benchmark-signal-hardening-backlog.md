@@ -146,9 +146,18 @@ the improvement does not establish that every supported step fits 60 Hz.
 At 32 Hz the corrected p95 was 14.8978 ms and worst step 30.3322 ms.
 These Windows x64 Core i7-9700K / .NET 10.0.10 results are host-specific.
 
+#156 now lets all six links settle between pulses. In the final paired
+retake, both corrected 60 Hz launches kept the same bounds and zero warm
+allocation, with a 1.92 ms mean and 7.00 ms mean launch p95. Their worst
+steps were 30.43 and 32.26 ms, both over the frame interval. The 32 Hz
+control also exceeded its 31.25 ms interval in both launches, peaking at
+62.60 ms. The
+[#156 record](2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-issue-156-implementation)
+retains both matched timing passes and the baseline launch variability.
+
 **Next isolation:** In Phase 3, correlate the long steps with awake population,
-contact rows, exact-response work and pulse/recovery phase. Separate sleep
-propagation from per-active-step cost, preserving the original support and
+contact rows, exact-response work and pulse/recovery phase. Attribute the
+per-active-step cost with coordinated sleep, preserving the original support and
 replay bounds. Compare 2/6/12 passes against the host's reserved physics
 budget; do not infer a portable frame-time guarantee from the mean or p95.
 The existing plan retains the settings, commands, raw-capture locations and

@@ -14,6 +14,61 @@ namespace Gravitas;
 /// <content>Queues spatial contact response and solves deterministic islands of contacts and joints.</content>
 public sealed partial class GravitasPhysicsService
 {
+    internal int BodySlotCount => _dynamicBodies.PeakCount;
+
+    internal int GetSleepSlot(SolidBody? body) => body?.HasSolverMobility == true
+        && _dynamicBodies.TryGetValue(body.DynamicId, out SolidBody registered) && ReferenceEquals(body, registered)
+        ? body.DynamicId : -1;
+
+    internal bool AdvanceSleepCounters()
+    {
+        bool ready = false;
+        foreach (SolidBody body in _dynamicBodies)
+            ready |= body.AdvanceSleepCounter();
+        return ready;
+    }
+
+    internal void BlockUnreadySleepIslands(SleepIslands islands, bool advanced)
+    {
+        foreach (SolidBody body in _dynamicBodies)
+            if (!body.IsSleeping && (!advanced || !body.ReadyForAutomaticSleep))
+                islands.Block(body.DynamicId);
+    }
+
+    internal void SleepReadyIslands(SleepIslands islands)
+    {
+        foreach (SolidBody body in _dynamicBodies)
+            if (!body.IsSleeping && islands.CanSleep(body.DynamicId))
+                body.Sleep();
+    }
+
+    internal void JoinSleepIslands(SleepIslands islands)
+    {
+        foreach (CollisionPairLifetimeToken token in _activeCollisionPairs)
+            JoinContact(token);
+        // A nested late step can run while an outer notification owns tokens.
+        foreach (CollisionPairLifetimeToken token in _activeCollisionPairSnapshot)
+            JoinContact(token);
+
+        GravitasConstraint3DService constraints = _context.Constraints3D;
+        for (int id = 1; id <= constraints.PeakJointCount; id++)
+            if (constraints.TryGetJointForSolver(id, out Joint3D? joint))
+                islands.Join(GetSleepSlot(joint!.BodyA), GetSleepSlot(joint.BodyB));
+
+        void JoinContact(CollisionPairLifetimeToken token)
+        {
+            CollisionPair pair = token.Pair;
+            if (!token.IsCurrentLifetime || !pair.Active || !pair.Manifold.HasContact)
+                return;
+
+            int first = GetSleepSlot(pair.ColliderA.Body);
+            int second = GetSleepSlot(pair.ColliderB.Body);
+            if (first >= 0 && second >= 0 && !pair.ColliderA.IsTrigger && !pair.ColliderB.IsTrigger
+                && RequireCollisionPair(pair.ColliderA, pair.ColliderB))
+                islands.Join(first, second);
+        }
+    }
+
     internal void QueueDiscreteResponsePair(CollisionPair pair)
     {
         ChronicleGuard.ThrowIfNull(pair, nameof(pair));

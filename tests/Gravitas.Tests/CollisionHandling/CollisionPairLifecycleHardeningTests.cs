@@ -549,6 +549,39 @@ public sealed class CollisionPairLifecycleHardeningTests
     }
 
     [Fact]
+    public void NestedStep_ShouldKeepQuietBodyAwakeWhileItsContactNotificationIsInFlight()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        GravitasWorldContext context = scenario.Context;
+        context.Environment.Gravity = Fixed64.Zero;
+        AddQuietPair(Vector3d.Zero);
+        SolidBody quiet = AddQuietPair(Vector3d.Right * (Fixed64)8);
+        int nestedSteps = 0;
+        quiet.Collider.OnContactEnter += _ =>
+        {
+            nestedSteps++;
+            Step(context);
+            Assert.False(quiet.IsSleeping);
+        };
+
+        Step(context);
+
+        Assert.Equal(1, nestedSteps);
+        Assert.False(quiet.IsSleeping);
+
+        SolidBody AddQuietPair(Vector3d position)
+        {
+            SolidBody first = scenario.CreateSphere(position).Body;
+            SolidBody second = scenario.CreateSphere(position + Vector3d.Right).Body;
+            first.UseManualGrounding();
+            second.UseManualGrounding();
+            first.SleepFrameThreshold = 1;
+            second.SleepEnabled = false;
+            return first;
+        }
+    }
+
+    [Fact]
     public void Simulate_WhenQueuedPairShellIsReused_ShouldProcessReplacementOnce()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

@@ -1167,7 +1167,7 @@ All eight original duration cases pass `verify-quality-ragdoll-duration
 drops retain two floor supports at the end. Supported starts retain six.
 Both dimensions wake all six links on the first pulse from six sleeping
 links. Later settling remains distinct from the geometry acceptance;
-[GRV-Issue-156](issue-tracker.md#grv-issue-156) still owns quiet spatial
+[GRV-Issue-156](issue-tracker.md#grv-issue-156) recorded quiet island
 sleep/wake cycling. It was discovered while validating #154's newly retained
 stack supports and reproduced independently on the earlier `5e653703` build
 with stationary boxes and staggered sleep timers.
@@ -1297,10 +1297,119 @@ invalid-geometry counterexamples, replay expectation changes, the final
 source/tests and benchmark admission fixes. No actionable findings remain.
 The runtime grows by 142 net lines across five existing files, with shared
 anchor preparation reused and no new runtime files or dependency changes.
-`GRV-Issue-155` is resolved in source. Quiet-island propagation remains
-`GRV-Issue-156`; Phase 3 retains the original heavy-stack budget work, heavy-tip
+`GRV-Issue-155` is resolved in source. The subsequent #156 record covers
+quiet-island propagation. Phase 3 retains the original heavy-stack budget work, heavy-tip
 chain drift and the measured ragdoll tail signal. Cross-OS/architecture replay
 and publication remain separate release gates.
+
+#### GRV-Issue-156 Implementation
+
+The corrected #154 duration stack exposed the defect on 2026-11-10. The
+stationary 100:1 control also reproduces on the earlier `5e653703` build,
+and in pure 2D and 3D on `baeab1c7`. The spatial control uses a
+16 × 1 × 16 floor at Y = -0.5 and 2 × 1 × 2 bodies with masses 1 and 100
+at Y = 0.5 and 1.5, with identity rotations. The planar control uses the
+matching 16 × 1 floor and 2 × 1 bodies. Use manual grounding, zero gravity,
+air density, drag and damping, 32 Hz and six passes. Set both quiet
+thresholds to four steps.
+With sleep enabled from the start, both bodies sleep on step four and stay
+asleep through step twenty. Enable the upper body's sleep after step one to
+stagger the thresholds. The lower body reaches its threshold on step four.
+Waking it for the still-awake upper body resets its counter just
+before the upper body reaches its own threshold. Leaving the upper body's
+sleep disabled also causes the lower body to cycle. All four baseline
+regressions fail at the premature sleep transition.
+
+Quiet counters now advance before the automatic sleep decision. When a body
+qualifies, the context groups current movable bodies through retained solid
+contacts and enabled joints. The group sleeps when all of its members are
+ready or already asleep. Mixed mode waits until all response phases finish
+and joins the dimensions only through rows that couple planar motion. A
+paused service's awake body still blocks a mixed group. Pair and joint
+endpoints must match the live slot registry. This prevents a stale joint
+after a service reset from voting on unrelated replacement bodies.
+Forces and torques queued by contact callbacks prevent automatic sleep until
+integration consumes them. A mixed notification control with a one-step
+threshold exposed the need for this check when the decision moved after
+mixed response.
+
+The scratch graph stores one integer per reserved body slot and retains no
+body references. Registration reserves capacity. Scratch is rebuilt on
+candidate frames and does not enter the saved state or replay hash. The
+recorded body counters continue to carry the quiet interval across a save
+and populate operation. Existing explicit sleep, wake, and wake relay
+operations retain their body and response ownership.
+
+The matched stacks stay awake through step four and sleep together on step
+five. Saving the lower body at step four, clearing its quiet counter with
+an explicit wake, and populating the saved record preserves the step-five
+transition. With one member disabled, both stay awake and the repeated candidate
+path allocates zero warm bytes. An explicit zero-velocity wake reaches the
+whole resting group. Mixed controls verify transitive 3D contact to planar
+contact connectivity, independent vertical-only support, and paused services.
+
+All strict stack and ragdoll duration cases retain their original support,
+geometry and replay checks. The centered 100:1 spatial pulse cases go from
+30 sleeps/29 wakes and zero fully sleeping pulses to 8 sleeps/6 wakes,
+with both bodies asleep before each of the three pulses and waking together
+after each. They retain both supports after first contact, no upper-floor
+contact, and zero warm bytes at 32 and 60 Hz. The stationary controls settle
+once. Each supported ragdoll now sleeps all six links between pulses, with
+24 sleeps/18 wakes and zero warm allocation. The four drops retain their
+prior traces and warm bytes (384 B in 2D from the first-use partition
+allocation tracked by GRV-Benchmark-036, zero in 3D).
+
+On Windows x64 (Core i7-9700K, .NET 10.0.10), disposable instrumentation of
+`verify-quality-ragdoll-duration --strict` timed `Simulate` plus
+`LateSimulate` in the unobserved control after the first second. The four
+fresh processes ran baseline, fix, fix, baseline, with 224 samples per case
+at 32 Hz and 420 at 60 Hz. The benchmark binary and package dependencies
+were identical. Only the Gravitas binary changed, from `baeab1c7` to the
+final #156 working source. All 32 case results completed, with identical
+non-timing outputs between launches of the same binary.
+
+| Supported start | Mean step (ms), before → after | Mean launch p95 (ms), before → after | Worst step (ms), before → after |
+| --- | ---: | ---: | ---: |
+| 2D 32 Hz | 1.22 → 0.50 | 3.39 → 1.45 | 14.25 → 4.35 |
+| 2D 60 Hz | 0.91 → 0.38 | 2.48 → 1.28 | 14.34 → 5.10 |
+| 3D 32 Hz | 6.69 → 3.15 | 24.89 → 9.43 | 59.55 → 62.60 |
+| 3D 60 Hz | 7.55 → 1.92 | 21.09 → 7.00 | 110.29 → 32.26 |
+
+The supported 2D/3D cases spend 184/181 steps at all-rest at 32 Hz and
+348/346 at 60 Hz, up from 49 and 91 respectively in both dimensions.
+Mean and p95 include those additional quiet steps. The 60 Hz spatial
+fix launches still peak at 30.43 and 32.26 ms against a 16.67 ms frame.
+Absolute times vary across launches, including a 114.77 ms outlier in an
+unchanged baseline drop control. An earlier candidate run also peaked
+at 62.90 ms in the spatial 32 Hz supported case, versus 37.82 ms before.
+Retain [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz)
+for Phase 3 active-step and tail attribution. Raw logs and payload hashes
+are under `artifacts/physics-quality-phase2/issue-156/timing-*.txt` and
+`timing-*-payload.csv`.
+
+Final verification uses released stack packages (`UseLocalLsfStack=false`),
+SDK 10.0.302 and the same Windows x64 runtime. Both profiles build
+`netstandard2.1` and `net10.0`. The full suites and reachable coverage are:
+
+| Profile | Passing tests | Visited sequence points | Visited branches | Visited methods |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 8,489 | 54,376 / 54,376 | 22,462 / 22,462 | 5,695 / 5,695 |
+| ReleaseLean | 8,418 | 54,374 / 54,374 | 22,462 / 22,462 | 5,694 / 5,694 |
+
+All eight shared replay captures and their fixture hashes match between
+ordinary Release and ReleaseLean binaries. The two strict duration
+commands, `verify-quality-continuation` and `verify-quality-mixed` have
+byte-identical outputs. The 1,024-actor `verify-strategy-2d 1024` and
+`verify-strategy-3d 1024 8` runs retain their replay, work counts, floor,
+CCD, and chain checks in both profiles. DocFX builds with zero warnings.
+All 4,039 local links across its 215 generated pages resolve.
+
+Independent review covered group connectivity, stale joint slots, mixed
+step order and queued motion. No actionable findings remain. The fix
+adds 212 net runtime lines across
+twelve files, including the two new files for context coordination and
+slot scratch. The dimension-specific scans use their existing contact
+and joint registries. The replay schema and dependencies stay the same.
 
 ### Command Replay And Body Population
 
@@ -1363,7 +1472,7 @@ Raw captures are under ignored `artifacts/physics-quality-phase2`.
 
 At the Phase 2 closeout, the opt-in stack and ragdoll `--strict` checks
 reproduced the measured physical failures while preserving replay and
-validity checks. The subsequent #153, #154 and #155 implementation records
+validity checks. The subsequent #153 through #156 implementation records
 retain their corrections and current verification. Phase 3 can use the same
 workloads and original bounds; its tuning checklist remains separate.
 
@@ -1375,8 +1484,8 @@ workloads and original bounds; its tuning checklist remains separate.
       Retain the #151 support bounds when assessing lower iteration counts.
 - [ ] Attribute the supported spatial ragdoll's 60 Hz full-step tails from
       [GRV-Benchmark-038](benchmark-signal-hardening-backlog.md#grv-benchmark-038--supported-ragdoll-full-step-tails-at-60-hz).
-      Preserve its eight-second physical checks and distinguish active-frame
-      cost from quiet-island sleep/wake propagation before choosing settings.
+      Preserve its eight-second physical checks and measure active-frame
+      cost with #156's coordinated sleep before choosing settings.
 - [ ] Resolve the eight- and sixteen-stack awake heavy-bottom budget limits
       from the [density closeout](done/2026-10-31-benchmark-signal-closeouts.md#shared-frame-lever-reduction-and-closure).
       Use the v2 density fixture with authored rotation. Keep the four-stack

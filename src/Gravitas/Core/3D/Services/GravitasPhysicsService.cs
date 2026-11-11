@@ -169,12 +169,13 @@ public sealed partial class GravitasPhysicsService
         return true;
     }
 
-    internal void CompleteLateSimulatePhysicsStep()
+    internal void CompleteLateSimulatePhysicsStep(bool deferSleep = false)
     {
         PrepareCollisionPartitions();
         RunDiscreteCollisionStep();
         ProcessActiveCollisionPairs();
-        UpdateSleepStatesAfterPhysicsStep();
+        if (!deferSleep)
+            _context.UpdateAutomaticSleep(ran3D: true, ran2D: false);
     }
 
     internal void MarkCollisionPositionPublicationPending() => _collisionPositionPublicationPending = true;
@@ -203,16 +204,6 @@ public sealed partial class GravitasPhysicsService
             _discreteIslandConstraints.Clear();
         }
         _context.Collisions.RetireExpiredRetainedPartitions();
-    }
-
-    private void UpdateSleepStatesAfterPhysicsStep()
-    {
-        int peak = _dynamicBodies.PeakCount;
-        for (int i = 0; i < peak; i++)
-        {
-            if (_dynamicBodies.TryGetValue(i, out SolidBody body))
-                body.UpdateSleepStateAfterPhysicsStep();
-        }
     }
 
     /// <summary>Publishes interpolated presentation state for registered 3D bodies.</summary>
@@ -296,6 +287,7 @@ public sealed partial class GravitasPhysicsService
         if (motionType != PhysicsMobilityType.Static)
         {
             dynamicId = _dynamicBodies.Add(body);
+            _context.ReserveSleepIslands();
             while (_continuousCollisionCandidateLifetimes.Count <= dynamicId)
                 _continuousCollisionCandidateLifetimes.Add(default);
             BodyCount++;
@@ -313,6 +305,7 @@ public sealed partial class GravitasPhysicsService
         if (previousMotionType == PhysicsMobilityType.Static)
         {
             int dynamicId = _dynamicBodies.Add(body);
+            _context.ReserveSleepIslands();
             while (_continuousCollisionCandidateLifetimes.Count <= dynamicId)
                 _continuousCollisionCandidateLifetimes.Add(default);
             body.SetDynamicId(dynamicId);

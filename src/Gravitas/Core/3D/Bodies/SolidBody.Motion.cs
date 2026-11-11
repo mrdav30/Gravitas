@@ -49,23 +49,30 @@ public partial class SolidBody
 
     private void UpdateSleepState()
     {
-        if (!CanSleep)
-        {
-            _sleepFrameCount = 0;
-            return;
-        }
+        if (AdvanceSleepCounter())
+            Sleep();
+    }
 
-        if (_linearSpeed > SleepLinearSpeedThreshold || _angularSpeed > SleepAngularSpeedThreshold)
+    private bool CanCountTowardSleep => CanSleep
+        && _linearSpeed <= SleepLinearSpeedThreshold && _angularSpeed <= SleepAngularSpeedThreshold
+        && _deltaAcceleration == Vector3d.Zero && _deltaTorque == Vector3d.Zero;
+
+    internal bool ReadyForAutomaticSleep => _sleepFrameCount >= SleepFrameThreshold && CanCountTowardSleep;
+
+    internal bool AdvanceSleepCounter()
+    {
+        if (_isSleeping)
+            return false;
+        if (!CanCountTowardSleep)
         {
             _sleepFrameCount = 0;
-            return;
+            return false;
         }
 
         if (_sleepFrameCount < _sleepFrameThreshold)
             _sleepFrameCount++;
 
-        if (_sleepFrameCount >= _sleepFrameThreshold)
-            Sleep();
+        return _sleepFrameCount >= SleepFrameThreshold;
     }
 
     private void ClearMotionForSleep()

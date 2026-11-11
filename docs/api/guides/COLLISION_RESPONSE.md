@@ -288,6 +288,15 @@ separate tuning knobs.
 non-kinematic body can sleep after linear and angular speed remain at or below
 explicit thresholds for `SleepFrameThreshold` fixed frames.
 
+At the end of a managed late physics step, automatic sleep waits for every
+movable body in a connected component to meet its own quiet threshold or
+already be asleep. A member with sleep disabled keeps the component awake.
+Forces and torques queued for the next integration also keep it awake.
+Solid contacts and enabled joints connect movable bodies. Bodies can settle
+independently on a shared static floor. In Mixed mode the decision follows
+all response phases and includes mixed contacts that couple planar motion.
+Explicit `Sleep()` and `Wake()` operate on the requested body immediately.
+
 Sleeping clears accumulated force, velocity, torque, acceleration, and pending
 position-correction state, but does not remove the collider from GridForge
 partitions.

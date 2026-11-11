@@ -141,6 +141,123 @@ public sealed partial class MixedBroadPhaseTests
         context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(1);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void QuietMixedChain_ShouldShareSleepEligibilityAcrossPureAndMixedContacts(int pausedDimension)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody first = CreateSphere3D(context, Vector3d.Zero, immovable: false).Body;
+        SolidBody bridge = CreateSphere3D(context, Vector3d.Right, immovable: false).Body;
+        SolidBody2D planar = CreateCircle2D(context, Vector2d.Right * Fixed64.Two, immovable: false);
+        SolidBody2D tail = CreateCircle2D(context, Vector2d.Right * (Fixed64)3, immovable: false);
+        SolidBody2D separate = CreateCircle2D(context, Vector2d.Right * (Fixed64)8, immovable: false);
+        first.UseManualGrounding();
+        bridge.UseManualGrounding();
+        planar.UseManualGrounding();
+        tail.UseManualGrounding();
+        first.SleepFrameThreshold = bridge.SleepFrameThreshold = separate.SleepFrameThreshold = 2;
+        planar.SleepFrameThreshold = 2;
+        tail.SleepFrameThreshold = 4;
+        context.Physics2D.SimulatePhysics = pausedDimension != 2;
+        context.Physics.SimulatePhysics = pausedDimension != 3;
+
+        for (int frame = 1; frame <= 8; frame++)
+        {
+            Step(context);
+            bool expected = pausedDimension == 0 && frame >= 4;
+            Assert.Equal(expected, first.IsSleeping);
+            Assert.Equal(expected, bridge.IsSleeping);
+            Assert.Equal(expected, planar.IsSleeping);
+            Assert.Equal(expected, tail.IsSleeping);
+            Assert.Equal(pausedDimension != 2 && frame >= 2, separate.IsSleeping);
+        }
+
+        Assert.Equal(1, context.MixedCollisions.ActivePairCount);
+        Assert.Equal(Vector3d.Zero, first.Position3d);
+        Assert.Equal(Vector3d.Right, bridge.Position3d);
+        Assert.Equal(Vector2d.Right * Fixed64.Two, planar.Position);
+        Assert.Equal(Vector2d.Right * (Fixed64)3, tail.Position);
+
+        if (pausedDimension == 0)
+        {
+            first.Wake();
+            Step(context);
+            Assert.False(first.IsSleeping);
+            Assert.False(bridge.IsSleeping);
+            Assert.False(planar.IsSleeping);
+            // The mixed wake reaches the planar side after its pure response.
+            Step(context);
+            Assert.False(tail.IsSleeping);
+            Assert.True(separate.IsSleeping);
+        }
+    }
+
+    [Fact]
+    public void QuietVerticalMixedSupport_ShouldAllowPlanarSleepWhileSpatialBodyStaysAwake()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody spatial = CreateSphere3D(context,
+            Vector3d.Up * Fixed64.FromFraction(3, 4), immovable: false).Body;
+        SolidBody2D planar = CreateCircle2D(context, Vector2d.Zero, immovable: false);
+        spatial.UseManualGrounding();
+        spatial.SleepEnabled = false;
+        planar.SleepFrameThreshold = 1;
+
+        Step(context);
+        Assert.Equal(1, context.MixedCollisions.ActivePairCount);
+        Assert.True(planar.IsSleeping);
+        Assert.False(spatial.IsSleeping);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void MixedNotification_ShouldPreserveInputsQueuedAfterIntegration(bool planar, bool torque)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.SetFrameRate(32);
+        var contact = CreateSphere3D(context, Vector3d.Zero, immovable: false);
+        SolidBody2D other = CreateCircle2D(context, Vector2d.Right, immovable: false);
+        contact.Body.SleepEnabled = other.SleepEnabled = false;
+
+        if (planar)
+        {
+            SolidBody2D target = CreateCircle2D(context, Vector2d.Right * (Fixed64)8, immovable: false);
+            target.UseManualGrounding();
+            target.SleepFrameThreshold = 1;
+            contact.Collider.OnMixedContactEnter += _ =>
+            {
+                if (torque) target.AddTorque(Fixed64.One);
+                else target.AddForce(Vector2d.Right);
+            };
+
+            Step(context);
+            Assert.False(target.IsSleeping);
+            Step(context);
+            Assert.True((torque ? target.AngularVelocity : target.LinearVelocity.X) > Fixed64.Zero);
+        }
+        else
+        {
+            SolidBody target = CreateSphere3D(context, Vector3d.Right * (Fixed64)8, immovable: false).Body;
+            target.UseManualGrounding();
+            target.SleepFrameThreshold = 1;
+            contact.Collider.OnMixedContactEnter += _ =>
+            {
+                if (torque) target.AddTorque(Vector3d.Up);
+                else target.AddForce(Vector3d.Right);
+            };
+
+            Step(context);
+            Assert.False(target.IsSleeping);
+            Step(context);
+            Assert.True((torque ? target.AngularVelocity.Y : target.LinearVelocity.X) > Fixed64.Zero);
+        }
+    }
+
     [Fact]
     public void Simulate_WithTriggerLayerAndSameAgentFilters_ShouldApplyMixedBroadPhaseRules()
     {

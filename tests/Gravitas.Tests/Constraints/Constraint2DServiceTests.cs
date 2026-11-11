@@ -13,6 +13,44 @@ namespace Gravitas.Tests.Constraints;
 
 public sealed class Constraint2DServiceTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void AutomaticSleep_ShouldOnlyUseEnabledJointsWithCurrentEndpoints(int replacements)
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D oldFirst = CreateBody(context, Vector2d.Zero);
+        SolidBody2D oldSecond = CreateBody(context, Vector2d.Zero);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(oldFirst, oldSecond));
+        if (replacements == 0)
+        {
+            oldFirst.SleepFrameThreshold = 1;
+            oldSecond.SleepEnabled = false;
+            Step(context);
+            Assert.False(oldFirst.IsSleeping);
+            joint.IsEnabled = false;
+            Step(context);
+            Assert.True(oldFirst.IsSleeping);
+            return;
+        }
+
+        context.Physics2D.Reset();
+        SolidBody2D quiet = CreateBody(context, -Vector2d.Right * (Fixed64)4);
+        Assert.Equal(oldFirst.DynamicId, quiet.DynamicId);
+        quiet.SleepFrameThreshold = 1;
+        if (replacements == 2)
+        {
+            SolidBody2D awake = CreateBody(context, Vector2d.Right * (Fixed64)4);
+            Assert.Equal(oldSecond.DynamicId, awake.DynamicId);
+            awake.SleepEnabled = false;
+        }
+
+        Step(context);
+
+        Assert.True(quiet.IsSleeping);
+    }
+
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
 
     [Fact]

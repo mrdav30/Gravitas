@@ -99,6 +99,7 @@ public sealed partial class GravitasPhysics2DService
         if (motionType != PhysicsMobilityType.Static)
         {
             body.DynamicId = _dynamicBodies.Add(body);
+            _context.ReserveSleepIslands();
             while (_continuousCollisionCandidateLifetimes.Count <= body.DynamicId)
                 _continuousCollisionCandidateLifetimes.Add(default);
             BodyCount++;
@@ -115,6 +116,7 @@ public sealed partial class GravitasPhysics2DService
         if (previousMotionType == PhysicsMobilityType.Static)
         {
             body.DynamicId = _dynamicBodies.Add(body);
+            _context.ReserveSleepIslands();
             while (_continuousCollisionCandidateLifetimes.Count <= body.DynamicId)
                 _continuousCollisionCandidateLifetimes.Add(default);
             BodyCount++;
@@ -262,11 +264,12 @@ public sealed partial class GravitasPhysics2DService
         return true;
     }
 
-    internal void CompleteLateSimulatePhysicsStep()
+    internal void CompleteLateSimulatePhysicsStep(bool deferSleep = false)
     {
         PrepareCollisionPartitions();
         RunDiscreteCollisionStep();
-        UpdateSleepStatesAfterPhysicsStep();
+        if (!deferSleep)
+            _context.UpdateAutomaticSleep(ran3D: false, ran2D: true);
     }
 
     private bool _collisionPositionPublicationPending;
@@ -304,12 +307,6 @@ public sealed partial class GravitasPhysics2DService
         RefreshGroundingFromDiscreteResponse(frame);
         CleanupUntouchedPairs(frame);
         _context.Collisions2D.RetireExpiredRetainedPartitions();
-    }
-
-    private void UpdateSleepStatesAfterPhysicsStep()
-    {
-        foreach (SolidBody2D body in _dynamicBodies)
-            body.UpdateSleepStateAfterPhysicsStep();
     }
 
     /// <summary>Publishes interpolated presentation state for registered 2D bodies.</summary>

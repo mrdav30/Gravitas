@@ -13,6 +13,56 @@ namespace Gravitas;
 /// <content>Groups planar contacts and joints into islands and solves each island in deterministic order.</content>
 public sealed partial class GravitasPhysics2DService
 {
+    internal int BodySlotCount => _dynamicBodies.PeakCount;
+
+    internal int GetSleepSlot(SolidBody2D? body, int offset) => body?.HasSolverMobility == true
+        && TryGetDynamicBody(body.DynamicId, out SolidBody2D registered) && ReferenceEquals(body, registered)
+        ? offset + body.DynamicId : -1;
+
+    internal bool AdvanceSleepCounters()
+    {
+        bool ready = false;
+        foreach (SolidBody2D body in _dynamicBodies)
+            ready |= body.AdvanceSleepCounter();
+        return ready;
+    }
+
+    internal void BlockUnreadySleepIslands(SleepIslands islands, int offset, bool advanced)
+    {
+        foreach (SolidBody2D body in _dynamicBodies)
+            if (!body.IsSleeping && (!advanced || !body.ReadyForAutomaticSleep))
+                islands.Block(offset + body.DynamicId);
+    }
+
+    internal void SleepReadyIslands(SleepIslands islands, int offset)
+    {
+        foreach (SolidBody2D body in _dynamicBodies)
+            if (!body.IsSleeping && islands.CanSleep(offset + body.DynamicId))
+                body.Sleep();
+    }
+
+    internal void JoinSleepIslands(SleepIslands islands, int offset)
+    {
+        foreach (var entry in _pairs)
+        {
+            CollisionPair2D pair = entry.Value;
+            if (!pair.HasResponse)
+                continue;
+
+            int first = GetSleepSlot(pair.ColliderA.Body, offset);
+            int second = GetSleepSlot(pair.ColliderB.Body, offset);
+            if (first >= 0 && second >= 0 && !pair.ColliderA.IsTrigger && !pair.ColliderB.IsTrigger
+                && RequireCollisionPair(pair.ColliderA, pair.ColliderB))
+                islands.Join(first, second);
+        }
+
+        GravitasConstraint2DService constraints = _context.Constraints2D;
+        for (int id = 1; id <= constraints.PeakJointCount; id++)
+            if (constraints.TryGetJointForSolver(id, out Joint2D? joint))
+                islands.Join(GetSleepSlot(joint!.BodyA, offset), GetSleepSlot(joint.BodyB, offset));
+
+    }
+
     private void SolveDiscreteResponsePairs()
     {
         // Later pair callbacks can retire a previously queued row's supplier.

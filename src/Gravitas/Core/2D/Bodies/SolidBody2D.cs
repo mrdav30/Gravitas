@@ -801,12 +801,6 @@ public sealed partial class SolidBody2D : IRecordable
         }
     }
 
-    internal void UpdateSleepStateAfterPhysicsStep()
-    {
-        if (!_isSleeping)
-            UpdateSleepState();
-    }
-
     internal void OnVisualize()
     {
         if (IsKinematic)

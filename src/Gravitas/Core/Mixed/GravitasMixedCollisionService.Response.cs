@@ -14,6 +14,23 @@ namespace Gravitas;
 /// <content>Builds mixed islands and solves every retained contact constraint.</content>
 internal sealed partial class GravitasMixedCollisionService
 {
+    internal void JoinSleepIslands(SleepIslands islands, int planarOffset)
+    {
+        foreach (var entry in _pairs)
+        {
+            CollisionPairMixed pair = entry.Value;
+            if (!pair.Manifold.HasContact)
+                continue;
+
+            int spatial = _context.Physics.GetSleepSlot(pair.Collider3D.Body);
+            int planar = _context.Physics2D.GetSleepSlot(pair.Collider2D.Body, planarOffset);
+            if (spatial >= 0 && planar >= 0 && !pair.Collider3D.IsTrigger && !pair.Collider2D.IsTrigger
+                && RequireCollisionPair(pair.Collider3D, pair.Collider2D)
+                && CollisionResponseMixed.HasPlanarResponseCoupling(pair.Manifold))
+                islands.Join(spatial, planar);
+        }
+    }
+
     private void SolveMixedResponsePairs()
     {
         // A later member callback can retire a previously queued carrier or supplier.

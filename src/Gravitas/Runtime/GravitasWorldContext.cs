@@ -425,11 +425,14 @@ public sealed partial class GravitasWorldContext : IDisposable
                 && Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);
             ProcessQueuedContinuousCollisionHandoffs(ran3D, ran2D);
             if (ran3D)
-                Physics.CompleteLateSimulatePhysicsStep();
+                Physics.CompleteLateSimulatePhysicsStep(deferSleep: willRunMixed);
             if (ran2D)
-                Physics2D.CompleteLateSimulatePhysicsStep();
+                Physics2D.CompleteLateSimulatePhysicsStep(deferSleep: willRunMixed);
             if (willRunMixed)
+            {
                 MixedCollisions.LateSimulate();
+                UpdateAutomaticSleep(ran3D, ran2D, mixed: true);
+            }
 
             _hooks.InvokeLateSimulate();
         }

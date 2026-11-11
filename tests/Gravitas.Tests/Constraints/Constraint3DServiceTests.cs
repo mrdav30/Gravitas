@@ -14,6 +14,45 @@ namespace Gravitas.Tests.Constraints;
 
 public sealed class Constraint3DServiceTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void AutomaticSleep_ShouldOnlyUseEnabledJointsWithCurrentEndpoints(int replacements)
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        var oldFirst = scenario.CreateSphere(Vector3d.Zero);
+        var oldSecond = scenario.CreateSphere(Vector3d.Zero);
+        Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(oldFirst.Body, oldSecond.Body));
+        if (replacements == 0)
+        {
+            oldFirst.Body.SleepFrameThreshold = 1;
+            oldSecond.Body.SleepEnabled = false;
+            Step(scenario.Context, 1);
+            Assert.False(oldFirst.Body.IsSleeping);
+            joint.IsEnabled = false;
+            Step(scenario.Context, 1);
+            Assert.True(oldFirst.Body.IsSleeping);
+            return;
+        }
+
+        scenario.Context.Physics.Reset();
+
+        var quiet = scenario.CreateSphere(Vector3d.Left * (Fixed64)4);
+        Assert.Equal(oldFirst.Body.DynamicId, quiet.Body.DynamicId);
+        quiet.Body.SleepFrameThreshold = 1;
+        if (replacements == 2)
+        {
+            var awake = scenario.CreateSphere(Vector3d.Right * (Fixed64)4);
+            Assert.Equal(oldSecond.Body.DynamicId, awake.Body.DynamicId);
+            awake.Body.SleepEnabled = false;
+        }
+
+        Step(scenario.Context, 1);
+
+        Assert.True(quiet.Body.IsSleeping);
+    }
+
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
 
     [Fact]
