@@ -1581,6 +1581,8 @@ heavy-tip chain's corresponding ranges were 1.59–1.66, 3.13–3.35 and
 setting. Planar chains had zero warm allocation. The spatial chain at six
 passes retained its 3,024 B first-use burst at both rates. These discrete
 workloads use no continuous-collision mode.
+[GRV-Benchmark-039](../benchmark-signal-hardening-backlog.md#grv-benchmark-039)
+records the two allocation frames and the follow-up gate.
 
 ### Supported Spatial Ragdoll Tail Attribution
 
@@ -1851,8 +1853,8 @@ contracts carry forward from the verified runtime.
 remains evidence-gated. The measured planar drop touches a cold dynamic
 membership in an otherwise warm context. Revisit when repeated first
 touches in a representative scene exceed its frame or allocation budget.
-The heavy-tip chain drift and the sixteen-stack budget limit are documented
-workload boundaries.
+The [benchmark watch list](../benchmark-signal-hardening-backlog.md#watch-items)
+retains the heavy-tip chain travel and sixteen-stack budget boundaries.
 
 ### Final Closeout Verification
 
@@ -1875,6 +1877,13 @@ The focused resource filter covered retired pair and planar grounding
 references, awake membership and partition reuse. The repository replay
 comparator passed the two Windows x64 lanes against all eight shared
 fixtures. The full native matrix remains a release check.
+
+The deferred-work audit on `bb84d855` repeated `verify-quality-stacks`,
+`verify-quality-stack-support` and `verify-quality-chain-duration` in
+both package-backed profiles with matching outputs. The original offset
+spatial 100:1 short case reports zero final lateral drift at capture
+precision and retains both supports. This supersedes the earlier
+0.572327-unit drift result for that fixture.
 
 DocFX built with warnings treated as errors, and all 4,041 local links
 across 215 generated pages resolved. The archive and its incoming links

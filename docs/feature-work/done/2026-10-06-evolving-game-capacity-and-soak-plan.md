@@ -812,8 +812,8 @@ and cold wake spike continue under
 Representative curved-contact frequency continues under
 [#024](../benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost).
 The unclassified 2D-256 outliers came from one process and did not recur in
-the warmed soak. Revisit their fresh-context phase if they repeat under
-matched host conditions.
+the warmed soak. The [benchmark watch list](../benchmark-signal-hardening-backlog.md#watch-items)
+retains the matched fresh-context recurrence check.
 
 Host capacity still depends on the application's tick reserve and workload.
 Solver iteration, grounding, and frame-rate quality curves belong to the

@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-039`.
+  `GRV-Benchmark-040`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -72,6 +72,7 @@ No active signals.
 | Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | [GRV-Benchmark-036 — First dynamic membership in a planar floor partition](#grv-benchmark-036--first-dynamic-membership-in-a-planar-floor-partition) | Evidence-gated. First-use allocation reproduced, representative burst frequency open. | First-touch membership allocation exceeds a representative scene’s reserved allocation or frame budget |
+| [GRV-Benchmark-039 — First-use allocation in spatial heavy-tip chains](#grv-benchmark-039) | Evidence-gated. A 3,024 B burst reproduces at 32 and 60 Hz. | A representative scene's first visits exceed its reserved allocation or frame budget |
 | [GRV-Benchmark-033 — 1,024-actor 3D partition cost and first-wake spike](#grv-benchmark-033) | Capacity-sensitive. Sustained cost profiled, first-wake allocation owner open. | An equivalent workload exceeds the host's reserved budget or the first-use burst recurs in a target scene |
 | [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental. Synthetic step costs measured, representative frequency open. | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
 | GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
@@ -100,6 +101,24 @@ entry with repeated entry in the same partitions. Measure retained memory and
 frame cost before choosing a reservation policy. Eagerly allocating dynamic
 sets for every static floor voxel expands cold memory. Preserve local-membership
 scaling, deterministic reuse, replay and the zero warm supported-contact baseline.
+
+<a id="grv-benchmark-039"></a>
+
+### GRV-Benchmark-039 — First-Use Allocation In Spatial Heavy-Tip Chains
+
+**Recorded 2026-11-11.** Run `verify-quality-chain-duration` in package-backed
+Release or ReleaseLean on `bb84d855`. The eight-second spatial 100:1 heavy-tip
+chain at six solver passes allocates 3,024 B on frame 156 at 32 Hz and on
+frame 289 at 60 Hz. These are the only allocating steps after warm-up. The
+matching planar chains and the shorter spatial chain cases report zero warm
+bytes. Replay, prepared rows and energy match across both profiles.
+
+The [duration record](done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#duration-quality-at-2612-passes)
+identifies first-use storage. The earlier short-case probe traced a larger
+burst to partition rental and voxel membership. Revisit when first visits
+in a representative scene exceed its allocation or frame budget. Capture
+allocation stacks on the two duration frames and compare with repeat visits
+to the same partitions before changing reservation or pooling policy.
 
 ### GRV-Benchmark-024 — Curved-Contact Workload Frequency And Step Cost
 
@@ -381,6 +400,28 @@ signal anchors remain on the rows below.
 
 ## Watch Items
 
+- **Fresh-context 256-actor planar tails.** Three of 320 active frames exceeded
+  16.67 ms in one of five fresh processes, with a 42.45 ms maximum. The warmed
+  soak recorded zero misses in 20,480 frames. If misses recur under matched
+  host conditions, repeat `verify-strategy-2d` in fresh processes and collect
+  frame-level timing, work counts and allocation evidence around the affected
+  stages. [Baseline and soak record](done/2026-10-06-evolving-game-capacity-and-soak-plan.md#baseline-frame-captures)
+- **Sixteen awake rotated stacks.** All 768 six-pass homogeneous steps per side
+  in the final #038 retake exceeded 16.67 ms despite matching support and zero
+  warm allocation. No 2/6/12 setting met the interval in every earlier launch,
+  and two passes lost support in the mixed-load control. If representative
+  density exceeds the host's reserved budget, follow [#034](#grv-benchmark-034)
+  and isolate the six-pass compact-normal rejections with equal-work replay
+  and support checks. Mixed-load membership and scratch growth has its own
+  recurrence condition in [#035](#grv-benchmark-035).
+  [Density sweep](done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#sustained-rotated-stack-density) ·
+  [#038 retake](done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-benchmark-038-closeout)
+- **Long-duration heavy-tip chain travel.** The six-pass 2D and 3D controls
+  reach about 1.146–1.151 units against the provisional one-unit tip travel
+  bound at 32 and 60 Hz. Anchor gaps and the input-work energy bounds hold.
+  If a host needs a tighter travel bound, compare axial and lateral travel
+  with actual anchor separation and a zero-input control. The unrestricted
+  chain can move about its pinned root. [Duration quality results](done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#duration-quality-at-2612-passes)
 - Mixed full-runtime CCD rows were heavier than pure 2D or pure 3D rows at
   `1024` bodies. This is expected because mixed mode exercises both dimensions
   and the mixed broad phase. Revisit if the gap grows after the 3D allocation
