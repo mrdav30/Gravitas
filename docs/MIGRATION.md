@@ -1,6 +1,23 @@
 # Gravitas Migration Guide
 
-## Byte-backed enums and replay hashes
+## From v1 to v2
+
+Use this guide when upgrading from Gravitas v1.x to v2.0, including
+`Gravitas.Lean`. Update Gravitas and its host adapters together and rebuild
+consuming assemblies. Before deploying, check [saved state and clock
+handling](#shared-simulation-timing), regenerate [replay hash
+baselines](#byte-backed-enums-and-replay-hashes), and validate any shapes or
+queries near the [geometry limits](#supported-effective-geometry).
+
+### Body mobility enum
+
+Replace `BodyMotionType` with `PhysicsMobilityType` in both 2D and 3D host code,
+including calls to `Initialize(...)` and `SetMotionType(...)`. For example,
+`BodyMotionType.Kinematic` becomes `PhysicsMobilityType.Kinematic`. The
+`MotionType` property and recorded field retain their names, and the
+`Dynamic`, `Kinematic`, and `Static` values retain their numeric meanings.
+
+### Byte-backed enums and replay hashes
 
 Replay hash schema 3 writes the byte-backed hash mode, 3D shape definition kind,
 mesh inertia policy, and material combine policies as one byte each. Regenerate
@@ -11,7 +28,7 @@ comparing hashes.
 definition. MemoryPack payloads containing `PhysicsMaterial` use the new binary
 field layout.
 
-## Shared diagnostics extraction
+### Shared diagnostics extraction
 
 Shared logging and exception guards now come from the independent
 `Chronicler.Diagnostics` package (v1.0.0), in both standard and Lean builds.
@@ -24,11 +41,10 @@ SwiftCollections; library-specific logger facades and channel names stay intact.
 Rebuild consumers and adapters together: moved types have new CLR identities,
 including types exposed in logger signatures. There are no forwarding wrappers.
 This extraction does not change recorded fields or record-hash identities.
-Publish Chronicler.Diagnostics before dependent packages, then validate against
-the coordinated released versions; local-stack builds alone do not prove the
-published package graph is compatible.
+Use the Chronicler.Diagnostics version required by the v2 package when your
+host or adapter references it directly.
 
-## Supported effective geometry
+### Supported effective geometry
 
 Runtime colliders, standalone meshes and context query sources share an
 inclusive `4,096`-world-unit conservative reach budget. Effective scale is
@@ -45,7 +61,7 @@ costs against your intended workload. This is an admission guarantee, not a
 guarantee that chunked response equals one continuous mesh or that the maximum
 supported geometry is a real-time workload target.
 
-## Query geometry and settings ownership
+### Query geometry and settings ownership
 
 Numeric query sources and explicit ground-probe radii enforce the supported
 `4,096`-unit reach budget. Validate authored workloads before issuing queries;
@@ -60,7 +76,7 @@ disposal releases it. Apply settings and change dimensional mode/mixed thickness
 between fixed steps. Invalid mixed envelopes reject before configuration
 changes. Recorded schemas and field keys are unchanged.
 
-## Runtime mass changes
+### Runtime mass changes
 
 `SolidBody.Mass` is now a property instead of a public field. Rebuild consuming
 assemblies. Assignments and object initializers remain source-compatible;
@@ -82,7 +98,7 @@ converted to acceleration are not rescaled. See
 [host integration](api/guides/HOST_INTEGRATION.md#runtime-mass-changes) for the
 complete contract.
 
-## Partition membership ownership
+### Partition membership ownership
 
 `PhysicsPartition`, `PhysicsPartition2D` and `PhysicsMixedPartition` no longer
 expose mutable `Contained*Objects` fields. Local membership storage now scales
@@ -117,16 +133,10 @@ Recorded body and collider schemas are unchanged. Cache-inclusive replay hashes
 and hashes from different library versions should not be compared as
 compatibility guarantees.
 
-## Chronicler v1.0.0
+### Chronicler v1.0.0
 
-Core, Lean, and shim package references now use Chronicler v1.0.0. Coordinated
-source references use the evergreen identities centralized in
-`Directory.Build.props` across the library, tests, and benchmarks. Keep sibling
-references aligned to prevent runtime assembly-load failures. After the
-SwiftCollections and GridForge alignments are committed and pushed, refresh
-their immutable CI pins together with FixedMathSharp and Chronicler. Validate
-both configurations against released upstream packages before publishing;
-source-mode packages remain development artifacts.
+Gravitas v2 uses Chronicler v1.0.0 for its Core, Lean, and shim dependencies.
+Update any direct Chronicler package references in your host to match.
 
 When building Gravitas with Chronicler v1.0.0, import `Chronicler.Hashing` for
 `ChronicleHash` returned by `GravitasWorldContext.ComputeReplayHash()` and for
@@ -151,7 +161,7 @@ See the
 [Chronicler migration guide](https://github.com/mrdav30/Chronicler/blob/main/docs/MIGRATION.md)
 for the complete API mapping.
 
-## Shared simulation timing
+### Shared simulation timing
 
 When upgrading from the narrow-clock API, update host code and stored data
 together. The integration step remains Fixed64; the absolute timeline does not.
