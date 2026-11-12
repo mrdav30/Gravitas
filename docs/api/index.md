@@ -63,6 +63,8 @@ description: API reference and guides for deterministic fixed-point 2D, 3D, and 
 | `Gravitas`      | Standard package with built-in MemoryPack support                      |
 | `Gravitas.Lean` | Same core physics API without the direct MemoryPack runtime dependency |
 
+Both variants target `netstandard2.1` and `net10.0`.
+
 <a id="part-of-the-lsf-stack"></a>
 
 ## Part of the LSF ecosystem
@@ -83,22 +85,53 @@ controller and navigation systems in the same ecosystem.
 
 ## Guides
 
-- [Get started](guides/GETTING_STARTED.md) with a host adapter, grid, and first
-  body.
-- [Integrate the host loop](guides/HOST_INTEGRATION.md) and choose
-  [2D, 3D, or mixed runtime modes](guides/DIMENSIONS.md).
-- Follow the [collision pipeline](guides/COLLISION_PIPELINE.md),
-  [shape contracts](guides/COLLIDER_SHAPE_REFERENCE.md), and
-  [continuous collision detection](guides/CONTINUOUS_COLLISION_DETECTION.md).
-- Use [queries](guides/QUERY_SERVICES.md),
-  [serialization and replay](guides/SERIALIZATION.md), and
-  [diagnostic adapters](guides/DIAGNOSTIC_ADAPTERS.md) at host boundaries.
+- [Getting Started](guides/GETTING_STARTED.md) — Set up a world, push a sphere,
+  and read its position after one step.
+- [Technical Overview](guides/OVERVIEW.md) — Follow that sphere across the host
+  and physics boundary.
+
+### Build the runtime
+
+- [Runtime Architecture](guides/RUNTIME_ARCHITECTURE.md) — Trace a frame through
+  the context and find which service owns each part.
+- [Host Integration](guides/HOST_INTEGRATION.md) — Bind host objects, drive the
+  fixed loop, and release registrations.
+- [Workload And Tuning](guides/WORKLOAD_TUNING.md) — Choose a tick budget and
+  measure a representative workload.
+- [2D, 3D, And Runtime Modes](guides/DIMENSIONS.md) — Choose planar, 3D,
+  independent, or mixed simulation.
+- [Serialization And Replay](guides/SERIALIZATION.md) — Restore state into
+  host-created objects and compare replay hashes.
+
+### Understand collision
+
+- [Collision Pipeline](guides/COLLISION_PIPELINE.md) — Follow a pair from
+  candidate discovery through response and cleanup.
+- [Collision Broad Phase](guides/COLLISION_BROAD_PHASE.md) — See how voxel
+  membership produces candidate pairs.
+- [Collider Shape Reference](guides/COLLIDER_SHAPE_REFERENCE.md) — Choose a
+  shape and check supported pairings.
+- [Continuous Collision Detection](guides/CONTINUOUS_COLLISION_DETECTION.md) —
+  Follow a fast sphere's sweep into a thin wall.
+- [Collision Response](guides/COLLISION_RESPONSE.md) — See how contacts,
+  materials, and joints change motion.
+
+### Query and observe it
+
+- [Query Services](guides/QUERY_SERVICES.md) — Choose a raycast, overlap, sweep,
+  all-hit query, or batch.
+- [Query Reference](guides/QUERY_REFERENCE.md) — Check hit geometry, filtering,
+  ordering, and reentrancy.
+- [Diagnostics](guides/DIAGNOSTICS.md) — Read events and counters or collect
+  debug-draw commands.
+- [Diagnostic Adapters](guides/DIAGNOSTIC_ADAPTERS.md) — Feed diagnostics into a
+  renderer, structured log, or replay timeline.
 
 ## Resources
 
-- [All guides](guides/Home.md)
 - [Source, issues, and releases](https://github.com/mrdav30/Gravitas)
 - [Core test-suite coverage](https://mrdav30.github.io/Gravitas/coverage/)
+- [Contributing guide](https://github.com/mrdav30/Gravitas/blob/main/CONTRIBUTING.md)
 
 The API reference is generated from the library's XML documentation. The guides
 explain lifecycle ownership, dimensional models, collision, queries,

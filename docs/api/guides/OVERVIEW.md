@@ -8,8 +8,7 @@ and GridForge provides spatial storage and traversal.
 
 Project resources: [documentation site](https://mrdav30.github.io/Gravitas/),
 [API reference](https://mrdav30.github.io/Gravitas/api/Gravitas.html),
-[coverage report](https://mrdav30.github.io/Gravitas/coverage/), and
-[guide home](Home.md).
+and [coverage report](https://mrdav30.github.io/Gravitas/coverage/).
 
 If this is your first Gravitas integration, start with
 [Getting Started](GETTING_STARTED.md) before using this page as the technical
@@ -58,22 +57,8 @@ project docs when you need the lower-level contracts behind a Gravitas API.
 
 ## Reading Path
 
-| Need                                                          | Read                                                                |
-| ------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Build and step a first world                                  | [Getting Started](GETTING_STARTED.md)                               |
-| Wire Gravitas into a host loop                                | [Host Integration](HOST_INTEGRATION.md)                             |
-| Understand context services, lifecycle, and ownership         | [Runtime Architecture](RUNTIME_ARCHITECTURE.md)                     |
-| Choose between 2D, 3D, `Both`, and `Mixed`                    | [2D, 3D, And Runtime Modes](DIMENSIONS.md)                          |
-| Understand collision at a high level                          | [Collision Pipeline](COLLISION_PIPELINE.md)                         |
-| Work on partitioning and candidate pairs                      | [Collision Broad Phase](COLLISION_BROAD_PHASE.md)                   |
-| Work on collider geometry, meshes, compounds, or narrow phase | [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md)             |
-| Work on tunneling, sweeps, TOI, or kinematic active sources   | [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md) |
-| Work on contacts, materials, warm starts, sleep, or events    | [Collision Response](COLLISION_RESPONSE.md)                         |
-| Use public queries                                            | [Query Services](QUERY_SERVICES.md)                                 |
-| Work on query reducers, batching, or hit details              | [Query Reference](QUERY_REFERENCE.md)                               |
-| Change save/load, replay, or hash behavior                    | [Serialization And Replay](SERIALIZATION.md)                        |
-| Add or consume diagnostics                                    | [Diagnostics](DIAGNOSTICS.md)                                       |
-| Build host-side debug/log/replay adapters                     | [Diagnostic Adapters](DIAGNOSTIC_ADAPTERS.md)                       |
+Use the [guide directory](../index.md#guides) to find the next guide for your
+task.
 
 ## Core Mental Model
 

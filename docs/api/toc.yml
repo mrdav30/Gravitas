@@ -2,8 +2,10 @@ items:
   - name: Home
     href: index.md
   - name: Guides
-    href: guides/Home.md
+    href: index.md#guides
     items:
+      - name: All guides
+        href: index.md#guides
       - name: Getting Started
         href: guides/GETTING_STARTED.md
       - name: Technical Overview
