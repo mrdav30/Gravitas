@@ -1,42 +1,35 @@
 # Runtime Architecture
 
-Gravitas is context-first. `GravitasWorldContext` is the host-facing object that
-ties together one explicit `GridWorld`, deterministic clock state, settings,
-physical environment values, and the mutable services needed to run one
-simulation.
+The host chooses the inputs for each fixed step. A `GravitasWorldContext`
+owns the state that advances from those inputs, including the GridForge world
+binding, clock, bodies, colliders, and physics services.
 
 For host wiring, read [Host Integration](HOST_INTEGRATION.md). For dimensional
 mode choices, read [2D, 3D, And Runtime Modes](DIMENSIONS.md).
 
 ## Quick Read
 
-- One live `GridWorld` can be attached to at most one live
-  `GravitasWorldContext`.
-- Runtime state is context-local: bodies, collider IDs, partitions, pairs,
-  queries, diagnostics, coroutines, constraints, and replay hash state.
-- `Simulate()` advances clock/service front-half work; `LateSimulate()`
-  integrates bodies, refreshes partitions, solves contacts/joints, processes
-  CCD, and updates sleep/grounding.
-- `Visualize()` publishes presentation state; it is not authoritative.
-- `PhysicsRuntimeMode.Both` runs 2D and 3D side by side. `Mixed` adds the
-  dedicated cross-dimensional lifecycle.
-- Chronicler populates host-created runtime shells; it does not construct the
-  runtime object graph.
+Suppose a host applies a force to drive a sphere toward a wall. Apply the
+command before `Simulate()`. The context advances its clock and runs the
+first half of the step. Then `LateSimulate()` integrates the sphere's motion,
+checks for collisions, and resolves contacts if it reaches the wall. On a
+render update, `Visualize()` publishes presentation transforms from the
+simulation result.
 
 ```mermaid
 flowchart TB
-    Context["GravitasWorldContext"]
-    Context --> World["GridWorld"]
-    Context --> Clock["GravitasClock"]
-    Context --> Settings["PhysicsSettings + Environment"]
-    Context --> Services["Context-owned services"]
-    Services --> Physics3D["3D physics/collision"]
-    Services --> Physics2D["2D physics/collision"]
-    Services --> Mixed["Mixed collision"]
-    Services --> Queries["2D/3D/mixed queries"]
-    Services --> Diagnostics["Diagnostics"]
-    Services --> Replay["Replay hash"]
+    accTitle: A host command becomes a presented pose
+    accDescr: The host queues a force before Simulate. LateSimulate integrates the motion and resolves contacts. Visualize publishes a presentation pose.
+    Input["Host queues a force"] --> Begin["Simulate: advance clock"]
+    Begin --> Solve["LateSimulate: move and resolve"]
+    Solve --> Present["Visualize: publish the pose"]
 ```
+
+The context owns the sphere's motion, collider ID, and contact state. A second
+context can have its own sphere and reuse the same ID in its own registry.
+Each live context needs its own `GridWorld` binding. See
+[context ownership](#context-ownership), [frame phases](#frame-phases), and
+[registration](#registration-model).
 
 ## Context Ownership
 
@@ -78,7 +71,9 @@ implementation details stay inside services.
 
 ## Frame Phases
 
-Context methods run in this order:
+The sphere's fixed step uses `Simulate()` and `LateSimulate()`. The two
+visualization phases run separately from that authoritative step. The complete
+order within each phase follows.
 
 ```text
 Simulate
@@ -100,8 +95,9 @@ LateSimulate
     Refresh collider partitions
     Distribute candidates and solve contact/joint islands
     Complete domain-specific grounding, pair cleanup and partition retirement
-    Update sleep state
+    Update sleep state when mixed contacts are disabled
   Run mixed contacts and constrained response in Mixed mode
+    Update sleep state after mixed response
   Hooks.InvokeLateSimulate
   Publish collision position corrections and refresh dirty query partitions
 
@@ -163,6 +159,8 @@ Simulation code should use context time values rather than wall-clock APIs.
 elapsed real time. `ExpectedAccumulation` is clamped to one simulation frame so
 visual interpolation cannot overshoot its target.
 
+### Coroutine Timing
+
 Context-owned coroutine waits observe this clock without mutating it. Frame
 waits use checked `long` deadlines; duration waits compare wide elapsed-time
 deadlines, so changing the step size does not change the requested number of
@@ -194,6 +192,8 @@ returned by `GravitasPhysicsService.AssimilateBody(...)`; static bodies remain
 registered through their collider but are excluded from this per-frame body
 collection. The 2D service follows the same ownership contract.
 
+### Collider Identity
+
 3D and 2D colliders use a shared context-local registry shape: reusable
 `SwiftSlotMap` slots provide stable live IDs, while compact live lists provide
 cache-friendly service iteration. Collider ID `0` is valid; `-1` is the
@@ -211,6 +211,8 @@ object for a different registered pair during the same collision pass. The final
 response boundary also rechecks eligibility and changed contact dependencies
 after callbacks, keeping observations separate from retained rows.
 
+### Partition Refresh Ownership
+
 Both 3D and 2D physics services keep compact service-refresh lists for bodyless
 and explicit static colliders. Simulated-body buckets refresh dynamic and
 kinematic colliders, so fixed-step partition preparation only visits colliders
@@ -223,6 +225,8 @@ directly yields unit scale and zero yaw; other bases retain decomposition and
 its fixed-point rounding and admission checks. This introduces no transform
 cache: host, hierarchy, shape and mixed-slab changes retain their existing
 sampling and publication boundaries.
+
+### Joint Registration
 
 3D joints use context-local IDs allocated by `GravitasConstraint3DService`.
 Removing a joint releases solver cache and linked-collider suppression state,
@@ -288,8 +292,8 @@ different member. Context reset/disposal releases every handle. See
 - deterministic sleep state.
 - Chronicler record data.
 
-`BodyMotionType` separates solver-controlled dynamic, host-controlled kinematic,
-and immobile static ownership. `FreezeAxes` independently constrains the linear
+`MotionType` uses `PhysicsMobilityType` for solver-controlled dynamic,
+host-controlled kinematic, and immobile static ownership. `FreezeAxes` independently constrains the linear
 and angular degrees of freedom of a dynamic body. Consequently, a
 position-frozen dynamic body can still integrate rotation, remain awake, solve
 off-center contacts and joints, run rotational CCD, and publish visualization. A
@@ -451,16 +455,14 @@ or unregisters another hook.
 
 ## Source Map
 
-| Area            | Source                                                                                                                                                                         |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Context         | [`src/Gravitas/Runtime/GravitasWorldContext.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasWorldContext.cs)                                   |
-| Clock           | [`src/Gravitas/Runtime/GravitasClock.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasClock.cs)                                                 |
-| Lifecycle hooks | [`src/Gravitas/Runtime/LifecycleHooks/GravitasLifecycleHooks.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/LifecycleHooks/GravitasLifecycleHooks.cs) |
-| 3D body/service | [`src/Gravitas/Core/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/3D)                                                                                   |
-| 2D body/service | [`src/Gravitas/Core/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/2D)                                                                                   |
-| Mixed service   | [`src/Gravitas/Core/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/Mixed)                                                                             |
-| Colliders       | [`src/Gravitas/Colliders`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders)                                                                               |
-| Partitions      | [`src/Gravitas/Partitions`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Partitions)                                                                             |
-| Queries         | [`src/Gravitas/Queries`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries)                                                                                   |
-| Diagnostics     | [`src/Gravitas/Diagnostics`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics)                                                                           |
-| Replay hashing  | [`src/Gravitas/Determinism`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Determinism)                                                                           |
+- [Context](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasWorldContext.cs)
+- [Clock](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasClock.cs)
+- [Lifecycle hooks](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/LifecycleHooks/GravitasLifecycleHooks.cs)
+- [3D body/service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/3D)
+- [2D body/service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/2D)
+- [Mixed service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/Mixed)
+- [Colliders](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders)
+- [Partitions](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Partitions)
+- [Queries](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries)
+- [Diagnostics](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics)
+- [Replay hashing](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Determinism)

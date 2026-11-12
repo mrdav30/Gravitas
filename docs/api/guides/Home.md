@@ -1,56 +1,56 @@
 # Gravitas Guides
 
-Gravitas is deterministic fixed-point physics for lockstep games, simulations,
-and engine-agnostic .NET hosts. It provides first-class 2D and 3D physics plus
-an explicit mixed 2D/3D runtime, all owned by isolated world contexts.
+Start with a sphere in one world, then use the guides below when you need to
+wire a host, investigate a contact, run a query, or compare replay state.
 
-The central idea is simple: your host owns commands, rendering, and the outer
-loop; one `GravitasWorldContext` owns the clock, bodies, colliders, collisions,
-constraints, queries, replay state, and diagnostics for one simulation.
+Gravitas provides deterministic fixed-point physics for lockstep games and
+simulations in 2D, 3D, and mixed 2D/3D. Your host owns commands, rendering, and
+the outer loop. A `GravitasWorldContext` owns the clock, bodies, colliders,
+constraints, queries, replay state, and diagnostics for each simulation.
 
 ## Start Here
 
-If you are new to Gravitas, follow this path:
-
-1. [Getting Started](GETTING_STARTED.md) — install a package, create a context,
-   add spatial coverage, and step your first body.
-2. [Technical Overview](OVERVIEW.md) — learn the ownership model and the major
-   runtime services.
-3. [Host Integration](HOST_INTEGRATION.md) — wire bodies, colliders, lifecycle,
-   queries, replay, and teardown into a real host.
-4. [2D, 3D, And Runtime Modes](DIMENSIONS.md) — choose the dimensional model
-   that matches your simulation.
-
-Already know what you need? Jump to a topic below.
+[Getting Started](GETTING_STARTED.md) takes you from package installation to
+your first fixed step. You will push a sphere and read its new position.
+[Technical Overview](OVERVIEW.md) follows the same sphere across the host and
+physics boundary and maps the services you will use as the simulation grows.
 
 ## Build The Runtime
 
-| Guide                                           | Use it for                                                                  |
-| ----------------------------------------------- | --------------------------------------------------------------------------- |
-| [Runtime Architecture](RUNTIME_ARCHITECTURE.md) | Context-owned services, frame phases, registration, and state ownership     |
-| [Host Integration](HOST_INTEGRATION.md)         | Host adapters, bodies, colliders, settings, constraints, and teardown       |
-| [Workload And Tuning](WORKLOAD_TUNING.md)        | Tick budgets, representative workload captures, and settings tradeoffs    |
-| [2D, 3D, And Runtime Modes](DIMENSIONS.md)      | Pure 2D, pure 3D, `Both`, mixed embedding, and dimensional queries          |
-| [Serialization And Replay](SERIALIZATION.md)    | Chronicler state transfer, shell ownership, continuation, and replay hashes |
+- [Runtime Architecture](RUNTIME_ARCHITECTURE.md)
+  Trace a frame through the context and find which service owns each part.
+- [Host Integration](HOST_INTEGRATION.md)
+  Bind host objects, drive the fixed loop, and release registrations.
+- [Workload And Tuning](WORKLOAD_TUNING.md)
+  Choose a tick budget and measure a representative workload.
+- [2D, 3D, And Runtime Modes](DIMENSIONS.md)
+  Choose planar, 3D, independent, or mixed simulation.
+- [Serialization And Replay](SERIALIZATION.md)
+  Restore state into host-created objects and compare replay hashes.
 
 ## Understand Collision
 
-| Guide                                                               | Use it for                                                                        |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| [Collision Pipeline](COLLISION_PIPELINE.md)                         | End-to-end phase order, filtering, detection, response, and events                |
-| [Collision Broad Phase](COLLISION_BROAD_PHASE.md)                   | GridForge partitions, candidate discovery, mobility buckets, and cleanup          |
-| [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md)             | Primitive, compound, mesh, 2D, 3D, and mixed shape support                        |
-| [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md) | Sweeps, time of impact, active sources, and rotational CCD                        |
-| [Collision Response](COLLISION_RESPONSE.md)                         | Manifolds, materials, islands, warm starts, sleep, constraints, and notifications |
+- [Collision Pipeline](COLLISION_PIPELINE.md)
+  Follow a pair from candidate discovery through response and cleanup.
+- [Collision Broad Phase](COLLISION_BROAD_PHASE.md)
+  See how voxel membership produces candidate pairs.
+- [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md)
+  Choose a shape and check supported pairings.
+- [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md)
+  Follow a fast sphere's sweep into a thin wall.
+- [Collision Response](COLLISION_RESPONSE.md)
+  See how contacts, materials, and joints change motion.
 
 ## Query And Observe It
 
-| Guide                                         | Use it for                                                                |
-| --------------------------------------------- | ------------------------------------------------------------------------- |
-| [Query Services](QUERY_SERVICES.md)           | Practical 2D, 3D, mixed, all-hit, and batch query workflows               |
-| [Query Reference](QUERY_REFERENCE.md)         | Reducers, witnesses, filtering, mesh boundaries, ordering, and reentrancy |
-| [Diagnostics](DIAGNOSTICS.md)                 | Diagnostic events, counters, typed views, and debug-draw commands         |
-| [Diagnostic Adapters](DIAGNOSTIC_ADAPTERS.md) | Host-side rendering, structured logging, and replay timeline tools        |
+- [Query Services](QUERY_SERVICES.md)
+  Choose a raycast, overlap, sweep, all-hit query, or batch.
+- [Query Reference](QUERY_REFERENCE.md)
+  Check hit geometry, filtering, ordering, and reentrancy.
+- [Diagnostics](DIAGNOSTICS.md)
+  Read events and counters or collect debug-draw commands.
+- [Diagnostic Adapters](DIAGNOSTIC_ADAPTERS.md)
+  Feed diagnostics into a renderer, structured log, or replay timeline.
 
 ## Packages And Compatibility
 

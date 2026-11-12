@@ -1,44 +1,56 @@
 # Query Services
 
-Queries are explicit context-owned services:
-
-- `GravitasWorldContext.Query3D`
-- `GravitasWorldContext.Query2D`
-- `GravitasWorldContext.QueryMixed`
-
-The services share the collision broad-phase data structures. General geometry
-queries keep query truth separate from physical pair filtering; the explicit 2D
-support query applies that filtering. This page is the readable API guide. For
-the full query matrix, reducer policies, and per-family notes, read
-[Query Reference](QUERY_REFERENCE.md).
+Use a query to inspect the world owned by a `GravitasWorldContext`. A raycast
+checks a line segment, a sweep moves a shape along a segment, and an overlap
+checks a shape at a pose. Choose the service by the dimensions you need to
+query.
 
 ## Quick Read
 
-- `Query3D` reports only 3D colliders.
-- `Query2D` reports only 2D colliders in the X/Z plane.
-- `QueryMixed` reports explicit cross-dimensional sweep hits.
-- All-hit APIs write into caller-owned `SwiftList<T>` buffers.
-- Batch APIs use typed request spans and caller-owned output/range buffers.
-- Public query `PhysicsLayerMask` values are include masks.
-- General geometry queries do not apply collider-local physical ignore masks.
-  `Query2D.QuerySupport` intentionally does: it asks what can support a real
-  collider.
-- Query services are same-thread and non-reentrant per context service.
+Two 3D spheres on layer 0 are centered at `x = 0` and `x = 2`. Cast a ray
+along the X axis from `x = -2` to `x = 4` to see both obstacles in travel
+order. The configured context must already contain both colliders in active
+grid coverage. Reuse the caller-owned list when running the query again.
 
-Pure 2D gathering visits partition memberships directly, deduplicates collider
-IDs and sorts the final candidate buffer by collider ID. Intermediate partition
-and member-copy sorts are unnecessary for that final order. Three-dimensional
-ray/sweep partition gathering already traverses memberships directly; the
-separate planar candidate-index rebuild still uses sorted member copies.
-Closest-hit reducers and all-hit output sorting retain their existing contracts
-in every dimension.
+```csharp
+using FixedMathSharp;
+using Gravitas.Queries;
+using Gravitas.Support;
+using SwiftCollections;
+
+Vector3d start = new(-2, 0, 0);
+Vector3d end = new(4, 0, 0);
+var mask = PhysicsLayerMask.FromLayer(0);
+var hits = new SwiftList<Physics3DHit>();
+int count = context.Query3D.RaycastAll(
+    start, end, mask, hits);
+```
+
+`count` is 2. The list contains the sphere at `x = 0` first and the sphere
+at `x = 2` second. Use `Query3D.Raycast` if you only need the nearest hit.
 
 ```mermaid
-flowchart LR
-    Query3D["Query3D"] --> Hits3D["Physics3DHit"]
-    Query2D["Query2D"] --> Hits2D["Physics2DHit"]
-    QueryMixed["QueryMixed"] --> HitsMixed["PhysicsMixedHit"]
+flowchart TB
+    accTitle: One ray, two obstacle hits
+    accDescr: A ray travels along X from minus 2 to 4. The closest hit is the sphere centered at 0. The all-hit query lists that sphere first and the sphere centered at 2 second.
+    Ray["Ray from x = -2 to x = 4"]
+    Ray -->|"Raycast"| Closest["Sphere at x = 0"]
+    Ray -->|"RaycastAll"| Both["Sphere at x = 0<br/>Then sphere at x = 2"]
 ```
+
+| To inspect | Use |
+| --- | --- |
+| 3D colliders | `context.Query3D` |
+| 2D colliders in the X/Z plane | `context.Query2D` |
+| Cross-dimensional sweep hits | `context.QueryMixed` |
+| Surfaces that can physically support a 2D collider | `context.Query2D.QuerySupport` |
+
+The services share collision broad-phase data. General geometry queries
+select targets through query filters. Physical 2D support also applies
+the source collider's collision policy. See [layer masks](#layer-mask-semantics),
+[physical 2D support](#physical-2d-support), and [batching](#batch-pattern) for
+the corresponding contracts. The [Query Reference](QUERY_REFERENCE.md) lists
+the full API and reducer behavior.
 
 ## Public Surface
 
@@ -164,6 +176,8 @@ absolute point to be representable. The familiar `Point`, `Point3D`, and
 when a query may approach a scalar face. Returning `false` from a witness
 materialization method does not invalidate the query hit.
 
+### Initial Contact With a Solid Primitive
+
 A sphere sweep against a solid 3D primitive, or a mixed circle-slab sweep
 against that primitive, retains the actual target boundary for a contained
 start. The normal uses the target's outward surface direction, independently of
@@ -174,6 +188,8 @@ apex contacts retain the separating direction from the closest feature toward
 the source center. Mixed slab witnesses clamp their vertical offset to the
 slab's caps without requiring the target witness's other coordinates to be
 representable.
+
+### Initial Contact With a Mesh
 
 A sphere sweep against a 3D mesh treats its triangles as two-sided surfaces,
 including convex meshes and convex-mesh compound parts. An initially touching or
@@ -214,6 +230,8 @@ When GJK reports an initial intersection, the mesh hit requires a normal
 resolved by complete contact geometry or certified by exact support intervals; a
 bounded GJK intersection alone cannot establish that contact.
 
+### Certified Planar Mesh Patches
+
 An ordinary, initially separated convex-source sweep may treat a whole concave
 mesh as one support-mapped surface when its existing topology certificate proves
 a filled convex coplanar patch. This requires a finite reference-center chord
@@ -248,6 +266,8 @@ index still participates in distance/index reduction. Equivalent triangulations
 and these patch paths need not select identical valid physical witnesses; mixed
 face normals can also differ from the legacy center-to-witness direction. Replay
 comparisons across versions must account for these result-field changes.
+
+### Initial Contact in 2D
 
 A 2D circle sweep that starts touching or overlapping a target reports zero
 travel distance but still retains the **target's surface witness**, not the
@@ -334,8 +354,11 @@ caller until that buffer is cleared, replaced, or released.
 
 ## Batch Pattern
 
-High-volume lockstep systems should prefer batch APIs when issuing many related
-queries in one frame.
+Use a batch when several sensors issue the same kind of query in one frame.
+Keep the request array and output buffers for reuse across frames. A request
+range points into the shared hit list and keeps each sensor's results together.
+See [a two-ray example](QUERY_REFERENCE.md#batch-apis) for how the ranges index
+the output.
 
 ```csharp
 PhysicsRaycast3DRequest[] requests = new PhysicsRaycast3DRequest[agentCount];
@@ -437,6 +460,18 @@ a body scan during an internal 2D query; ordinary post-step queries already have
 current membership. Raycasts, sweeps, overlaps, and batch or explicit mixed
 queries after completion sample the completed body pose.
 
+### Candidate Ordering
+
+Pure 2D gathering visits partition memberships directly, deduplicates collider
+IDs and sorts the final candidate buffer by collider ID. Intermediate partition
+and member-copy sorts are unnecessary for that final order. Three-dimensional
+ray/sweep partition gathering already traverses memberships directly. The
+separate planar candidate-index rebuild still uses sorted member copies.
+Closest-hit reducers and all-hit output sorting retain their existing contracts
+in every dimension.
+
+### When Physical Support Can Be Queried
+
 Do not sample physical support during `Simulate`/`LateSimulate`, their open
 transaction, or a grid-change callback whose committed change has not reached
 the context. `QuerySupport` returns `WorldNotReady` at those boundaries.
@@ -509,11 +544,11 @@ explicit caller-owned query job/state design with tests and benchmarks.
 
 ## Source Map
 
-| Area              | Source                                                                                                                                                                                                                                                                                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3D queries        | [`src/Gravitas/Queries/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/3D)                                                                                                                                                                                                                                                           |
-| 2D queries        | [`src/Gravitas/Queries/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/2D)                                                                                                                                                                                                                                                           |
-| Mixed queries     | [`src/Gravitas/Queries/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/Mixed)                                                                                                                                                                                                                                                     |
-| Common hit ranges | [`src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs)                                                                                                                                                                                                   |
-| Query tests       | [`tests/Gravitas.Tests/Queries`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Queries), [`tests/Gravitas.Tests/Physics2D`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Physics2D), [`tests/Gravitas.Tests/MixedDimensions`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/MixedDimensions) |
-| Query benchmarks  | [`tests/Gravitas.Benchmarks/Queries`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Benchmarks/Queries)                                                                                                                                                                                                                                       |
+- [3D query service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/3D)
+- [2D query service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/2D)
+- [Mixed query service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/Mixed)
+- [Query hit ranges](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs)
+- [Query tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Queries)
+- [2D tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Physics2D)
+- [Mixed-dimension tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/MixedDimensions)
+- [Query benchmarks](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Benchmarks/Queries)

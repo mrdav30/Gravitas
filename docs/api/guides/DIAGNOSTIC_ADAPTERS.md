@@ -1,21 +1,26 @@
 # Diagnostic Adapters
 
-Diagnostics in Gravitas are data streams, not renderer calls. Core runtime code
-emits deterministic `GravitasDiagnosticEvent` values and
-`GravitasDebugDrawCommand` values into `context.Diagnostics`; host adapters
-translate those streams into engine-specific overlays, logs, captures, or replay
-tools outside `src/Gravitas`.
-
-Read [Diagnostics](DIAGNOSTICS.md) for the event and draw command reference.
+A host adapter turns the data in `context.Diagnostics` into an overlay, a log
+entry, or a replay timeline. Build it in the host, sample, or tooling project.
+The core provides deterministic events and debug draw commands. The adapter
+chooses the renderer, log format, or storage.
 
 ## Quick Read
 
-- Keep adapter code in host, sample, or tooling projects.
-- Consume diagnostics after the deterministic frame or capture window.
-- Preserve `Frame` and `Sequence` as ordering keys.
-- Resolve context-local IDs only against the producing context.
-- Translate fixed-point values at the host boundary.
-- Do not feed diagnostics back into authoritative simulation decisions.
+The [diagnostic ray capture](DIAGNOSTICS.md#quick-read) contains a line from
+`x = -2` to `x = 4` and a query event with two hits. A host can use either
+stream or copy both for later playback.
+
+| Host task | Consume | Output |
+| --- | --- | --- |
+| Show the ray in an overlay | [Draw commands](#debug-draw-adapter) | A line between the two endpoints |
+| Inspect the hit result on a server | [Typed events](#structured-log-adapter) | Hit count, closest collider ID, and distance |
+| Inspect the capture after the step | [Both streams](#replay-timeline-adapter) | A host-owned copy for the timeline |
+
+Consume the capture after the deterministic frame or diagnostic window. For
+a timeline that displays object labels, retain those labels while the
+registrations are still valid.
+Read [Diagnostics](DIAGNOSTICS.md) for capture setup and payload reference.
 
 ## Adapter Boundary
 
@@ -23,9 +28,10 @@ An adapter should:
 
 - consume diagnostics after the deterministic frame or debug capture window has
   finished.
-- preserve `Frame` and `Sequence` as ordering keys.
+- preserve `Frame` and `Sequence` within each stream and capture window.
+  Event and draw-command sequence numbers advance independently.
 - resolve body, collider, and joint IDs through the same `GravitasWorldContext`
-  that produced the payload.
+  that produced the payload, while the referenced registrations are active.
 - translate fixed-point values at the edge when the host renderer or log format
   requires floats or text.
 - call `context.Diagnostics.Clear()` after consumption when the host wants a
@@ -36,7 +42,8 @@ An adapter should not:
 - mutate `SolidBody`, `SolidBody2D`, collider, partition, query, or constraint
   state while consuming diagnostics.
 - make authoritative simulation decisions from diagnostic payloads.
-- assume collider IDs are global, stable across contexts, or valid after reset.
+- treat a collider ID as a permanent identity. IDs are context-local and can
+  be reused after deactivation or reset.
 - add engine-specific renderer, file-system, networking, or editor dependencies
   to the Gravitas core library.
 
@@ -51,9 +58,10 @@ using Gravitas.Diagnostics;
 
 ## Debug Draw Adapter
 
-Renderer adapters usually need a small command sink that mirrors the host's
-debug drawing API. The adapter owns conversion to host units, colors, and
-duration.
+A draw visitor translates each command into the host's drawing API. For the
+captured ray, the `Line` command reaches `VisitLine`, which passes the two
+endpoints and the color to the host. The host sink owns unit conversion,
+colors, and display duration.
 
 ```csharp
 public interface IHostDebugDrawSink
@@ -126,6 +134,10 @@ public sealed class HostDebugDrawAdapter : GravitasDebugDrawCommandVisitor
 }
 ```
 
+Create the adapter with the host sink, then call `Flush(context)` after
+capture. Dispatch visits the buffered commands in order. Clear the capture
+once every consumer has finished.
+
 2D debug draw in mixed mode is emitted as finite 3D slab geometry. Use
 `ColliderDimension` and `Collider2DType` to style embedded 2D geometry
 separately from normal 3D colliders.
@@ -136,9 +148,10 @@ gameplay.
 
 ## Structured Log Adapter
 
-Server or headless hosts can ignore draw commands and write diagnostic events to
-a deterministic log sink. Prefer `GravitasDiagnosticEventVisitor` so decoding
-stays centralized in Gravitas.
+A server can log the ray event through `VisitRayQuery`. In the two-sphere
+example, the view exposes a hit count of 2 plus the nearest collider's ID
+and distance. The event visitor reads those named values and passes the
+original frame and sequence to the log sink.
 
 ```csharp
 public interface IHostDiagnosticLogSink
@@ -173,7 +186,8 @@ public sealed class HostDiagnosticLogAdapter : GravitasDiagnosticEventVisitor
             view.Frame,
             view.Sequence,
             view.Event.Kind,
-            $"hit={view.Hit} collider={view.HitColliderId} distance={view.Distance}");
+            $"hit={view.Hit} count={view.HitCount} " +
+            $"collider={view.HitColliderId} distance={view.Distance}");
 
     public override void VisitContact(in GravitasContactDiagnosticView view) =>
         _sink.Write(
@@ -200,9 +214,9 @@ important rule is that adapters consume semantic typed views instead of decoding
 
 ## Replay Timeline Adapter
 
-Replay tooling should keep diagnostics beside the authoritative replay frame,
-not inside the authoritative snapshot. A simple frame capture can store events
-and draw commands in order:
+To revisit the ray later, copy the line command and query event before the
+sink is cleared. Keep the copies alongside the authoritative replay frame as
+presentation data. The example copies each stream in capture order:
 
 ```csharp
 public readonly struct DiagnosticFrameCapture
@@ -243,6 +257,10 @@ public static class DiagnosticTimelineCapture
 }
 ```
 
+For a window spanning multiple frames, use each event or command's own
+`Frame` stamp when placing it on the timeline. The outer capture's `Frame`
+records when the host took the copy.
+
 The array allocation belongs to the tooling edge. Long-running replay tools
 should pool or stream capture storage when diagnostics are enabled for many
 frames.
@@ -266,8 +284,6 @@ adapters. Do not overload an event or draw kind with undocumented meanings.
 
 ## Source Map
 
-| Area                 | Source                                                                                                                                                   |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Event visitors/views | [`src/Gravitas/Diagnostics/Events`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics/Events)                                       |
-| Draw visitors/views  | [`src/Gravitas/Diagnostics/DebugDraw`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics/DebugDraw)                                 |
-| Diagnostic sink      | [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs) |
+- [Event visitors and views](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics/Events)
+- [Draw visitors and views](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics/DebugDraw)
+- [Diagnostic sink](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs)

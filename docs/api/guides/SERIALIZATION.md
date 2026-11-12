@@ -1,26 +1,32 @@
 # Serialization And Replay
 
-Gravitas uses Chronicler for deterministic state transfer into host-created
-runtime shells. The goal is not to materialize a full engine object graph from
-data. The host creates the context, world, agents, transforms, body instances,
-and concrete collider shape types; Chronicler populates deterministic physics
-state into those existing objects.
-
-This contract supports lockstep debugging, rollback-style validation, save-state
-testing, and replay tools.
+To resume a Gravitas simulation from a record, create the context and physics
+objects in your host first. Chronicler writes saved physics values into those
+existing objects, including their bodies and concrete collider shapes. Use
+the resulting state for save-state testing, replay, or rollback-style
+validation.
 
 ## Quick Read
 
-- Serialize authoritative simulation state, not host object identity.
-- Load into existing runtime shells created by the host.
-- Rebuild context-owned runtime caches after load.
-- Populate settings before body/collider state when snapshots include
-  `PhysicsSettingsSaver`.
-- Use `GravitasWorldContext.ComputeReplayHash()` for compact conformance checks.
-- Treat hash strings as deterministic non-cryptographic signals, not
-  cross-version compatibility values.
-- Keep `ReleaseLean` compiling when serialization-related fields or attributes
-  change.
+Advance a 3D crate through four fixed steps. Queue a torque for its next step,
+then save its body record. To replay from that point, prepare another crate
+with the same collider shape in a world on the matching frame and timeline.
+Populating the body record restores values such as mass and the queued torque
+into that existing crate. Step both worlds with the same subsequent commands.
+
+```mermaid
+flowchart TB
+    accTitle: Restore a crate at a replay checkpoint
+    accDescr: Save a body record and prepare a matching host world and crate. Populate the prepared body, then continue stepping with the same commands.
+    Save["Saved record"] --> Load["Populate the body"]
+    Shell["Prepared crate"] --> Load
+    Load --> Replay["Continue stepping"]
+```
+
+The host supplies the timeline and object bindings. Compare replay hashes
+only once the worlds have equivalent continuation state, including any
+live contact caches that affect the next step. See the
+[restore order](#replay-workflow) and [hash comparison rules](#replay-hashes).
 
 ## Ownership Contract
 
@@ -35,7 +41,10 @@ testing, and replay tools.
 | Existing `StaticSurface`, `StaticSurface2D` handles        | Declared membership through typed links to registered collider lifetimes.                                                                                     |
 | Renderer, ECS, networking, pooling, editor state           | Nothing. These remain host-owned.                                                                                                                             |
 
-Runtime-owned state that should not be serialized:
+### Derived State And Host Bindings
+
+The following values stay outside the record. The runtime rebuilds derived
+state as needed, and the host supplies bindings and callbacks.
 
 - context-local collider IDs and service indices.
 - GridForge partition coordinate lists and active partition payloads.
@@ -50,6 +59,8 @@ Runtime-owned state that should not be serialized:
 - host transform object identity.
 - 3D visual interpolation buffers and presentation-only rotation speed state.
 
+### Validation And Publication
+
 On load, bodies publish restored authoritative position and rotation into their
 existing host transform. A restored 3D quaternion is scale-safely normalized
 before any runtime shape or host state observes it; a zero quaternion resolves
@@ -62,9 +73,9 @@ undefined byte-cast values throw `ArgumentOutOfRangeException`. A rejected body
 value does not replace its previously valid mode, and a rejected
 `PhysicsSettingsSaver` does not replace the context's existing settings.
 
-`BodyMotionType` is authoritative serialized state and defaults to `Dynamic`
-when the field is absent. Motion type and freeze masks are validated before any
-loaded body state is published. Loading a different role into an already
+The `MotionType` field records the body's `PhysicsMobilityType` and defaults to
+`Dynamic` when the field is absent. The runtime validates motion type and freeze
+masks before publishing loaded body state. Loading a different role into an already
 registered shell reconciles simulated-body membership, partitions, CCD state,
 and solver caches through the same atomic lifecycle invariants as a public role
 transition. Undefined roles or freeze bits fail without partially publishing the
@@ -177,7 +188,8 @@ its collider geometry or host objects.
 
 ## Replay Workflow
 
-A deterministic replay or rollback restore should follow this shape:
+For a scene with more objects than the single crate, restore dependencies in
+this order.
 
 1. Create or attach a `GravitasWorldContext` with matching settings and
    GridForge world setup.
@@ -226,6 +238,8 @@ the same per-frame `ChronicleHash` sequence after population. Equivalence
 includes replay-relevant live state such as retained contacts and warm-start
 impulses.
 
+### What The Hash Covers
+
 The authoritative hash covers context state that can affect continuation:
 
 - serialized continuation state is included.
@@ -240,6 +254,8 @@ The authoritative hash covers context state that can affect continuation:
   holes are excluded.
 - additional solver cache state and diagnostic counters are included in
   `AuthoritativeWithSolverCaches` mode for RCA.
+
+### Hash Schema
 
 Replay hashes use `Chronicler.Hashing.ChronicleHash` and Chronicler's
 hash-writer mechanics. Gravitas owns the physics-specific inclusion policy and
@@ -260,14 +276,6 @@ resolve it to `Dynamic`. Both body recorders validate `GroundMinNormalDot` in
 2D restores gravity and support policy through backing state to preserve saved
 sleep, then rebuilds its transient support ownership and probe timing. Its
 recorded fields and replay hash layout remain unchanged.
-
-```mermaid
-flowchart LR
-    Shells["Host-created shells"] --> Populate["Chronicler populate"]
-    Populate --> Sim["Continue fixed-step simulation"]
-    Sim --> Hash["ComputeReplayHash"]
-    Hash --> Compare["Compare peers/replay runners"]
-```
 
 ## Transport Notes
 
@@ -306,13 +314,11 @@ When changing serialized fields, defaults, or load behavior:
 
 ## Source Map
 
-| Area                            | Source                                                                                                                                                               |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3D body serialization           | [`src/Gravitas/Core/3D/Bodies/SolidBody.Serialization.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.Serialization.cs)     |
-| 2D body serialization           | [`src/Gravitas/Core/2D/Bodies/SolidBody2D.Serialization.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.Serialization.cs) |
-| 3D collider replay/record state | [`src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs)             |
-| 2D collider replay/record state | [`src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs)         |
-| Settings saver                  | [`src/Gravitas/Settings/PhysicsSettingsSaver.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsSettingsSaver.cs)                       |
-| Replay hash service             | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Determinism/GravitasReplayHashService.cs)       |
-| Serialization tests             | [`tests/Gravitas.Tests/Serialization`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Serialization)                                             |
-| Replay conformance tests        | [`tests/Gravitas.Tests/Determinism`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Determinism)                                                 |
+- [3D body serialization](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.Serialization.cs)
+- [2D body serialization](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.Serialization.cs)
+- [3D collider replay/record state](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Colliders/3D/LSCollider.ReplayHash.cs)
+- [2D collider replay/record state](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Colliders/2D/LSCollider2D.ReplayHash.cs)
+- [Settings saver](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsSettingsSaver.cs)
+- [Replay hash service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Determinism/GravitasReplayHashService.cs)
+- [Serialization tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Serialization)
+- [Replay conformance tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Determinism)

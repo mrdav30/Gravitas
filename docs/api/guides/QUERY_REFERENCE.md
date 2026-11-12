@@ -1,8 +1,14 @@
 # Query Reference
 
-This page contains the detailed query API matrix, reducer policy, batch
-contract, mesh-source boundary, and per-family implementation notes. For the
-short guide, read [Query Services](QUERY_SERVICES.md).
+Use the [public query tables](#public-query-surface) to choose an overload.
+For example, a ray through two spheres can return the closest collider, both
+colliders in travel order, or [one result range per ray](#batch-apis) in a
+batch. [Query Services](QUERY_SERVICES.md#quick-read) shows that scene and the
+single-query call.
+
+A *reducer* is the geometry routine that tests a candidate for a hit. Use its
+[label](#reducer-labels) to understand which geometry the result represents
+and the [witness contract](#query-witnesses) to interpret the retained point.
 
 ## Reducer Labels
 
@@ -139,8 +145,25 @@ All public all-hit APIs use service-owned scratch and caller-owned hit buffers.
 ## Batch APIs
 
 Every public query family also has typed batch access on its owning service.
-Batch APIs keep dimensional semantics explicit instead of routing all queries
-through one tagged request type.
+Each service takes typed requests for its own dimensional API.
+
+### Two Rays Through the Same Spheres
+
+Send two requests through the layer-0 spheres at `x = 0` and `x = 2` from
+[Query Services](QUERY_SERVICES.md#quick-read). Both rays travel along X.
+The second reverses the first. `Query3D.RaycastAllBatch` writes four hits
+into one list and a separate `PhysicsQueryHitRange` for each request.
+
+| Request | X endpoints | Sphere centers in hit order | Range (start, count) |
+| --- | --- | --- | --- |
+| 0 | -2 to 4 | 0, then 2 | (0, 2) |
+| 1 | 4 to -2 | 2, then 0 | (2, 2) |
+
+The shared list stores each request's hits together. Use the range to retrieve
+the hits for a particular ray. Sorting within a range follows that ray's
+direction of travel.
+
+### Request and Output Contracts
 
 | Service      | Batch families                                                                             |
 | ------------ | ------------------------------------------------------------------------------------------ |
@@ -219,6 +242,8 @@ testing candidate triangles.
 
 ## 3D Sweeps And Volumes
 
+### Sweep a Sphere
+
 `SweepSphere` and `SweepSphereAll` use a segment-based true 3D swept sphere:
 
 - non-positive radius, zero direction, or zero segment length returns no hits.
@@ -227,6 +252,8 @@ testing candidate triangles.
 - all-hit results sort by impact distance and collider ID.
 - hit distance is the swept center's time-of-impact distance.
 - hit point is the target surface point closest to the swept center at impact.
+
+### Sweep a Registered Convex Collider
 
 Registered source sweeps use support-mapped conservative advancement for convex
 3D sources. The source collider is skipped automatically, and `excludedCollider`
@@ -240,6 +267,8 @@ approaches can have a larger difference along the chord. At an initial mesh
 contact, an exact face or boundary certificate takes precedence over an
 approximate separating normal. Genuinely disjoint contacts inside tolerance
 retain their separation axis rather than an uncertified hull face exit.
+
+### Check a Finite Cone Volume
 
 `OverlapCone` and `OverlapConeAll` query an apex-origin finite cone volume.
 Supported convex targets use deterministic support-mapped cone-volume
@@ -257,6 +286,8 @@ It does not narrow the apex into mesh-local coordinates or materialize
 transformed triangle vertices. The selected witness is rounded once in the
 triangle's authored frame and returned as a contact anchor; use `TryGetPoint` if
 a world-space `Vector3d` is needed.
+
+### Check a Circle Against the X/Z Projection
 
 The 3D `OverlapCircle` family classifies the complete X/Z projection of each
 supported 3D collider. It is not a `Query2D` call, not a swept circle, and not a
@@ -361,10 +392,8 @@ call, and the caller must keep that span stable for the duration of the call.
 
 ## Source Map
 
-| Area                | Source                                                                                                                                                     |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3D query service    | [`src/Gravitas/Queries/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/3D)                                                         |
-| 2D query service    | [`src/Gravitas/Queries/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/2D)                                                         |
-| Mixed query service | [`src/Gravitas/Queries/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/Mixed)                                                   |
-| Query hit ranges    | [`src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs) |
-| CCD reference       | [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md)                                                                                        |
+- [3D query service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/3D)
+- [2D query service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/2D)
+- [Mixed query service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/Mixed)
+- [Query hit ranges](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Queries/Common/PhysicsQueryHitRange.cs)
+- [Continuous collision detection guide](CONTINUOUS_COLLISION_DETECTION.md)

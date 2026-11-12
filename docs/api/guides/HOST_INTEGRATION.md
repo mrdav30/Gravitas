@@ -1,36 +1,40 @@
 # Host Integration
 
-Gravitas does not own your application loop. A game engine, server,
-deterministic simulation harness, or unit test creates the host objects and
-calls Gravitas at deterministic points.
+Use this guide to wire your game engine, server, or test harness into Gravitas.
+Your host creates the objects, applies commands in a stable order, and calls
+Gravitas on the fixed-step schedule.
 
-This page is the practical starting point for wiring Gravitas into a host. For
-the shortest end-to-end setup, read [Getting Started](GETTING_STARTED.md). For
-runtime ownership details, read [Runtime Architecture](RUNTIME_ARCHITECTURE.md).
-For replay and snapshot boundaries, read
-[Serialization And Replay](SERIALIZATION.md).
+[Getting Started](GETTING_STARTED.md) builds a complete first world.
+[Runtime Architecture](RUNTIME_ARCHITECTURE.md) maps the services behind it,
+and [Serialization And Replay](SERIALIZATION.md) covers saving and restoring
+its state.
 
 ## Quick Read
 
-- Create or attach one `GravitasWorldContext` per simulation.
-- Add GridForge grid coverage before registering colliders.
-- Implement `IMatterAgent` to bridge host objects to context and
-  `FixedTransform`.
-- Use `SolidBody`/`LSCollider` for 3D and `SolidBody2D`/`LSCollider2D` for 2D.
-- Apply deterministic commands before `context.Simulate()`.
-- Call `context.Simulate()` and `context.LateSimulate()` from the authoritative
-  fixed step.
-- Use `context.Visualize()` and `context.LateVisualize()` only for presentation.
-- Deactivate bodies and colliders before pooling or destroying host wrappers.
+Suppose the host receives a command to push the sphere from
+[Getting Started](GETTING_STARTED.md). The host applies that command before
+`Simulate()`. `LateSimulate()` completes the authoritative step. A replay
+hash can record the result there. The render loop can independently call
+`Visualize()` and `LateVisualize()` to present it.
 
 ```mermaid
-flowchart LR
-    Commands["Ordered commands"] --> Simulate["context.Simulate()"]
-    Simulate --> Late["context.LateSimulate()"]
-    Late --> Hash["optional replay hash"]
-    Late --> Visualize["context.Visualize()"]
-    Visualize --> Render["host render/update"]
+flowchart TB
+    accTitle: Fixed step and presentation for one sphere command
+    accDescr: Apply the sphere impulse before Simulate and finish the fixed step with LateSimulate. Hash the completed state if needed. Presentation runs from the render loop.
+    Commands["Apply ordered impulse"]
+    Commands --> Simulate["Simulate()"]
+    Simulate --> Late["LateSimulate()"]
+    Late -->|"Optional"| Hash["Hash state"]
+    Late -.->|"On a render update"| Visualize["Publish pose"]
 ```
+
+- [Set up a simulation](#minimal-setup) with one context, grid coverage, and
+  an `IMatterAgent` that exposes the object's `FixedTransform`.
+- [Choose a body and collider](#dynamic-3d-body) for 3D or
+  [the 2D counterparts](#2d-body) for planar motion.
+- [Drive the fixed loop](#fixed-loop), [run spatial queries](#queries-and-grounding),
+  and [release registrations](#deactivation-and-disposal) before pooling host
+  objects.
 
 ## Public Surface
 
@@ -233,7 +237,7 @@ SolidBody body = new(agent, collider)
 body.Initialize(
     Vector3d.Zero,
     FixedQuaternion.Identity,
-    BodyMotionType.Dynamic);
+    PhysicsMobilityType.Dynamic);
 ```
 
 Initialization binds the body and collider to `agent.Context`, allocates
@@ -259,7 +263,7 @@ SolidBody2D body = new(agent, collider)
 
 body.Initialize(
     agent.Transform.WorldPositionXZ,
-    motionType: BodyMotionType.Dynamic);
+    motionType: PhysicsMobilityType.Dynamic);
 ```
 
 The 2D projection uses the LSF X/Z convention: world X maps to 2D X and world Z
@@ -293,7 +297,7 @@ floor.InitializeWithNoBody(agent);
 Non-trigger bodyless colliders block dynamic bodies in discrete response in both
 3D and pure 2D. They contribute collision geometry and material, with zero
 velocity, inverse mass and inverse inertia. Only the body-owned participant
-receives correction or impulse. Use an explicit `BodyMotionType.Static` body
+receives correction or impulse. Use an explicit `PhysicsMobilityType.Static` body
 when the host needs body-owned state; it is not required for a solid floor.
 
 A body with all translation axes frozen is different from a static body or a
@@ -301,9 +305,9 @@ bodyless collider. Select the runtime role explicitly:
 
 | Role                       | Ownership                                                                                                            |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `BodyMotionType.Dynamic`   | Solver controlled. `FreezeAxes` independently constrains translation and rotation.                                   |
-| `BodyMotionType.Kinematic` | Host controlled. Gravitas samples deterministic host motion and CCD, but applies no solver impulse.                  |
-| `BodyMotionType.Static`    | Immobile and excluded from simulated-body iteration. Use explicit pose setters to reposition it between fixed steps. |
+| `PhysicsMobilityType.Dynamic`   | Solver controlled. `FreezeAxes` independently constrains translation and rotation.                                   |
+| `PhysicsMobilityType.Kinematic` | Host controlled. Gravitas samples deterministic host motion and CCD, but applies no solver impulse.                  |
+| `PhysicsMobilityType.Static`    | Immobile and excluded from simulated-body iteration. Use explicit pose setters to reposition it between fixed steps. |
 
 For example, a rotating platform that must not translate is a `Dynamic` body
 with `BodyFreezeAxes3D.Position`; the 2D equivalent uses
@@ -505,6 +509,8 @@ posture of the same collider, not a replacement identity. Host world Y and the
 accepted rotation are retained. Other runtime modes reject rather than omit
 potential cross-dimensional blockers.
 
+#### What Counts As A Blocker
+
 Both 2D and 3D admission distinguish exact touching from positive penetration
 before contact-depth rounding. Even a penetration smaller than one raw
 fixed-point unit rejects the transaction; a rounded solver depth of zero is not
@@ -521,6 +527,8 @@ completed before publication; this is not a promise to recover from
 process-level allocation failure. Hosts must prepare their own fallible
 navigation/controller state before calling, then publish that prepared state
 through the callback.
+
+#### Publish Host State Before Callbacks
 
 Pair-separation callbacks from an accepted reconfiguration run after the new
 geometry, root pose, mass properties, and partitions are coherent. A
@@ -540,6 +548,8 @@ with its original stack only after the call completes.
 
 If a callback deactivates and reinitializes a body, retirement from the old
 transaction cannot clear pairs belonging to the replacement registration.
+
+#### Scale And Coordinate Conversion
 
 Authored `FixedTransform.LocalScale` may be signed or zero, but physical
 collider dimensions may not. Gravitas requires every consumed authored local
@@ -834,6 +844,8 @@ All-hit APIs use caller-owned buffers. Batch APIs use typed request spans,
 caller-owned output spans or shared hit lists, and `PhysicsQueryHitRange`
 buffers.
 
+### Choose A Grounding Policy
+
 Ground checks use `context.Settings.GroundCheckLayerMask`; hosts should set this
 explicitly for their layer model. `SolidBody.GroundingMode` and
 `SolidBody2D.GroundingMode` can stay automatic or switch to manual host-owned
@@ -847,6 +859,8 @@ selection and 2D support policy. `SolidBody2D.GroundMinNormalDot` applies the
 same limit range against planar resolved up for both probes and contact support.
 Actual changes to its limit or effective up direction invalidate automatic
 support and wake the body; manual grounding remains host-owned.
+
+### Keep Sleeping Support Current
 
 An established solid contact is also a sleep dependency. Removing that contact,
 or changing the counterpart's committed shape, explicit pose, or material, wakes
@@ -930,13 +944,21 @@ context is finished.
 
 ## Source Map
 
-| Area                  | Source                                                                                                                                                                                                                                                                                                           |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Context and lifecycle | [`src/Gravitas/Runtime/GravitasWorldContext.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasWorldContext.cs), [`src/Gravitas/Runtime/GravitasClock.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasClock.cs)                                     |
-| Host boundary         | [`src/Gravitas/Core/IMatterAgent.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/IMatterAgent.cs)                                                                                                                                                                                           |
-| 3D body/service       | [`src/Gravitas/Core/3D/Bodies/SolidBody.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.cs), [`src/Gravitas/Core/3D/Services/GravitasPhysicsService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.cs)         |
-| 2D body/service       | [`src/Gravitas/Core/2D/Bodies/SolidBody2D.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.cs), [`src/Gravitas/Core/2D/Services/GravitasPhysics2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.cs) |
-| Settings              | [`src/Gravitas/Settings/PhysicsSettings.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsSettings.cs), [`src/Gravitas/Settings/PhysicsRuntimeMode.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsRuntimeMode.cs)                                 |
-| Constraints           | [`src/Gravitas/Constraints/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/3D), [`src/Gravitas/Constraints/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/2D)                                                                                           |
-| Query APIs            | [`src/Gravitas/Queries`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries)                                                                                                                                                                                                                     |
-| Replay hash           | [`src/Gravitas/Determinism/GravitasReplayHashService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Determinism/GravitasReplayHashService.cs)                                                                                                                                                   |
+- Context and lifecycle
+  - [Context](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasWorldContext.cs)
+  - [Clock](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasClock.cs)
+- [Host agent](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/IMatterAgent.cs)
+- 3D body and service
+  - [3D body](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.cs)
+  - [3D physics service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.cs)
+- 2D body and service
+  - [2D body](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.cs)
+  - [2D physics service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.cs)
+- Settings
+  - [Physics settings](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsSettings.cs)
+  - [Runtime modes](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsRuntimeMode.cs)
+- Constraints
+  - [3D constraints](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/3D)
+  - [2D constraints](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/2D)
+- [Query implementations](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries)
+- [Replay hash service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Determinism/GravitasReplayHashService.cs)

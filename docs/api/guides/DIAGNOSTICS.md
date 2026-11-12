@@ -1,48 +1,50 @@
 # Diagnostics
 
-Gravitas diagnostics are context-owned, deterministic, and engine-agnostic. They
-expose physics state for debug drawing, logs, replay tooling, and server-side
-inspection without linking the core library to an engine, editor, or renderer.
+Enable `context.Diagnostics` to see what a query, collision, or solver step
+reported. The context records deterministic data for drawing, logs, and replay
+tools. The host decides how to present it.
 
-Diagnostics are disabled by default. Disabled runtime hooks return before
-touching diagnostic buffers. Enabled events and draw commands append to
-pre-sized `SwiftList` buffers owned by the active `GravitasWorldContext`.
-
-For host-side translation patterns, read
-[Diagnostic Adapters](DIAGNOSTIC_ADAPTERS.md).
+Diagnostics are disabled by default. Disabled hooks return before touching
+buffers. While enabled, the context appends events and draw commands to
+pre-sized `SwiftList` buffers.
 
 ## Quick Read
 
-- Use `context.Diagnostics`.
-- Call `Enable(...)` with realistic capacities before capture-heavy runs.
-- Consume `Events` and `DrawCommands` after the deterministic frame or capture
-  window.
-- Call `Clear()` after consuming a per-frame stream.
-- Prefer visitors and typed views over manual generic-field decoding.
-- Keep adapters outside `src/Gravitas`.
-- Leave diagnostics disabled for normal hot-path measurements unless the
-  measurement is specifically about diagnostics.
+Consider the ray in [Query Services](QUERY_SERVICES.md#quick-read). It travels
+from `x = -2` to `x = 4` and hits two spheres. With capture enabled,
+`Query3D.RaycastAll` records a `RayQuery` event. The event reports the hit
+count and the closest collider. To draw the segment, also call `CaptureLine`
+with the same endpoints.
 
 ```mermaid
-flowchart LR
-    Enable["Enable"] --> Sim["Simulate + LateSimulate"]
-    Sim --> Events["Events"]
-    Sim --> Draws["DrawCommands"]
-    Events --> Adapter["Host adapter"]
-    Draws --> Adapter
-    Adapter --> Clear["Clear"]
+flowchart TB
+    accTitle: Capturing and consuming a ray query
+    accDescr: RaycastAll records one event for the two-hit query. CaptureLine records a draw command for the segment. The host reads both streams and clears the buffers after consumption.
+    Query["RaycastAll"] -->|"Two hits"| Event["RayQuery event"]
+    Capture["CaptureLine"] -->|"Ray endpoints"| Draw["Line command"]
+    Event --> Host["Host reads both streams"]
+    Draw --> Host
+    Host --> Clear["Clear after reading"]
 ```
+
+Use the [entry point](#entry-point) to capture a window. Read the
+[typed views](#typed-views-and-dispatch) to interpret events and the
+[draw commands](#draw-commands) to add geometry to an overlay.
+[Diagnostic Adapters](DIAGNOSTIC_ADAPTERS.md) shows how a host can draw,
+log, or retain the same capture.
 
 ## Entry Point
 
-With an existing `GravitasWorldContext context`:
+Reserve capacity before capturing the frame or diagnostic window. In this
+example, `context` is the configured world, and `start`, `end`, `mask`, and
+`hits` come from [the two-sphere ray](QUERY_SERVICES.md#quick-read).
 
 ```csharp
 using Gravitas.Diagnostics;
 
 context.Diagnostics.Enable(eventCapacity: 512, drawCommandCapacity: 256);
-context.Simulate();
-context.LateSimulate();
+context.Query3D.RaycastAll(start, end, mask, hits);
+context.Diagnostics.CaptureLine(start, end, GravitasDiagnosticColor.Cyan);
 
 foreach (GravitasDiagnosticEvent diagnosticEvent in context.Diagnostics.Events)
 {
@@ -57,6 +59,9 @@ foreach (GravitasDebugDrawCommand command in context.Diagnostics.DrawCommands)
 context.Diagnostics.Clear();
 ```
 
+To capture a full step, enable the sink before running `Simulate()` and
+`LateSimulate()`, then consume the buffers after the step.
+
 `Events` and `DrawCommands` are read-only spans over the sink's live backing
 storage. Consume them before further capture, clearing, disabling, or resetting
 the sink. Copy values into host-owned storage when retaining a frame; the
@@ -64,8 +69,8 @@ the sink. Copy values into host-owned storage when retaining a frame; the
 that boundary.
 
 `Enable(...)` reserves capacity to avoid resize spikes when expected event
-counts are known. `Clear()` resets captured data and per-frame sequence values
-while keeping allocated buffers. `Disable()` clears and stops capture.
+counts are known. `Clear()` empties both streams and resets their sequence
+counters while keeping allocated buffers. `Disable()` clears and stops capture.
 
 ## Event Stream
 
@@ -111,8 +116,10 @@ hit events.
 
 ## Typed Views And Dispatch
 
-Host adapters should usually consume events through
-`GravitasDiagnosticEventVisitor`:
+Use a typed view to read event fields by name. For the ray, a
+`GravitasRayQueryDiagnosticView` exposes `HitCount`, `HitColliderId`, and
+`Distance` for the nearest hit. A `GravitasDiagnosticEventVisitor` dispatches
+each event to the matching handler. For example, to read mixed contacts:
 
 ```csharp
 using Gravitas.Diagnostics;
@@ -175,12 +182,19 @@ known event kinds.
 
 Some diagnostics are service-local counters instead of event-buffer entries:
 
-| Counter family        | Surface                                                                                                                                                                                  |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CCD island handoff    | `GravitasPhysicsService` and `GravitasPhysics2DService` `LastContinuousCollisionIslandCount`, `LastContinuousCollisionIslandIterationCount`, `LastContinuousCollisionIslandLimitReached` |
-| Body TOI work         | `SolidBody.LastContinuousCollisionToiIterationCount`, `LastContinuousCollisionToiIterationLimitReached`, and matching `SolidBody2D` values                                               |
-| Batch queries         | `Query2D`, `Query3D`, and `QueryMixed` `LastBatchRequestCount`, `LastBatchHitCount`, `LastBatchCandidateCount`                                                                           |
-| Mixed batch mesh work | `QueryMixed.LastBatchMeshTriangleCandidateCount`                                                                                                                                         |
+- CCD island and handoff work on `GravitasPhysicsService` and
+  `GravitasPhysics2DService`
+  - `LastContinuousCollisionIslandCount`
+  - `LastContinuousCollisionIslandIterationCount`
+  - `LastContinuousCollisionIslandLimitReached`
+- Body time of impact (TOI) work on `SolidBody` and `SolidBody2D`
+  - `LastContinuousCollisionToiIterationCount`
+  - `LastContinuousCollisionToiIterationLimitReached`
+- Batch queries on `Query2D`, `Query3D`, and `QueryMixed`
+  - `LastBatchRequestCount`
+  - `LastBatchHitCount`
+  - `LastBatchCandidateCount`
+  - `LastBatchMeshTriangleCandidateCount` on `QueryMixed`
 
 These counters are deterministic frame-local state for tuning, tests, host
 telemetry, and benchmark triage. They are not serialized replay state.
@@ -193,9 +207,9 @@ views and are measurement state, not extra tuning knobs.
 
 ## Draw Commands
 
-`GravitasDebugDrawCommand` is the renderer-facing stream. Gravitas emits
-primitive draw descriptions; hosts translate them into their own debug drawing
-API.
+Each `GravitasDebugDrawCommand` describes a primitive the host can draw.
+The line in the ray example carries the start, end, and color. A host adapter
+passes those values to its drawing API.
 
 | Kind           | Required payload                                      |
 | -------------- | ----------------------------------------------------- |
@@ -264,10 +278,9 @@ prismatic slider axis where applicable.
 
 ## Source Map
 
-| Area                          | Source                                                                                                                                                                                                                                                                                                                       |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Diagnostic sink               | [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs), [`src/Gravitas/Diagnostics/GravitasDiagnosticSink.Draw.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Diagnostics/GravitasDiagnosticSink.Draw.cs) |
-| Event payloads and views      | [`src/Gravitas/Diagnostics/Events`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics/Events)                                                                                                                                                                                                           |
-| Debug draw payloads and views | [`src/Gravitas/Diagnostics/DebugDraw`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics/DebugDraw)                                                                                                                                                                                                     |
-| Diagnostics tests             | [`tests/Gravitas.Tests/Diagnostics`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Diagnostics)                                                                                                                                                                                                         |
-| Diagnostics benchmarks        | [`tests/Gravitas.Benchmarks/Diagnostics`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Benchmarks/Diagnostics)                                                                                                                                                                                               |
+- [Diagnostic sink and capture buffers](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Diagnostics/GravitasDiagnosticSink.cs)
+- [Draw capture helpers](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Diagnostics/GravitasDiagnosticSink.Draw.cs)
+- [Event payloads and views](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics/Events)
+- [Debug draw payloads and views](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics/DebugDraw)
+- [Diagnostics tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Diagnostics)
+- [Diagnostics benchmarks](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Benchmarks/Diagnostics)

@@ -1,10 +1,10 @@
 # Gravitas Overview
 
-Gravitas is a deterministic, engine-agnostic physics library for lockstep
-simulations and games. It uses FixedMathSharp for fixed-point math,
-SwiftCollections for low-allocation runtime data structures, GridForge for
-world/grid ownership, and context-owned Gravitas services for physics runtime
-state.
+Gravitas runs deterministic, engine-agnostic physics for lockstep simulations
+and games. The host applies commands and decides when to step. One
+`GravitasWorldContext` owns each simulation's physics state. FixedMathSharp
+provides fixed-point math, SwiftCollections provides low-allocation collections,
+and GridForge provides spatial storage and traversal.
 
 Project resources: [documentation site](https://mrdav30.github.io/Gravitas/),
 [API reference](https://mrdav30.github.io/Gravitas/api/Gravitas.html),
@@ -15,40 +15,35 @@ If this is your first Gravitas integration, start with
 [Getting Started](GETTING_STARTED.md) before using this page as the technical
 map.
 
-The core runtime rule is simple: there is no process-wide physics world. A
-simulation happens inside a `GravitasWorldContext`, and every body, collider,
-partition, query, coroutine, diagnostic buffer, and clock value belongs to that
-context.
-
 ## Quick Read
 
-- Hosts own the outer loop, command ordering, rendering, networking, editor
-  integration, and engine objects.
-- Gravitas owns deterministic context-local physics state.
-- `SolidBody`/`LSCollider` are the 3D path.
-- `SolidBody2D`/`LSCollider2D` are the 2D path.
-- `PhysicsRuntimeMode.Both` runs 2D and 3D side by side without mixed contacts.
-- `PhysicsRuntimeMode.Mixed` enables explicit 2D/3D contacts, queries, CCD, and
-  diagnostics.
-- Chronicler populates host-created runtime shells; it does not construct the
-  object graph.
-- Diagnostics are data streams; host adapters translate them outside the core
-  runtime.
+Follow the sphere from [Getting Started](GETTING_STARTED.md). The host
+creates its object and exposes a fixed-point transform through `IMatterAgent`.
+It applies the impulse and calls both fixed-step phases. The context advances the
+sphere's body state. On a presentation update, the host can read its published
+visual transform and draw the sphere.
 
 ```mermaid
-flowchart TD
-    Host["Host loop"] --> Context["GravitasWorldContext"]
-    Context --> Clock["GravitasClock"]
-    Context --> World["GridWorld"]
-    Context --> Settings["PhysicsSettings + Environment"]
-    Context --> ThreeD["3D bodies/colliders/constraints"]
-    Context --> TwoD["2D bodies/colliders/constraints"]
-    Context --> Mixed["Mixed collision service"]
-    Context --> Queries["2D/3D/mixed query services"]
-    Context --> Diagnostics["Diagnostics"]
-    Agent["IMatterAgent"] --> Context
-    Agent --> Transform["FixedTransform"]
+flowchart TB
+    accTitle: The sphere crosses the host and physics boundary
+    accDescr: The host applies an impulse to the sphere and calls the fixed step. The context advances the body. The host reads the visual transform on a presentation update.
+    Host["Host schedules the step"]
+    Context["Context advances the sphere"]
+    Render["Host draws the sphere"]
+    Host -->|"Ordered impulse and step calls"| Context
+    Context -->|"Visual transform on render update"| Render
 ```
+
+The sphere, its collider, and all physics services belong to one context.
+A 3D simulation uses `SolidBody` and `LSCollider`. Planar simulations use
+`SolidBody2D` and `LSCollider2D`. Choose `Both` for independent 2D and 3D
+simulation, or `Mixed` when colliders in those dimensions should interact.
+See [runtime modes](DIMENSIONS.md) for the geometry and query rules.
+
+For save and load, the host creates the runtime objects and Chronicler
+populates them. For debugging, Gravitas exposes diagnostic data and the host
+adapter turns it into logs or drawings. The [ownership map](#core-mental-model)
+lists what each side manages.
 
 ## Foundation Libraries
 
@@ -174,15 +169,28 @@ These are deliberate public-runtime boundaries:
 
 ## Source Map
 
-| Area                     | Source                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Context and lifecycle    | [`src/Gravitas/Runtime/GravitasWorldContext.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasWorldContext.cs), [`src/Gravitas/Runtime/GravitasClock.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasClock.cs), [`src/Gravitas/Runtime/LifecycleHooks/GravitasLifecycleHooks.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/LifecycleHooks/GravitasLifecycleHooks.cs) |
-| Host boundary and bodies | [`src/Gravitas/Core/IMatterAgent.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/IMatterAgent.cs), [`src/Gravitas/Core/3D/Bodies/SolidBody.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.cs), [`src/Gravitas/Core/2D/Bodies/SolidBody2D.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.cs)                                                       |
-| Physics services         | [`src/Gravitas/Core/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/3D), [`src/Gravitas/Core/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/2D), [`src/Gravitas/Core/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/Mixed)                                                                                                                                                               |
-| Colliders                | [`src/Gravitas/Colliders`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders)                                                                                                                                                                                                                                                                                                                                                             |
-| Collision handling       | [`src/Gravitas/CollisionHandling`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling)                                                                                                                                                                                                                                                                                                                                             |
-| Constraints              | [`src/Gravitas/Constraints/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/3D), [`src/Gravitas/Constraints/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/2D)                                                                                                                                                                                                                                       |
-| Queries                  | [`src/Gravitas/Queries`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries)                                                                                                                                                                                                                                                                                                                                                                 |
-| Serialization and replay | [`src/Gravitas/Determinism`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Determinism), [`src/Gravitas/Settings/PhysicsSettingsSaver.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsSettingsSaver.cs)                                                                                                                                                                                                         |
-| Diagnostics              | [`src/Gravitas/Diagnostics`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics)                                                                                                                                                                                                                                                                                                                                                         |
-| Tests and benchmarks     | [`tests/Gravitas.Tests`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests), [`tests/Gravitas.Benchmarks`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Benchmarks)                                                                                                                                                                                                                                                         |
+- Context and lifecycle
+  - [Context](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasWorldContext.cs)
+  - [Clock](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/GravitasClock.cs)
+  - [Lifecycle hooks](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Runtime/LifecycleHooks/GravitasLifecycleHooks.cs)
+- Host boundary and bodies
+  - [Host agent](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/IMatterAgent.cs)
+  - [3D body](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.cs)
+  - [2D body](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.cs)
+- Physics services
+  - [3D](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/3D)
+  - [2D](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/2D)
+  - [Mixed](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/Mixed)
+- [Collider implementations](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders)
+- [Detection and response](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling)
+- Constraints
+  - [3D constraints](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/3D)
+  - [2D constraints](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/2D)
+- [Query implementations](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries)
+- Serialization and replay
+  - [Replay hashing](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Determinism)
+  - [Settings saver](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsSettingsSaver.cs)
+- [Diagnostic implementations](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Diagnostics)
+- Tests and benchmarks
+  - [Tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests)
+  - [Benchmarks](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Benchmarks)

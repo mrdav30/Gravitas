@@ -1,36 +1,31 @@
 # 2D, 3D, And Runtime Modes
 
-Gravitas has first-class 3D, first-class 2D, and explicit mixed 2D/3D
-interaction. The runtime is type-driven: `SolidBody` and `LSCollider` are the 3D
-path, while `SolidBody2D` and `LSCollider2D` are the 2D path.
-
-There is no public `PhysicsDimension` enum that changes a body's behavior after
-creation. Concrete body and collider types define the simulation domain. Mixed
-behavior is an explicit policy between those concrete types.
+Choose body types for the motion you want, then set
+`PhysicsSettings.RuntimeMode` for the interaction you want. Use `SolidBody`
+and an `LSCollider` for 3D, or `SolidBody2D` and an `LSCollider2D` for
+planar X/Z motion. Those concrete types define the body's domain throughout
+its lifetime.
 
 ## Quick Read
 
-- Use `PhysicsRuntimeMode.ThreeD` for normal 3D physics.
-- 3D bodies use `Vector3d` position, `FixedQuaternion` rotation, and full
-  translation/rotation solver controls.
-- Use `PhysicsRuntimeMode.TwoD` for 2D physics in the X/Z plane.
-- Use `PhysicsRuntimeMode.Both` when 2D and 3D should run side by side without
-  cross-dimensional contacts.
-- Use `PhysicsRuntimeMode.Mixed` when 2D and 3D colliders should collide.
-- 2D position is `Vector2d`; `Vector2d.x` maps to world X and `Vector2d.y` maps
-  to world Z.
-- World Y is not a 2D collision axis. In mixed mode it centers the finite 2D
-  slab used by cross-dimensional collision.
-- 2D constraints are native planar/scalar physics, not projected 3D joints.
+Put a planar circle and a 3D sphere at the same host position `(2, 5, 3)`.
+With `Both`, the two simulations run side by side and the shapes create no
+mixed pair. With `Mixed`, the circle gets a finite vertical extent for 3D contact
+tests. A sphere that overlaps this slab can contact it when the pair passes
+collision filters. The circle still moves only in X/Z.
 
 ```mermaid
 flowchart TB
-    Mode["PhysicsSettings.RuntimeMode"]
-    Mode --> ThreeD["ThreeD: 3D only"]
-    Mode --> TwoD["TwoD: 2D only"]
-    Mode --> Both["Both: 3D + 2D, isolated"]
-    Mode --> Mixed["Mixed: 3D + 2D + cross-dimensional contacts"]
+    accTitle: Runtime mode for a planar circle and a 3D sphere
+    accDescr: Both runs separate 2D and 3D simulation without cross-dimensional contacts. Mixed lets an eligible 3D sphere contact the finite slab of a planar circle.
+    Shapes["2D circle and 3D sphere"]
+    Shapes -->|"Both"| Isolated["Separate<br/>simulation paths"]
+    Shapes -->|"Mixed"| Contact["Mixed contact<br/>is possible"]
 ```
+
+If your scene uses only one dimension, choose `TwoD` for planar motion or
+`ThreeD` for full spatial motion. See the [runtime mode table](#runtime-mode),
+[2D coordinates](#2d-coordinate-contract), and [mixed embedding](#mixed-2d-embedding).
 
 ## Runtime Mode
 
@@ -77,6 +72,8 @@ swept travel. Position still has to satisfy each API's representability rules.
 It does not guarantee representable mass, inertia, speed or arbitrarily small
 features. Grid cell size and the number of covered cells remain independent
 memory and performance choices.
+
+### Calculate Effective Reach
 
 Let `C(v)` mean the smallest Q32.32 value enclosing the exact length of `v`. The
 following measures use prepared effective dimensions and vertices after scale,
@@ -203,6 +200,8 @@ through `EffectiveInverseInertiaTensor`. Neither impulse API applies `DeltaTime`
 or advances pose. `AddForce(...)` and `AddTorque(...)` instead queue continuous
 inputs whose acceleration is integrated during the next fixed step.
 
+### 3D Friction And Support
+
 Grounded 3D bodies also apply a material-driven friction term after queued
 driving forces and torques. Linear friction opposes motion tangent to the
 support within the body's permitted axes; it preserves separating normal motion.
@@ -263,7 +262,9 @@ retain the resolved mode and radius.
 
 ## 2D Coordinate Contract
 
-2D uses the X/Z planar convention:
+For the circle from the example, a host position of `(2, 5, 3)` gives a
+planar position of `(2, 3)`. X and Z are the motion axes. The value `5`
+is the height the host retains and mixed collision uses for the slab center.
 
 | 2D value                 | World/host value                                                           |
 | ------------------------ | -------------------------------------------------------------------------- |
@@ -281,6 +282,8 @@ vector conversion.
 Grounding is modeled as planar support in the 2D simulation plane:
 `SolidBody2D.IsGrounded`, `WasGrounded`, `GroundNormal`, `GroundPoint`, and
 `LastGroundedPosition` are X/Z-plane values.
+
+### Planar Support
 
 Automatic 2D probes select the nearest physically eligible support by distance,
 then collider ID. A nearer rejected normal or ignored collider does not hide
@@ -312,6 +315,8 @@ Manual grounding retains host-owned support and projection. Populate restores
 validated policy without waking saved bodies; transient 2D support ownership and
 probe timing are rebuilt through the existing load contract. Older sparse
 records that omit the limit retain the default of one half.
+
+### Host Transform Publication
 
 Dynamic 2D bodies publish their authoritative planar position and yaw rotation
 back to the host `FixedTransform` during `Visualize()` whenever the runtime mode
@@ -349,7 +354,7 @@ impulses change velocity immediately without applying `DeltaTime` or advancing
 pose; planar force and yaw torque are integrated during the next fixed step.
 
 `BodyFreezeAxes2D.PositionX` maps to world X. `BodyFreezeAxes2D.PositionY` maps
-to world Z, not world height. `BodyMotionType` selects solver-controlled
+to world Z. `MotionType` uses `PhysicsMobilityType` to select solver-controlled
 `Dynamic`, host-controlled `Kinematic`, or immobile `Static` ownership in both
 dimensions. Freeze masks then constrain dynamic degrees of freedom without
 changing that role. A fully position-frozen dynamic body has zero effective
@@ -475,8 +480,12 @@ blending remain host or animation-library responsibilities.
 
 ## Mixed 2D Embedding
 
-`LSCollider2D` carries the deterministic 3D embedding data needed by the mixed
-runtime path:
+Place that same circle at host height `Y = 5` with a mixed half-thickness
+of `0.5`. Its slab spans `Y = 4.5` through `Y = 5.5`, while its
+planar shape stays centered at `(2, 3)`. The slab's finite height matters
+when the circle interacts with a 3D collider.
+
+`LSCollider2D` carries the data for this embedding.
 
 | Value                                  | Purpose                                                |
 | -------------------------------------- | ------------------------------------------------------ |
@@ -526,6 +535,8 @@ not a translation guaranteed to escape a nonconvex owner. Inspect
 `CollisionPairMixed.Manifold` when the complete contact set matters. Response,
 awake coupling and CCD use all retained constraints; enter/stay/exit events
 remain once per pair.
+
+### Mixed Contact Response
 
 `CollisionResponseMixed` applies the constrained response model:
 
@@ -619,17 +630,25 @@ reducer policies.
 
 ## Source Map
 
-| Area                     | Source                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime modes            | [`src/Gravitas/Settings/PhysicsRuntimeMode.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsRuntimeMode.cs)                                                                                                                                                                                                         |
-| 3D service               | [`src/Gravitas/Core/3D/Services/GravitasPhysicsService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.cs), [`src/Gravitas/Core/3D/Services/GravitasCollisionService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasCollisionService.cs)         |
-| 3D body                  | [`src/Gravitas/Core/3D/Bodies/SolidBody.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.cs), [`src/Gravitas/Core/3D/Bodies/SolidBody.Grounding.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.Grounding.cs)                                                     |
-| 3D colliders             | [`src/Gravitas/Colliders/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/3D)                                                                                                                                                                                                                                             |
-| 3D constraints           | [`src/Gravitas/Constraints/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/3D)                                                                                                                                                                                                                                         |
-| 2D service               | [`src/Gravitas/Core/2D/Services/GravitasPhysics2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.cs), [`src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs) |
-| 2D body                  | [`src/Gravitas/Core/2D/Bodies/SolidBody2D.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.cs), [`src/Gravitas/Core/2D/Bodies/SolidBody2D.Grounding.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.Grounding.cs)                                             |
-| 2D colliders             | [`src/Gravitas/Colliders/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/2D)                                                                                                                                                                                                                                             |
-| 2D constraints           | [`src/Gravitas/Constraints/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/2D)                                                                                                                                                                                                                                         |
-| Mixed collision service  | [`src/Gravitas/Core/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/Mixed)                                                                                                                                                                                                                                                 |
-| Mixed detection/response | [`src/Gravitas/CollisionHandling/Detection/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection/Mixed), [`src/Gravitas/CollisionHandling/Response/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response/Mixed)                                                   |
-| Mixed queries            | [`src/Gravitas/Queries/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/Mixed)                                                                                                                                                                                                                                           |
+- [Runtime modes](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Settings/PhysicsRuntimeMode.cs)
+- 3D service
+  - [`GravitasPhysicsService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.cs)
+  - [`GravitasCollisionService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasCollisionService.cs)
+- 3D body
+  - [`SolidBody.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.cs)
+  - [`SolidBody.Grounding.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.Grounding.cs)
+- [3D colliders](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/3D)
+- [3D constraints](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/3D)
+- 2D service
+  - [`GravitasPhysics2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.cs)
+  - [`GravitasCollision2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs)
+- 2D body
+  - [`SolidBody2D.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.cs)
+  - [`SolidBody2D.Grounding.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.Grounding.cs)
+- [2D colliders](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/2D)
+- [2D constraints](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/2D)
+- [Mixed collision service](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/Mixed)
+- Mixed detection/response
+  - [`Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection/Mixed)
+  - [`Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response/Mixed)
+- [Mixed queries](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/Mixed)

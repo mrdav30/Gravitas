@@ -1,48 +1,65 @@
 # Continuous Collision Detection
 
-Continuous collision detection (CCD) prevents fast motion from skipping relevant
-contacts. Gravitas keeps CCD deterministic by using fixed-point sweep reducers,
-stable candidate ordering, bounded time-of-impact work, and service-owned
-handoff queues.
+Continuous collision detection (CCD) checks a body's path through a fixed step
+to catch contacts that discrete collision can miss between poses. Enable it on
+a fast body with `ContinuousCollisionMode.Continuous`.
 
 ## Quick Read
 
-- CCD resolves from body, hierarchy, then context defaults.
-- Bodyless colliders, explicit static bodies, and stationary kinematic bodies
-  use static-style sweeps.
-- Moving dynamic and kinematic targets use frame-prepared candidate indexing.
-- Kinematic bodies can act as active swept sources from frame-start pose to host
-  target pose.
-- Translation and geometry-changing rotation compete in one normalized-time
-  arbiter; rotating round shapes at their own center do not enlarge their sweep.
-- Mixed CCD runs only in `PhysicsRuntimeMode.Mixed`.
-- Service-level handoff queues handle dense same-frame contact chains.
-- Public query APIs remain query APIs; CCD uses internal target filters where
-  needed.
+A sphere of radius 0.5 starts at `x = -2` and would move to `x = +2` in one
+step. A stationary wall 0.1 units thick is centered at `x = 0`. At either
+end of the step, the sphere is clear of the wall. With discrete collision, it
+passes through.
+
+With CCD, Gravitas **sweeps** the sphere along the intended path. The first
+contact occurs when the sphere's leading edge reaches the wall's near face,
+at a center position of about `x = -0.55`. The **time of impact (TOI)** is when
+that contact happens within the step. In this example, the collision stops
+the sphere's motion along X.
+
+```mermaid
+flowchart TB
+    accTitle: One step with a fast sphere and a thin wall
+    accDescr: Both modes start at x equals minus 2. Discrete reaches x equals plus 2 past the wall. Continuous sweeps the path and stops at contact near x equals minus 0.55.
+    Start["Sphere starts at x = -2"]
+    Start -->|"Discrete"| End["Ends at x = +2<br/>Past the wall"]
+    Start -->|"Continuous"| Contact["Stops near x = -0.55<br/>At the wall"]
+```
+
+To enable this behavior for an existing 3D body, set its mode before stepping
+the world. The 2D body exposes the same property.
+
+```csharp
+body.ContinuousCollisionMode =
+    ContinuousCollisionMode.Continuous;
+```
+
+See [how mode inheritance works](#public-control-surface), [which path handles
+each target](#ccd-paths), and [which counters to inspect](#diagnostics-and-replay).
+The [source map](#source-map) links to the sphere-and-wall regression tests.
 
 ## Public Control Surface
 
-| Concern                 | API                                                                                                                                                       |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Context default         | `PhysicsSettings.DefaultContinuousCollisionMode`                                                                                                          |
-| 3D body override        | `SolidBody.ContinuousCollisionMode`                                                                                                                       |
-| 2D body override        | `SolidBody2D.ContinuousCollisionMode`                                                                                                                     |
-| Body-owned TOI counters | `LastContinuousCollisionToiIterationCount`, `LastContinuousCollisionToiIterationLimitReached`                                                             |
-| 3D service counters     | `GravitasPhysicsService.LastContinuousCollisionIslandCount`, `LastContinuousCollisionIslandIterationCount`, `LastContinuousCollisionIslandLimitReached`   |
-| 2D service counters     | `GravitasPhysics2DService.LastContinuousCollisionIslandCount`, `LastContinuousCollisionIslandIterationCount`, `LastContinuousCollisionIslandLimitReached` |
+Set `ContinuousCollisionMode` on a `SolidBody` or `SolidBody2D` to choose
+the mode for that body. Set `PhysicsSettings.DefaultContinuousCollisionMode`
+to choose the fallback for a context.
 
-Both body types expose body-owned TOI counters, and both physics services expose
-service-level island counters for the last late step.
+| Mode | Behavior |
+| --- | --- |
+| `Discrete` | Advances using discrete collision without a CCD sweep. |
+| `Continuous` | Enables CCD for eligible motion. |
+| `Auto` | Applies a motion threshold. For translation, the intended displacement must exceed the body's proxy radius, measured from the pivot to enclose the collider. |
+| `Inherit` | Uses the top parent body's explicit mode if present, then the context default. A context default of `Inherit` resolves to `Discrete`. |
 
-`Inherit`, `Discrete`, `Continuous`, and `Auto` are the only valid
-`ContinuousCollisionMode` values. The context default deliberately accepts
-`Inherit`; if no body or hierarchy override supplies a concrete mode, that
-context value resolves to `Discrete`. Public settings/body assignment and
-settings or replay population reject undefined byte-cast values with
-`ArgumentOutOfRangeException` before publishing them. Invalid authored or
-serialized state therefore cannot silently change tunneling policy.
+Body and settings assignments and settings or replay population reject
+undefined enum values with `ArgumentOutOfRangeException` before publishing them.
 
 ## CCD Paths
+
+The sphere in the example takes the stationary 3D path. For a moving target,
+Gravitas uses the prepared motion of both bodies to find when they meet.
+The tables show how the target's mobility and dimension select the sweep.
+A *reducer* is the geometry routine that tests a sweep for a hit.
 
 ### `SolidBody`
 
@@ -66,6 +83,8 @@ serialized state therefore cannot silently change tunneling policy.
 
 ## Stationary And Kinematic Targets
 
+### Which Targets Can Block a Sweep?
+
 Static-style CCD targets include bodyless colliders, explicit static bodies, and
 stationary kinematic bodies. Freeze axes do not change a body's CCD role.
 Translational source admission follows `CanTranslate`; rotational source and
@@ -81,12 +100,16 @@ query filters. Final CCD target admission uses the owning collision service's
 physical-pair gate, including collider lifecycle, authored filters, hierarchy
 rules, and linked-joint collision suppression.
 
+### Starting Inside a Solid
+
 3D sphere sweeps against solid cylinders and cones retain the target's outward
 surface normal even when the source center is contained. Starting overlaps have
 zero sweep distance, and the selected surface anchor is retained independently
 of world-point representability. Direct primitives and compound parts follow the
 same rule. Queries report the geometric hit for either travel direction; CCD
 uses its normal to permit escape and block motion deeper into the solid.
+
+### When the Host Moves a Kinematic Body
 
 For kinematic active-source CCD, hosts write deterministic target transforms
 before `context.LateSimulate()`. Gravitas captures the frame-start pose, reads
@@ -102,27 +125,7 @@ kinematic body was processed earlier in service order.
 
 ## Dynamic Candidate Ordering
 
-A sphere or planar circle with an exactly zero collider-local offset occupies
-the same geometry while turning. Gravitas still applies its requested rotation
-and preserves angular state, but does not charge that turn as a geometric sweep.
-An offset round collider still sweeps about its body pivot. Nearby rotating
-obstacles can require rotational sampling even when the source is centered or
-stationary, including opposite-dimensional obstacles in Mixed mode.
-
-For a centered round source already touching a supported convex primitive,
-tangential or separating motion does not become a rotational blocker merely
-because another nearby object is rotating. Closing motion is still tested.
-Compounds and concave targets retain conservative handling: a non-closing
-contact on one child is not proof that another child is clear.
-
-For a non-compound source rotating solely around a cardinal supporting-plane
-axis, CCD can also certify tangential or separating motion against a stationary
-mesh or cuboid. Exact source support must start on or beyond the full target's
-supporting plane, and the source's quaternion and angular components must
-preserve that projection throughout the interval. Mesh targets include every
-vertex; compound targets include every mesh/cuboid leaf. A floor contact cannot
-hide another blocking part. General rotations, moving targets and curved target
-leaves retain the conservative interval search when this proof is unavailable.
+### Prepare Geometry and Trajectories
 
 Before frame preparation, body-owned colliders publish pending geometry through
 the normal shape transaction. Candidate bounds, inertia and mixed slab thickness
@@ -148,6 +151,8 @@ segments are chronological and non-overlapping, the first admitted non-boundary
 hit is the global earliest hit. This contract is shared by dynamic and kinematic
 2D, 3D, and mixed CCD.
 
+### Compare Hits Across Trajectories
+
 Relative circle and sphere reducers keep motion as an endpoint-free direction
 plus physical distance. They compare the exact hit distance with the active
 overlap boundary, reconstruct both bodies from their authored trajectory
@@ -163,19 +168,19 @@ therefore cannot reject a real slab-closing contact merely because the proxy
 normal is separating, and it cannot promote an enclosing-proxy-only hit after an
 exact reducer certifies a miss.
 
-Candidate results use stable ordering:
+Candidate results use time of impact and stable collider identity or
+dimension-tagged mixed keys. Cross-dimensional arbitration puts 2D first on an
+exact-time tie. The ordering is deterministic across repeated runs.
 
-- time of impact.
-- target dimension, with 2D before 3D for an exact-time tie.
-- stable collider ID or dimension-tagged mixed key.
-- bounded iteration counts.
+### Continue After an Impact
 
-The ordering is deterministic across repeated runs. Service-level queues own
-same-frame handoff processing so dense contact chains do not depend on traversal
-side effects. Queue admission deduplicates a body only while that body owns an
-unread entry. Dequeue releases that ownership before consumption, allowing a
-later same-frame relay to append the body again under the same deterministic
-iteration budget. Requeued work that exceeds the budget is explicitly discarded
+An impact can change another body's motion while time remains in the step.
+The physics service queues that body to continue along its updated path. These
+handoffs let dense contact chains advance in a deterministic order.
+
+Queue admission deduplicates a body only while it owns an unread entry. Dequeue
+releases that ownership before consumption, allowing a later same-frame relay
+to append the body again under the same deterministic iteration budget. Requeued work that exceeds the budget is explicitly discarded
 rather than left as stale continuation state. A later terminal handoff update
 (no remaining time or no resulting motion) likewise cancels any older pending
 continuation for that body; latest-state-wins includes the absence of further
@@ -207,6 +212,32 @@ proxy candidates used by dynamic CCD paths.
 
 ## Rotational CCD
 
+### When a Turn Needs a Sweep
+
+A sphere or planar circle with an exactly zero collider-local offset occupies
+the same geometry while turning. Gravitas still applies its requested rotation
+and preserves angular state, but does not charge that turn as a geometric sweep.
+An offset round collider still sweeps about its body pivot. Nearby rotating
+obstacles can require rotational sampling even when the source is centered or
+stationary, including opposite-dimensional obstacles in Mixed mode.
+
+For a centered round source already touching a supported convex primitive,
+tangential or separating motion does not become a rotational blocker merely
+because another nearby object is rotating. Closing motion is still tested.
+Compounds and concave targets retain conservative handling: a non-closing
+contact on one child is not proof that another child is clear.
+
+For a non-compound source rotating solely around a cardinal supporting-plane
+axis, CCD can also certify tangential or separating motion against a stationary
+mesh or cuboid. Exact source support must start on or beyond the full target's
+supporting plane, and the source's quaternion and angular components must
+preserve that projection throughout the interval. Mesh targets include every
+vertex; compound targets include every mesh/cuboid leaf. A floor contact cannot
+hide another blocking part. General rotations, moving targets and curved target
+leaves retain the conservative interval search when this proof is unavailable.
+
+### Prove That an Interval Is Clear
+
 Rotational CCD is bounded and deterministic across same-dimensional and mixed
 pairs. When either participant has rotational motion, source translation, source
 rotation, target translation, and target rotation compete in one normalized-time
@@ -237,6 +268,8 @@ same split: exact finite admission during refinement, then the ordinary complete
 manifold at the accepted response pose. Declared mesh continuity and closed
 convex containment keep their existing complete-contact path.
 
+### Build Response at the Accepted Contact
+
 A retained witness can lie after an earlier unresolved safe frontier. Complete
 response rows are built when the witness time equals that frontier; both source
 and moving target are resampled at the exact witness time before closing
@@ -253,6 +286,8 @@ both 2D and 3D, a live registry containing only the source collider needs no
 same-dimensional candidate query. The gatherer clears retained results; the
 separate mixed search still runs. Registering another collider resumes normal
 collection immediately.
+
+### Stop Safely When the Budget Runs Out
 
 An unresolved interval is subdivided until a fixed depth or per-candidate work
 budget. A witnessed earliest contact can apply the contact-point response and
@@ -274,6 +309,8 @@ pair update, Gravitas conservatively clamps before mutating either body and
 reports the CCD iteration limit. Linear-only handoffs preserve unrelated angular
 acceleration, and angular-only handoffs preserve unrelated linear acceleration.
 
+### Choose Rotational Candidates
+
 Rotational broad-phase radii are measured from each body's actual rotation
 pivot, not merely from the collider center, so local offsets and remote compound
 parts remain inside the candidate volume. Unsupported collision pairs are
@@ -285,9 +322,20 @@ their prepared piecewise trajectories; mixed candidates are admitted only in
 
 ## Diagnostics And Replay
 
-Body-owned bounded TOI counters are deterministic frame-local state for tuning,
-tests, and host diagnostics. Service counters describe CCD island/handoff
-behavior without adding event-buffer traffic to the hot path.
+Check these counters after `LateSimulate()` to see how much CCD work the step
+did and whether it reached a limit.
+
+- On `SolidBody` and `SolidBody2D`
+  - `LastContinuousCollisionToiIterationCount`
+  - `LastContinuousCollisionToiIterationLimitReached`
+- On `GravitasPhysicsService` and `GravitasPhysics2DService`
+  - `LastContinuousCollisionIslandCount`
+  - `LastContinuousCollisionIslandIterationCount`
+  - `LastContinuousCollisionIslandLimitReached`
+
+The body counters are deterministic frame-local state for tuning, tests, and
+host diagnostics. The service counters track CCD island and handoff work
+without adding event-buffer traffic to the hot path.
 
 Active cross-frame CCD handoff state is included in the authoritative replay
 hash because it can affect the next fixed step. Rebuildable per-frame CCD
@@ -307,12 +355,22 @@ through solver-cache hash mode when useful for drift RCA.
 
 ## Source Map
 
-| Area                 | Source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3D body CCD          | [`src/Gravitas/Core/3D/Bodies/SolidBody.ContinuousCollision.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.ContinuousCollision.cs), [`src/Gravitas/Core/3D/Bodies/SolidBody.ContinuousCollision.Dynamic.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.ContinuousCollision.Dynamic.cs), [`src/Gravitas/Core/3D/Bodies/SolidBody.ContinuousCollision.Kinematic.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.ContinuousCollision.Kinematic.cs), and the focused `SolidBody.ContinuousCollision.Rotational*.cs` partials.               |
-| 2D body CCD          | [`src/Gravitas/Core/2D/Bodies/SolidBody2D.ContinuousCollision.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.ContinuousCollision.cs), [`src/Gravitas/Core/2D/Bodies/SolidBody2D.ContinuousCollision.Dynamic.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.ContinuousCollision.Dynamic.cs), [`src/Gravitas/Core/2D/Bodies/SolidBody2D.ContinuousCollision.Kinematic.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.ContinuousCollision.Kinematic.cs), and the focused `SolidBody2D.ContinuousCollision.Rotational*.cs` partials. |
-| 3D service CCD       | [`src/Gravitas/Core/3D/Services/GravitasPhysicsService.ContinuousCollision.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.ContinuousCollision.cs)                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| 2D service CCD       | [`src/Gravitas/Core/2D/Services/GravitasPhysics2DService.ContinuousCollision.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.ContinuousCollision.cs)                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| CCD common helpers   | [`src/Gravitas/CollisionHandling/Continuous`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Continuous)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Mixed query reducers | [`src/Gravitas/Queries/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/Mixed)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| CCD tests            | [`tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs), [`tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs`](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs), [`tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs`](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs)                                                                                                   |
+- 3D body CCD
+  - [Frame preparation](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.ContinuousCollision.cs)
+  - [Dynamic motion](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.ContinuousCollision.Dynamic.cs)
+  - [Kinematic motion](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Bodies/SolidBody.ContinuousCollision.Kinematic.cs)
+  - Rotational motion in the `SolidBody.ContinuousCollision.Rotational*.cs` partials
+- 2D body CCD
+  - [Frame preparation](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.ContinuousCollision.cs)
+  - [Dynamic motion](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.ContinuousCollision.Dynamic.cs)
+  - [Kinematic motion](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Bodies/SolidBody2D.ContinuousCollision.Kinematic.cs)
+  - Rotational motion in the `SolidBody2D.ContinuousCollision.Rotational*.cs` partials
+- Service-owned CCD
+  - [3D service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.ContinuousCollision.cs)
+  - [2D service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.ContinuousCollision.cs)
+  - [Shared CCD helpers](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Continuous)
+  - [Mixed query reducers](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Queries/Mixed)
+- Tests
+  - [3D CCD, including the thin-wall case](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs)
+  - [2D CCD](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs)
+  - [Mixed query and CCD](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs)

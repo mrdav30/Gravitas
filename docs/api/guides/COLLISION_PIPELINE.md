@@ -1,46 +1,39 @@
 # Collision Pipeline
 
-Collision in Gravitas is split into deterministic stages: broad phase, pair
-filtering, narrow phase, contact manifold generation, response, notifications,
-and cleanup. The same structure exists for 3D, 2D, and explicit mixed 2D/3D
-contacts, with each domain owning its own state and ordering rules.
-
-This page is the readable entry point. Use the reference pages when you need the
-full implementation contract:
-
-- [Collision Broad Phase](COLLISION_BROAD_PHASE.md)
-- [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md)
-- [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md)
-- [Collision Response](COLLISION_RESPONSE.md)
+When a falling sphere meets a floor, Gravitas first finds the pair, checks
+where their shapes touch, and uses that contact to change the sphere's motion.
+These stages run in `LateSimulate()` in a stable order.
 
 ## Quick Read
 
-- 3D colliders route through `GravitasPhysicsService` and
-  `GravitasCollisionService`.
-- 2D colliders route through `GravitasPhysics2DService` and
-  `GravitasCollision2DService`.
-- Mixed contacts exist only in `PhysicsRuntimeMode.Mixed` and route through
-  `GravitasMixedCollisionService`.
-- GridForge-backed voxel partitions produce deterministic candidate pairs.
-- Candidate pairs pass hierarchy, same-agent, layer, local physical ignore,
-  trigger, awake, and bounds filters before narrow phase.
-- Narrow phase writes deterministic contact manifolds.
-- Response solves contacts and joints in stable islands during `LateSimulate()`.
-- Contact notifications and pair cleanup happen after response.
+Follow a dynamic sphere of radius 0.5 onto a solid floor whose top is at
+`y = 0`. The floor is a static collider without a body. When the sphere's
+bounds reach the floor, the **broad phase** uses shared GridForge voxels to
+find the pair. Filters check that the colliders are eligible to interact.
+
+The **narrow phase** checks the shapes themselves and records a **contact
+manifold**, the pair's contact points, normals, and depths. At the center
+position `y = 0.5`, the sphere just touches the floor. Response uses the
+contact to oppose downward motion. The floor remains in place.
 
 ```mermaid
-flowchart LR
-    Refresh["Refresh collider bounds"]
-    Partition["GridForge partitions"]
-    Candidates["Candidate pairs"]
-    Filters["Deterministic filters"]
-    Narrow["Shape narrow phase"]
-    Contacts["Contact manifolds"]
-    Response["Response islands"]
-    Notify["Notifications + cleanup"]
-
-    Refresh --> Partition --> Candidates --> Filters --> Narrow --> Contacts --> Response --> Notify
+flowchart TB
+    accTitle: A sphere meets a static floor
+    accDescr: Shared voxels nominate the sphere and floor. Pair filters admit them, the shape test finds contact, and response opposes the sphere's downward motion.
+    Broad["Broad phase finds sphere and floor"]
+    Filter["Pair filters check eligibility"]
+    Narrow["Narrow phase finds contact"]
+    Solve["Response opposes downward motion"]
+    Broad -->|"Candidate pair"| Filter
+    Filter -->|"Eligible pair"| Narrow
+    Narrow -->|"Contact manifold"| Solve
 ```
+
+Use the [broad-phase guide](COLLISION_BROAD_PHASE.md) to trace candidate
+discovery, the [shape reference](COLLIDER_SHAPE_REFERENCE.md) to check pair
+support, and the [response guide](COLLISION_RESPONSE.md) to see how motion
+and notifications follow contact. If a fast body can cross a thin obstacle
+in one step, see [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md).
 
 ## Runtime Paths
 
@@ -49,6 +42,9 @@ flowchart LR
 | 3D          | `SolidBody`, `LSCollider`     | `PhysicsPartition` on GridForge voxels                 | `GravitasPhysicsService`        |
 | 2D          | `SolidBody2D`, `LSCollider2D` | `PhysicsPartition2D` on the internal Y=0 storage plane | `GravitasPhysics2DService`      |
 | Mixed 2D/3D | existing 3D and 2D types      | `PhysicsMixedPartition` using embedded 2D slabs        | `GravitasMixedCollisionService` |
+
+The 3D route pairs `GravitasPhysicsService` with `GravitasCollisionService`.
+The planar route pairs `GravitasPhysics2DService` with `GravitasCollision2DService`.
 
 2D uses X/Z host projection: world `Vector3d.x` maps to `Vector2d.x` and world
 `Vector3d.z` maps to `Vector2d.y`. World `Vector3d.y` is height or mixed
@@ -68,9 +64,10 @@ Collision work is part of `context.LateSimulate()`:
 5. Narrow phase evaluates exact shape-pair collision.
 6. Contact manifolds are written to pair-owned storage.
 7. Contact and joint rows are solved in deterministic islands.
-8. Grounding/support and sleep state update from post-response state.
-9. Contact events, pair maintenance, retained partition cleanup, and
-   deactivation cleanup run.
+8. The services refresh support, dispatch notifications, maintain pairs, and
+   clean up retained partitions and deactivations.
+9. Automatic sleep updates after the dimensional collision pass. In `Mixed`
+   mode, it waits until after mixed response.
 
 Mixed contacts run after both dimension-local services have integrated and
 refreshed their own collider partitions, so mixed response observes
@@ -100,13 +97,17 @@ include masks are caller-owned; see [Query Services](QUERY_SERVICES.md).
 
 ## Narrow Phase
 
-Narrow phase owns shape truth. Supported shape coverage includes:
+Narrow phase determines whether the shapes touch and where. For the sphere
+and floor above, it locates the sphere's lowest point and the corresponding
+point on the floor. Supported shape coverage includes:
 
 | Domain | Shape families                                                                     |
 | ------ | ---------------------------------------------------------------------------------- |
 | 3D     | sphere, capsule, cuboid, finite cylinder, finite cone, mesh, compound              |
 | 2D     | circle, capsule, AABB, convex polygon, compound                                    |
 | Mixed  | supported 3D shapes against embedded 2D circle/capsule/AABB/polygon/compound slabs |
+
+### Planar Contact Samples
 
 Pure 2D convex contacts retain paired anchors clipped to the finite contact
 features. Single-contact consumers, including initial-overlap shape sweeps and
@@ -119,6 +120,8 @@ samples per group. Its flat enumeration follows structural group order, then
 contact identity. Group boundaries and supplier materials remain meaningful when
 several boundary normals constrain one body; the first sample is not necessarily
 the deepest representative. Use `PrimaryContact` for that purpose.
+
+### Convex Shape Tests
 
 Convex support predicates share one GJK simplex policy for 3D contacts and
 finite cone overlap queries. Region and face-orientation dot signs use exact
@@ -165,6 +168,8 @@ and delegate each BVH-admitted triangle pair to FixedMathSharp's full-domain
 rigid-frame contact relation. Compound paths scan parts in stable declaration
 order and return the owner collider as the public identity.
 
+### Sphere and Capsule Contact on Meshes
+
 Surface mesh/sphere and concave mesh/capsule contacts admit the complete finite
 shape before grouping. Triangles join only through a shared edge or vertex that
 actually meets the shape. Each connected overlap region has its own face group
@@ -198,6 +203,8 @@ consistently without changing the authored triangles.
 
 Overlapping, nonmanifold or otherwise ambiguous topology retains independent
 triangle domains. Convex-volume admission still requires consistent winding.
+
+### Cylinders and Round Slabs on Meshes
 
 Native cylinders and mixed circle/stadium slabs share the finite filled-surface
 reducer for trusted mesh patches. Covered diagonals cannot supply response; real
@@ -233,6 +240,8 @@ its selected witnesses. General math sampling also retains an interior witness,
 which can be the only representable witness; a certified covered footprint needs
 only its boundary poles. Contact admission, depth and provenance precede final
 Q32.32 sampling.
+
+### Cone Contact on Meshes
 
 Mesh/cone contacts include the base disk, rim, apex and lateral generators.
 Prepared mesh geometry certifies coplanar surface domains from exact welded
@@ -288,6 +297,8 @@ cylinders.
 
 The selected paired anchors can lie in the middle of the core.
 
+### Mesh Contact with Flat Patches and Prisms
+
 Closed convex mesh contacts against a finite convex mesh patch or an embedded
 polygonal prism select the convex-pair separating-axis exit once. Finite support
 faces and edges then supply paired anchors for that exit. The existing plane
@@ -310,6 +321,8 @@ use that map before final contact-anchor rounding; public centered inspection
 vertices are not collision geometry. See the
 [mesh coordinate contract](COLLIDER_SHAPE_REFERENCE.md).
 
+### Contact Anchors Near the Coordinate Limits
+
 Finite axes, oriented cuboids, and planar convex shapes retain center-relative
 canonical geometry through narrow phase. Contact witnesses use `ContactAnchor`
 or `ContactAnchor2D`: a representable origin, normalized frame rotation, and
@@ -323,6 +336,8 @@ representable world witness is not lost to an overflowing local intermediate.
 `Offset` and legacy `PointA`/`PointB` views materialize derived coordinates and
 throw when the requested view is not representable; domain-edge callers should
 use `TryGetOffset` and the matching `TryGetPoint*` method.
+
+### Exact Response When Compact Arithmetic Cannot Fit
 
 Response keeps materialized 2D/3D lever vectors as the ordinary fast path and
 reconstructs a Gravitas-owned `ExactLever3D` from contact anchors only when the
@@ -350,6 +365,8 @@ accumulated-normal, Coulomb-line, and Coulomb-disk response policy.
 `ExactContactLever3D` and `ExactContactLever2D` adapt body mobility and
 dimension-specific state into that kernel; they do not duplicate its arithmetic
 or expose the FixedMathSharp internal representation.
+
+### Round Shapes in 2D and Mixed Mode
 
 Pure 2D circle/circle contacts use FixedMathSharp's zero-core capsule relation,
 matching the geometry ownership of 3D sphere contacts. Classification precedes
@@ -578,14 +595,19 @@ event timing, read [Collision Response](COLLISION_RESPONSE.md).
 
 ## Source Map
 
-| Area                      | Source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3D collision service      | [`src/Gravitas/Core/3D/Services/GravitasCollisionService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasCollisionService.cs)                                                                                                                                                                                                                                                                                                                                                                               |
-| 3D physics/pairs/response | [`src/Gravitas/Core/3D/Services/GravitasPhysicsService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.cs), [`src/Gravitas/Core/3D/Services/GravitasPhysicsService.Pairs.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.Pairs.cs), [`src/Gravitas/Core/3D/Services/GravitasPhysicsService.Response.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.Response.cs)             |
-| 2D collision service      | [`src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs)                                                                                                                                                                                                                                                                                                                                                                           |
-| 2D physics/pairs/response | [`src/Gravitas/Core/2D/Services/GravitasPhysics2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.cs), [`src/Gravitas/Core/2D/Services/GravitasPhysics2DService.Pairs.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.Pairs.cs), [`src/Gravitas/Core/2D/Services/GravitasPhysics2DService.Response.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.Response.cs) |
-| Mixed collision           | [`src/Gravitas/Core/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/Mixed)                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Narrow phase              | [`src/Gravitas/CollisionHandling/Detection`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection)                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Contact data              | [`src/Gravitas/CollisionHandling/Contacts`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Contacts)                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Response                  | [`src/Gravitas/CollisionHandling/Response`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response)                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Collision tests           | [`tests/Gravitas.Tests/CollisionHandling`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/CollisionHandling), [`tests/Gravitas.Tests/Physics2D`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Physics2D), [`tests/Gravitas.Tests/MixedDimensions`](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/MixedDimensions)                                                                                                                                                                     |
+- [3D collision service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasCollisionService.cs)
+- [3D physics service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.cs)
+- [3D pair lifecycle](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.Pairs.cs)
+- [3D response scheduling](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasPhysicsService.Response.cs)
+- [2D collision service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs)
+- [2D physics service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.cs)
+- [2D pair lifecycle](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.Pairs.cs)
+- [2D response scheduling](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasPhysics2DService.Response.cs)
+- [Mixed collision](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Core/Mixed)
+- [Narrow phase](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection)
+- [Contact data](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Contacts)
+- [Response](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response)
+- [Collision tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/CollisionHandling)
+- [2D physics tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/Physics2D)
+- [Mixed-dimension tests](https://github.com/mrdav30/Gravitas/tree/main/tests/Gravitas.Tests/MixedDimensions)
+- [Sphere and floor tests](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/CollisionHandling/BodylessStaticResponseTests.cs)

@@ -1,21 +1,26 @@
 # Collision Broad Phase
 
-The broad phase maps colliders into GridForge-backed voxel partitions and emits
-stable candidate pairs for narrow phase. It is responsible for candidate
-coverage, mobility buckets, duplicate suppression, retained partition lifetime,
-and deterministic pair routing.
+The broad phase decides which collider pairs are worth checking. Gravitas
+uses GridForge voxels as a spatial index. A pair can share a voxel even when
+its shapes are separated, so candidates still pass filters and a shape test.
 
 ## Quick Read
 
-- 3D uses `PhysicsPartition`.
-- 2D uses `PhysicsPartition2D` on the internal Y=0 storage plane.
-- Mixed uses `PhysicsMixedPartition` with dimension-tagged 3D/2D candidate keys.
-- Partitions store context-local collider IDs, not collider references.
-- Static, kinematic, dynamic, and awake-dynamic membership are separate.
-- Sleeping colliders remain query-visible but do not activate solver work by
-  themselves.
-- Empty partitions are retained for a deterministic frame window, then retired
-  through a bounded sweep budget.
+Imagine a sphere moving across a floor. Its bounds cover cells A and B at
+first, then B and C. The labels stand for full world voxel identities.
+Gravitas updates only the changed memberships.
+
+| Cell | Before the move | After the move | Membership update |
+| --- | --- | --- | --- |
+| A | Covered | Clear | Remove the sphere ID |
+| B | Covered | Covered | Keep the sphere ID |
+| C | Clear | Covered | Add the sphere ID |
+
+If the sphere and floor share both B and C, the pair is routed through
+its first shared partition in stable order. [Duplicate suppression](#duplicate-suppression)
+keeps the extra shared cell from producing a second shape check. If the
+sphere sleeps, it remains available to queries. Only awake dynamic
+membership activates [solver pair distribution](#active-partitions-and-pair-distribution).
 
 ## Partition Owners
 
@@ -45,6 +50,8 @@ comparison uses full world voxel identities, including grid spawn tokens.
 
 ## 3D Partitioning
 
+### Update Coverage
+
 When a collider initializes, moves, rotates, changes scale, or changes local
 shape inputs, `LSCollider` rebuilds runtime shape data and asks
 `GravitasCollisionService` to repartition it. Shape inputs are tracked by an
@@ -69,6 +76,8 @@ only for partition coverage; narrow phase always consumes the canonical shape.
 7. stores the collider's `WorldVoxelIndex`.
 8. adds the collider ID to the partition mobility bucket.
 
+### Reuse Empty Partitions
+
 When a collider leaves a voxel, Gravitas removes the collider ID from the
 partition but keeps the empty `PhysicsPartition` attached to that voxel. Empty
 partitions are inactive and query-invisible. `PhysicsSettings`
@@ -85,9 +94,8 @@ collision/query ordering still uses sorted spatial identities and collider IDs.
 
 `GravitasWorldContext.Reset()` is a stronger session boundary: it detaches
 retained Gravitas partition payloads from GridForge voxels, clears retained
-tracking, and clears partition pools. Within a session, released collider IDs
-are not cached for reuse; reset starts a fresh context-local allocation
-sequence.
+tracking, and clears partition pools. The collider registry can reuse IDs
+within a session. A reset starts a fresh context-local allocation sequence.
 
 ## 2D Partitioning
 
@@ -117,13 +125,13 @@ comparable because the services intentionally own separate ID spaces.
 
 Membership is explicit:
 
-| Collider/body state                      | Partition bucket           |
-| ---------------------------------------- | -------------------------- |
-| Bodyless collider                        | static                     |
-| `MotionType == BodyMotionType.Static`    | static                     |
-| `MotionType == BodyMotionType.Kinematic` | kinematic                  |
-| `MotionType == BodyMotionType.Dynamic`   | dynamic                    |
-| Awake dynamic body with solver mobility  | dynamic plus awake-dynamic |
+| Collider or body state | Partition bucket |
+| --- | --- |
+| Bodyless collider | static |
+| `PhysicsMobilityType.Static` | static |
+| `PhysicsMobilityType.Kinematic` | kinematic |
+| `PhysicsMobilityType.Dynamic` | dynamic |
+| Awake dynamic body with solver mobility | dynamic plus awake-dynamic |
 
 Freeze axes never change the partition role. Partial freezes and fully locked
 dynamic bodies remain in dynamic membership; the solver constrains their degrees
@@ -238,7 +246,7 @@ renderer distance or presentation priority.
 3. removes holder references from opposite colliders.
 4. clears explicit parent binding.
 5. deactivates and pools pairs when pooling is enabled.
-6. returns the collider ID to the context-local physics service.
+6. unregisters the collider ID from the context-local physics service.
 7. marks the collider inactive.
 
 2D and mixed cleanup follow the same ownership principle through their owning
@@ -246,11 +254,10 @@ services.
 
 ## Source Map
 
-| Area                     | Source                                                                                                                                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3D partition service     | [`src/Gravitas/Core/3D/Services/GravitasCollisionService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasCollisionService.cs)                         |
-| 2D partition service     | [`src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs)                     |
-| Mixed partition service  | [`src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs) |
-| Partition payloads       | [`src/Gravitas/Partitions`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Partitions)                                                                                             |
-| Collider partition state | [`src/Gravitas/Colliders/State`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/State)                                                                                   |
-| Local filtering          | [`src/Gravitas/CollisionHandling/Filtering/ColliderCollisionFilter.cs`](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/CollisionHandling/Filtering/ColliderCollisionFilter.cs)     |
+- [3D partition service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/3D/Services/GravitasCollisionService.cs)
+- [2D partition service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/2D/Services/GravitasCollision2DService.cs)
+- [Mixed partition service](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs)
+- [Partition payloads](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Partitions)
+- [Collider partition state](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/State)
+- [Local filtering](https://github.com/mrdav30/Gravitas/blob/main/src/Gravitas/CollisionHandling/Filtering/ColliderCollisionFilter.cs)
+- [Partition coverage tests](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/Partitions/PartitionDeltaRefreshTests.cs)

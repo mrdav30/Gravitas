@@ -1,11 +1,13 @@
 # Getting Started
 
-This guide builds the smallest useful Gravitas host: one explicit physics
-context, one GridForge grid, one host adapter, and one dynamic 3D sphere.
+Build a world with one sphere at the origin. Give it a push along +X, advance
+one fixed step, and read its new position. You will create one
+`GravitasWorldContext` for the simulation, one GridForge grid for spatial
+coverage, and one host adapter for the sphere.
 
-Gravitas does not hide the application loop or create engine objects. Your host
-owns input, rendering, networking, and scene lifetime; Gravitas owns
-deterministic physics state inside a `GravitasWorldContext`.
+Your host creates the objects and owns input, rendering, networking, and
+scene lifetime. Gravitas advances the sphere's authoritative physics state
+inside the context.
 
 ## 1. Install A Package
 
@@ -106,8 +108,9 @@ world.
 
 ## 4. Create A Body And Collider
 
-Create a fixed transform, wrap it in the host agent, then initialize a collider
-and body against that agent.
+Start the sphere at the origin with a radius of 0.5 and a mass of 1. The
+collider defines its shape and material. The body stores its simulated motion.
+Bind both to the host agent so they share its context and transform.
 
 ```csharp
 using FixedMathSharp;
@@ -138,7 +141,7 @@ SolidBody body = new(agent, collider)
 body.Initialize(
     Vector3d.Zero,
     FixedQuaternion.Identity,
-    BodyMotionType.Dynamic);
+    PhysicsMobilityType.Dynamic);
 ```
 
 Initialization assigns context-local runtime identity, prepares the shape and
@@ -160,19 +163,24 @@ LSCollider authoredCollider = shape.CreateCollider();
 
 ## 5. Advance The Fixed Step
 
-Apply the frame's deterministic commands first, then run both authoritative
-physics phases:
+Apply the impulse before the fixed step. The impulse points along +X, so the
+sphere's X position is positive when the step finishes.
 
 ```csharp
+body.AddLinearImpulse(Vector3d.Right * body.Mass);
 context.Simulate();
 context.LateSimulate();
+
+Console.WriteLine(body.Position3d.X > Fixed64.Zero); // True
 ```
 
 `Simulate()` advances the context clock and primary services. `LateSimulate()`
 completes deferred collision, constraint, pair, cleanup, and post-step work.
 Keep them in the same deterministic fixed-frame transaction.
 
-Presentation happens separately:
+### Publish The Sphere's Pose
+
+On a render update, publish the sphere's visual pose to the host:
 
 ```csharp
 context.Visualize();
@@ -181,6 +189,8 @@ context.LateVisualize();
 
 These phases publish presentation state. Do not apply authoritative gameplay or
 physics corrections from them.
+
+### Check Replay State
 
 For lockstep or replay validation, hash the context after the authoritative
 step:

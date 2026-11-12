@@ -1,24 +1,32 @@
 # Collider Shape Reference
 
-Collider shape code owns deterministic geometry, bounds, authored shape data,
-narrow-phase dispatch, and compound/mesh identity rules. This page is the
-technical companion to [Collision Pipeline](COLLISION_PIPELINE.md).
+Use this guide to choose collider geometry and check which shape pairs the
+runtime can evaluate. Start with the [3D](#3d-shape-pair-matrix) or
+[2D](#2d-shape-pair-matrix) pair matrix when you already know your shapes.
+See the [collision pipeline](COLLISION_PIPELINE.md) for where shape tests run.
 
 ## Quick Read
 
-- Runtime colliders are not serialized asset definitions.
-- Shape definitions are data-only authoring/import surfaces.
-- Registered sphere, capsule, and finite-cylinder bodies can transactionally
-  change same-family geometry through `SolidBody.TryReconfigureCollider(...)`.
-- Compound colliders own one public collider identity and stable private part
-  order.
-- Mesh colliders can be valid simulation/query targets; concave mesh source
-  sweeps are outside the public runtime query surface.
-- Mesh topology and acceleration structures are immutable after construction;
-  pose and scale rebuild only scale-dependent runtime caches.
-- Narrow phase uses stable pair priority and stable contact-normal orientation.
-- SAT axes, mesh triangle candidates, and compound parts are processed in
-  deterministic order.
+A crouched character uses a 1-unit-tall capsule on a floor at `y = 0`.
+To stand up, the host passes a 2-unit-tall capsule definition and a root
+position of `y = 1` to `SolidBody.TryReconfigureCollider(...)`. The candidate
+keeps its lower end on the floor. Touching the floor is allowed. Penetrating
+a low ceiling blocks the resize and preserves the crouched shape and position.
+
+```mermaid
+flowchart TB
+    accTitle: Standing up with a capsule collider
+    accDescr: The same registered capsule accepts taller geometry and its requested position when clear. A low ceiling blocks the change and the crouched state stays committed.
+    Request["Request a taller capsule"]
+    Request -->|"Room to stand"| Apply["Publish new shape<br/>and pose"]
+    Request -->|"Ceiling penetration"| Block["Keep crouched shape<br/>and pose"]
+```
+
+The [shape definition](#authoring-surfaces) describes the geometry to try.
+The [runtime collider](#runtime-shape-state) owns the registered identity
+and commits geometry after validation. For several shapes that should
+move and report events as one collider, see
+[hierarchy versus compound](#hierarchy-versus-compound).
 
 ## Runtime Shape State
 
@@ -66,8 +74,8 @@ Hierarchy binding and compound colliders solve different problems:
 
 Hierarchy state stores a dimension-tagged top-parent collider key. It does not
 walk engine transform trees during simulation. When a parent collider
-deactivates, child bindings are cleared before the parent collider ID returns to
-the reusable ID pool.
+deactivates, child bindings are cleared before the service unregisters the
+parent collider ID.
 
 Compound parts are not registered with the physics service, cannot be parented
 independently, and are scanned in stable declaration order by the owning
@@ -114,6 +122,8 @@ queries, diagnostics, and replay hashing.
 | Mesh            | Convex or concave target geometry with triangle candidates and cached mass properties.                                                                                                                   |
 | Compound        | Stable part-order reduction under one public collider identity, with solid-volume mass distribution and deterministic equal-mass fallback when every part measure quantizes to zero.                     |
 
+### Cone Geometry and Mass Properties
+
 Cones use analytic support and closest-surface geometry instead of generating a
 runtime triangle fan. Mesh colliders use cached closed-volume mass properties by
 default when angular dynamics are enabled and keep an explicit uniform
@@ -127,6 +137,8 @@ weighting retains the existing fixed-point `Pi/3` coefficient and unnarrowed
 dimension products. Pose changes reuse the committed volume when effective
 radius and height are unchanged; geometry changes prepare a new value before
 publication.
+
+### Capsule and Cylinder Limits
 
 For a 3D capsule with normalized motion direction `n`, world-space axis
 `Rotation * Vector3d.Up`, radius `r`, and cylindrical height `h`, the projected
@@ -150,6 +162,8 @@ witness selection. A positive authored height that scales to zero is still
 rejected because it does not retain the cylinder's flat-cap contract. Capsules
 remain different by design: a collapsed capsule center segment is the
 well-defined sphere limit.
+
+### Compound Mass and Bounds
 
 3D compound colliders distribute uniform-density mass by each solid part's
 volume rather than by the public `Area` value, whose drag/diagnostic meaning is
@@ -254,14 +268,17 @@ pool churn.
 
 ## Mesh Policy
 
+### Meshes as Collision and Query Targets
+
 Mesh colliders are valid simulation colliders and query targets. 3D raycasts and
 swept-sphere queries test mesh triangle candidates and return the owning
 `LSMeshCollider` once. Convex mesh source sweeps also support concave mesh
 targets by testing only target triangles inside the source swept bounds and
 reducing hits back to the target owner.
 
-`MeshColliderMode.Convex` is an enforced geometry contract, not an optimization
-hint. Construction accepts either one connected, consistently wound, closed
+### Convex Volume and Triangle Surfaces
+
+`MeshColliderMode.Convex` enforces a geometry contract. Construction accepts either one connected, consistently wound, closed
 convex manifold shell or one connected, consistently wound, open coplanar
 triangulation that fills a single convex polygon. It rejects unused vertices,
 duplicate faces, disconnected components, non-manifold edges, inconsistent
@@ -304,6 +321,8 @@ Prefer `Convex` when the authored geometry satisfies its enforced contract;
 otherwise use deterministic convex decomposition, authored compound proxies, or
 partitioned static concave surfaces for competitive runtime paths.
 
+### Closest Points and Projected Overlaps
+
 Mesh closest-surface queries always return a point on an authored triangle. They
 seed an exact upper-bound candidate, query the local triangle BVH inside a
 conservative cube that contains every point capable of improving that bound, and
@@ -319,18 +338,29 @@ Projected overlap queries classify exact X/Z geometry and retain that real 3D
 anchor; clipped broad-phase boxes and invented coordinates are never
 narrow-phase substitutes.
 
-This validation is intentionally breaking for assets that previously selected
+For existing mesh assets, this validation is intentionally breaking for those
+that previously selected
 `Convex` despite violating its geometry contract. Author raw terrain, triangle
 soups, bent open surfaces, and nonconvex shells as `Concave`; use deterministic
 convex decomposition when a moving or support-mapped collider needs multiple
 convex parts.
 
-Runtime meshes preserve the authored transformation before rounding:
-`poseOrigin + placementRotation * (localOffset * ownerScale)
+### Authored Mesh Placement and Scale
 
-- geometryRotation * ((sourcePoint - authoredBoundsCenter) * ownerScale *
-  partScale)`. For a standalone collider both rotations are its committed rotation, part scale is one, and the default local offset is the authored bounds center. A compound part places its center using its parent's rotation and owner scale; geometry uses the existing normalized combined rotation and both scale factors. Direct `PhysicsMesh`
-  placement specifies the centered mesh reference instead.
+Runtime meshes preserve the authored transformation before rounding.
+
+```text
+poseOrigin
++ placementRotation * (localOffset * ownerScale)
++ geometryRotation * ((sourcePoint - authoredBoundsCenter)
+                      * ownerScale * partScale)
+```
+
+For a standalone collider, both rotations are its committed rotation, part
+scale is one, and the default local offset is the authored bounds center.
+A compound part places its center using its parent's rotation and owner scale.
+Its geometry uses the normalized combined rotation and both scale factors.
+Direct `PhysicsMesh` placement specifies the centered mesh reference.
 
 Scale products, reference subtraction and placement remain exact through finite
 collision/query admission and selection. Only final physical witnesses are
@@ -362,6 +392,8 @@ construction stays in the authoritative rigid frame.
 Direct `PhysicsMesh` transform APIs retain this strict validation contract.
 Compound-part authoring reaches the same mesh path only after
 `CompoundColliderPart` has normalized its stored local orientation.
+
+### Topology, Bounds Index, and Mass Properties
 
 Source vertices, triangle indices, authored face normals, convex SAT edge
 topology, and support topology are immutable and exposed only through read-only
@@ -416,14 +448,13 @@ collision dispatch should not fall through to accidental mixed response.
 
 ## Source Map
 
-| Area                   | Source                                                                                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3D colliders           | [`src/Gravitas/Colliders/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/3D)                                           |
-| 2D colliders           | [`src/Gravitas/Colliders/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/2D)                                           |
-| Shape definitions      | [`src/Gravitas/Colliders/Definitions`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/Definitions)                         |
-| Compound parts         | [`src/Gravitas/Colliders/Compound`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/Compound)                               |
-| Collider state helpers | [`src/Gravitas/Colliders/State`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/State)                                     |
-| 3D detection           | [`src/Gravitas/CollisionHandling/Detection/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection/3D)       |
-| 2D detection           | [`src/Gravitas/CollisionHandling/Detection/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection/2D)       |
-| Mixed detection        | [`src/Gravitas/CollisionHandling/Detection/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection/Mixed) |
-| Mesh support           | [`src/Gravitas/Colliders/Mesh`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/Mesh)                                       |
+- [3D colliders](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/3D)
+- [2D colliders](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/2D)
+- [Shape definitions](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/Definitions)
+- [Compound parts](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/Compound)
+- [Collider state helpers](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/State)
+- [3D detection](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection/3D)
+- [2D detection](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection/2D)
+- [Mixed detection](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Detection/Mixed)
+- [Mesh support](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Colliders/Mesh)
+- [Collider reconfiguration tests](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/Core/SolidBodyColliderReconfigurationTests.cs)

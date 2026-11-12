@@ -1,26 +1,42 @@
 # Collision Response
 
-Response converts contact manifolds into deterministic body motion, trigger and
-contact events, warm-start caches, sleep/wake state, and cleanup. 3D, 2D, and
-mixed response share ordering principles while keeping dimensional math
-explicit.
+Collision response turns contact data into changes to motion. For a solid
+contact, the solver can push bodies apart, reduce sliding, or produce a
+bounce. The [collision pipeline](COLLISION_PIPELINE.md) explains how the
+contact reaches the solver.
 
 ## Quick Read
 
-- Narrow phase writes pair-owned contact manifolds.
-- Bodyless trigger volumes skip physical response and emit trigger events for
-  valid trigger/body pairs.
-- Non-trigger bodyless geometry is an immobile response participant in 3D and
-  pure 2D, contributing shape and material without body state or solver mass.
-- Non-trigger pairs are solved with enabled joints in deterministic body
-  islands.
-- 3D response uses 3D mass, inertia tensors, contact arms, and tangent frames.
-- 2D response uses planar mass, scalar moment, and scalar yaw.
-- Mixed response constrains 2D participants to planar X/Z motion and scalar yaw.
-- Warm-start caches are pair-local and keyed by stable contact identity.
-- Sleep updates after response.
+A radius-0.5 sphere at center position `y = 0.5` touches a floor with its
+top at `y = 0`. The contact normal lets the solver oppose downward motion.
+Friction can oppose motion along the floor. A bodyless floor supplies
+geometry and material and stays immobile.
+
+If a trigger volume and the same sphere pass pair filtering and overlap,
+Gravitas dispatches trigger callbacks. The overlap applies no physical
+impulse to the sphere.
+
+```mermaid
+flowchart TB
+    accTitle: Physical contact and trigger overlap
+    accDescr: The floor supplies a contact for the solver to oppose downward motion. An eligible trigger overlapping the sphere dispatches trigger callbacks without applying an impulse.
+    Sphere["Sphere meets another collider"]
+    Sphere -->|"Solid floor"| Solve["Solver opposes<br/>downward motion"]
+    Sphere -->|"Trigger volume"| Notify["Dispatch trigger callbacks"]
+```
+
+To inspect the data used for response, start with
+[contact manifolds](#contact-manifolds). Check [materials](#materials) for
+friction and bounce, [response islands](#response-islands) for connected
+bodies, and [notifications](#notifications) for which callbacks fire.
 
 ## Contact Manifolds
+
+A manifold describes where two shapes meet. The sphere and floor example
+uses a single contact point. Wider contact regions can retain several points
+to give the solver useful leverage against rotation.
+
+### 3D Contact Groups
 
 The 3D narrow phase writes a `ContactManifold` owned by the `CollisionPair`.
 `ManifoldContact` stores:
@@ -48,6 +64,8 @@ carry distinct normals at exact touch. Rotational CCD selects a closing impact
 row using the sampled bodies' contact-point velocities, rather than assuming the
 deepest row is the impact witness.
 
+### Inspecting a 3D Manifold
+
 `Count`, the indexer and enumeration expose flattened group/point order;
 `GroupCount`, `GetGroupStartIndex` and `GetGroupContactCount` support
 inspection. There is no fixed pair-wide group or sample cap. Flattened order
@@ -60,6 +78,8 @@ on demand and remains with the pair after reset or pooling. First-ever capacity
 growth can allocate; regeneration at a retained high-water mark does not. Warm
 starts follow the same grouped ownership and are pruned after narrow-phase
 regeneration, including when response is skipped.
+
+### 2D Contact Groups
 
 2D narrow phase writes `ContactManifold2D` into `CollisionPair2D`. It retains up
 to `ContactManifold2D.MaxContactsPerGroup` (two) samples per geometric surface
@@ -78,6 +98,12 @@ not contact data.
 
 ## Response Islands
 
+An island is a group of bodies connected by contact or joints. The solver
+handles the connected constraints together. An immobile floor shared by
+otherwise unrelated bodies does not merge their islands.
+
+### Which Bodies Solve Together?
+
 After active partitions distribute candidates, the owning physics service sorts
 queued response pairs by stable pair key and combines them with enabled joints:
 
@@ -93,6 +119,8 @@ single-row 3D scenes stay on a direct response path when no active joints exist.
 A lone 3D pair with multiple points uses the configured iteration budget, as
 does the public `CollisionResponse.CalculateImpulse` entry point. The 2D owner
 keeps its own dimensional scheduling policy.
+
+### Iteration Budget and Joint Repair
 
 Multi-constraint islands run a bounded number of iterations from
 `PhysicsSettings.DiscreteSolverIterations`. Cached warm-start impulses and
@@ -161,6 +189,8 @@ Non-trigger 3D response:
 8. stores each row's normal/tangent impulses independently. A failed velocity
    representability preflight clears only that row's cache; other rows continue.
 
+### Contact Normals and Multi-Point Loads
+
 Admitted nonzero normals are authoritative. Collider-center direction is a
 fallback only for a genuinely zero legacy normal. Contained sphere contacts with
 finite cones/cylinders retain the solid's outward escape normal and sphere's
@@ -182,6 +212,8 @@ shares one normal direction, the deepest depth on each interface can also
 drive one coupled translation correction. The ordinary sequential path
 handles restitution, constrained motion, larger islands, and cases where the
 coupled state cannot be prepared within the numeric limits.
+
+### Torque Arms and Friction Precision
 
 3D response torque arms are measured from `SolidBody.WorldCenterOfMass`.
 Collider centers remain collision-geometry references for narrow phase, culling,
@@ -288,6 +320,8 @@ separate tuning knobs.
 non-kinematic body can sleep after linear and angular speed remain at or below
 explicit thresholds for `SleepFrameThreshold` fixed frames.
 
+### How an Island Goes to Sleep
+
 At the end of a managed late physics step, automatic sleep waits for every
 movable body in a connected component to meet its own quiet threshold or
 already be asleep. A member with sleep disabled keeps the component awake.
@@ -300,6 +334,8 @@ Explicit `Sleep()` and `Wake()` operate on the requested body immediately.
 Sleeping clears accumulated force, velocity, torque, acceleration, and pending
 position-correction state, but does not remove the collider from GridForge
 partitions.
+
+### What Wakes a Body?
 
 Deterministic wake stimuli include:
 
@@ -334,6 +370,8 @@ must not overwrite that state or continue preparing the old lifetime's motion.
 
 ## Notifications
 
+### Retaining Contact Pairs
+
 Unused colliders retain lazy pair-lookup storage. First contact prepares both
 owner and holder lookup roles, so a later role reversal can reuse that storage.
 Spatial registration reserves a return-stack baseline proportional to collider
@@ -363,11 +401,15 @@ Pure 2D and mixed pair cleanup uses the context's late-step token for contact
 freshness. `LastFrame` continues to describe the public frame clock; repeated
 `LateSimulate()` calls without `Simulate()` still perform separation cleanup.
 
+### Which Callbacks Fire?
+
 `LSCollider.NotifyContact(...)` and `LSCollider2D.NotifyContact(...)` emit:
 
 - `OnTriggerEnter`, `OnTriggerStay`, and `OnTriggerExit` when exactly one
-  collider is a trigger volume and the non-trigger collider is body-owned. Both
-  colliders in the pair receive the trigger callback.
+  collider is a trigger volume and the non-trigger collider is body-owned.
+  Both colliders are eligible to receive the callback. During enter or stay,
+  the first callback can deactivate a participant or cause separation, which
+  skips the second active-contact notification.
 - `OnContactEnter`, `OnContact`, and `OnContactExit` for body contacts.
 
 Contact callbacks receive the other `SolidBody` or `SolidBody2D`. A bodyless
@@ -393,14 +435,14 @@ data, response behavior, or replay state.
 
 ## Source Map
 
-| Area            | Source                                                                                                                                         |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3D contact data | [`src/Gravitas/CollisionHandling/Contacts/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Contacts/3D)       |
-| 2D contact data | [`src/Gravitas/CollisionHandling/Contacts/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Contacts/2D)       |
-| Mixed contacts  | [`src/Gravitas/CollisionHandling/Contacts/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Contacts/Mixed) |
-| 3D response     | [`src/Gravitas/CollisionHandling/Response/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response/3D)       |
-| 2D response     | [`src/Gravitas/CollisionHandling/Response/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response/2D)       |
-| Mixed response  | [`src/Gravitas/CollisionHandling/Response/Mixed`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response/Mixed) |
-| Materials       | [`src/Gravitas/Materials`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Materials)                                               |
-| 3D constraints  | [`src/Gravitas/Constraints/3D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/3D)                                     |
-| 2D constraints  | [`src/Gravitas/Constraints/2D`](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/2D)                                     |
+- [3D contact data](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Contacts/3D)
+- [2D contact data](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Contacts/2D)
+- [Mixed contacts](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Contacts/Mixed)
+- [3D response](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response/3D)
+- [2D response](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response/2D)
+- [Mixed response](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/CollisionHandling/Response/Mixed)
+- [Materials](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Materials)
+- [3D constraints](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/3D)
+- [2D constraints](https://github.com/mrdav30/Gravitas/tree/main/src/Gravitas/Constraints/2D)
+- [Sphere and floor tests](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/CollisionHandling/BodylessStaticResponseTests.cs)
+- [Trigger tests](https://github.com/mrdav30/Gravitas/blob/main/tests/Gravitas.Tests/Colliders/ColliderTriggerTests.cs)

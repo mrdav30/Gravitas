@@ -1,16 +1,29 @@
 # Workload And Tuning
 
-Size a Gravitas world against the work it performs during a tick. Registered
-bodies determine the population the context manages. Awake bodies, their local
-contact density, partition coverage, and scheduled host work determine how much
-of that population becomes expensive in a given frame.
+Start by measuring the busiest tick your host needs to support. In a strategy
+scene with 1,024 registered actors, a quiet frame and a crowded frame can have
+very different costs. The difference depends on how many actors are awake,
+how many contacts they create, how many partitions they cover, and which
+host work runs that tick.
+
+Set a time budget first. Then replay the same scene while changing one
+setting at a time, checking both timing and the resulting physics.
 
 ## Set The Host Budget
 
 The fixed interval in milliseconds is `1000 / tick rate`. At 60 Hz it is
 16.67 ms. If the host reserves 5 ms for work outside the measured scenario,
 the scenario has 11.67 ms available. Choose the reserve and the tolerated
-miss rate from the application’s own latency requirements.
+miss rate from the application's own latency requirements. For example, a
+12 ms scenario frame fits the full 60 Hz interval but exceeds the 11.67 ms
+budget with that reserve.
+
+```mermaid
+flowchart TB
+    accTitle: Example timing budget at 60 Hz
+    accDescr: A 60 hertz tick lasts about 16.67 milliseconds. Reserving 5 milliseconds for other host work leaves 11.67 milliseconds for the scenario.
+    Tick["60 Hz tick: 16.67 ms"] -->|"Reserve 5 ms for other work"| Budget["Scenario budget: 11.67 ms"]
+```
 
 Measure two windows on the target host:
 
@@ -57,14 +70,17 @@ coverage and lookup costs. Larger cells can increase candidate and contact
 work even when partition refresh gets cheaper. Measure both before choosing.
 [Collision Broad Phase](COLLISION_BROAD_PHASE.md)
 
+### Example Capture At 60 Hz
+
 One 60 Hz synthetic strategy scene used pure 2D circles and boxes or pure 3D
 spheres and boxes, manual grounding, six discrete solver iterations, and CCD
 on the scheduled projectiles. The capture used a Windows x64 Core i7-9700K
 and .NET 10 Release.
-Two fresh processes per configuration each contributed 10,240 frames after
-four complete warmup cycles. The active scene used up to 32 awake actors per
-256 registered actors. These measurements provide a reference for similar
-scenes on that host.
+Each configuration pooled 20,480 measured frames from two fresh processes
+after four complete warmup cycles per process. The active scene used up to
+32 awake actors per 256 registered actors.
+[Capture protocol](https://github.com/mrdav30/Gravitas/blob/bb84d8552c422442de965961d40914d5299505de/docs/feature-work/done/2026-10-06-evolving-game-capacity-and-soak-plan.md#soak-protocol) ·
+[Warmed frame results](https://github.com/mrdav30/Gravitas/blob/bb84d8552c422442de965961d40914d5299505de/docs/feature-work/done/2026-10-06-evolving-game-capacity-and-soak-plan.md#warmed-frame-tails)
 
 | Configuration | Warmed scenario p99 | Warmed misses of 16.67 ms |
 | --- | ---: | ---: |
@@ -75,13 +91,16 @@ scenes on that host.
 | 3D, 1,024 actors, X/Z 16 and Y 4 | 12.28 ms | 3 / 20,480 |
 
 In the 1,024-actor 3D scene, 16-unit cells improved **crowded** warmed p99
-from 15.96 to 12.66 ms and retained about 2.9 MiB more managed heap. The first
-synchronized wake at 16 units missed 60 Hz in all six fresh-context comparisons,
-while the warmed wake bursts fit at both sizes. Four-unit cells missed every
+from 15.96 to 12.66 ms and retained about 2.9 MiB more managed heap.
+[Warmed frame results](https://github.com/mrdav30/Gravitas/blob/bb84d8552c422442de965961d40914d5299505de/docs/feature-work/done/2026-10-06-evolving-game-capacity-and-soak-plan.md#warmed-frame-tails) ·
+[Retained memory results](https://github.com/mrdav30/Gravitas/blob/bb84d8552c422442de965961d40914d5299505de/docs/feature-work/done/2026-10-06-evolving-game-capacity-and-soak-plan.md#retained-managed-memory)
+
+The first synchronized wake at 16 units missed 60 Hz in all six fresh-context
+comparisons, while the warmed wake bursts fit at both sizes. Four-unit cells missed every
 crowded frame in the short comparison. Keep 8 as the reference for this scene.
 Compare 16 if sustained crowd cost matters and first-use latency and memory fit
 your host budget. At the example 11.67 ms budget, both 1,024-actor 3D settings
-exceed the crowded p99 target.
+exceed the crowded p99 target. [Fresh-context cell-size comparison](https://github.com/mrdav30/Gravitas/blob/bb84d8552c422442de965961d40914d5299505de/docs/feature-work/done/2026-10-06-evolving-game-capacity-and-soak-plan.md#matched-1024-actor-3d-xz-cell-sizes)
 
 ## Tune One Policy At A Time
 
@@ -123,9 +142,12 @@ group sleeps between disturbances and wakes together. Compare replay within
 each setting and use complete-step timings to check the host's reserved
 physics budget. [Collision Response](COLLISION_RESPONSE.md)
 
+### Example Solver-Pass Comparison
+
 In an eight-second 60 Hz pass sweep on a Windows x64 Core i7-9700K with
 .NET 10 Release, the same spatial fixtures produced these ranges of
-per-launch full-step p95 values after the first second:
+per-launch full-step p95 values after the first second.
+[Duration quality measurements](https://github.com/mrdav30/Gravitas/blob/bb84d8552c422442de965961d40914d5299505de/docs/feature-work/done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#duration-quality-at-2612-passes)
 
 | Fixture | 2 passes | 6 passes | 12 passes | Physical result |
 | --- | ---: | ---: | ---: | --- |
@@ -147,6 +169,7 @@ full-interval overruns, with worst steps of 21.53 ms at 32 Hz and
 16.62 ms at 60 Hz. The 60 Hz result leaves about 0.04 ms before any
 additional host work. Measure the recovery frames and the host reserve
 when choosing a rate.
+[Supported spatial ragdoll measurements](https://github.com/mrdav30/Gravitas/blob/bb84d8552c422442de965961d40914d5299505de/docs/feature-work/done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md#grv-benchmark-038-closeout)
 
 ## Check Save And Populate Continuation
 
