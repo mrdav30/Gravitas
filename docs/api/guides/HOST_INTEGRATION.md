@@ -802,6 +802,11 @@ those two poses when continuous collision is enabled. The first static-style
 blocker clips the kinematic pose and writes the clipped transform back to the
 host binding.
 
+In 2D, `SolidBody2D.Rotation` is the accepted scalar yaw. If the host
+orientation still represents that yaw, idle and translation-only steps
+preserve the scalar exactly. Gravitas projects a changed host orientation
+onto X/Z to obtain a new rotation target.
+
 For scenario budgets, partition comparisons, and long-session measurements,
 see [Workload And Tuning](WORKLOAD_TUNING.md).
 

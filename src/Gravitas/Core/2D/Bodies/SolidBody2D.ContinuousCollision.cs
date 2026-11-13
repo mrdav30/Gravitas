@@ -197,7 +197,7 @@ public sealed partial class SolidBody2D
                     out _)
                 : targetPosition - startPosition;
 
-            Fixed64 targetRotation = CanonicalizeRotation(Agent.Transform.WorldRotationXZRadians);
+            Fixed64 targetRotation = ReadHostRotation(Agent.Transform);
             angularDelta = CanonicalizeRotation(targetRotation - startRotation);
             angularVelocity = angularDelta / Context.DeltaTime;
         }

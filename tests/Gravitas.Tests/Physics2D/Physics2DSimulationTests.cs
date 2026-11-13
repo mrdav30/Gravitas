@@ -13,6 +13,107 @@ namespace Gravitas.Tests.Physics2D;
 public sealed class Physics2DSimulationTests
 {
     [Fact]
+    public void KinematicYaw_ShouldPreserveTheExactInitialAngleWithoutAHostRotationEdit()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 16);
+        Fixed64 yaw = Fixed64.FromRaw(123456789);
+        SolidBody2D body = CreateKinematicCircle(context, Vector2d.Zero, yaw);
+        FixedTransform transform = body.Agent.Transform;
+        Vector3d start = transform.WorldPosition;
+        FixedQuaternion rotation = transform.WorldRotation;
+
+        for (int frame = 0; frame < 12; frame++)
+        {
+            Step(context);
+
+            body.Rotation.Should().Be(yaw, "the host did not request a rotation on frame {0}", frame + 1);
+            body.Collider.Rotation.Should().Be(yaw);
+            body.Position.Should().Be(Vector2d.Zero);
+            transform.WorldPosition.Should().Be(start);
+            transform.WorldRotation.Should().Be(rotation);
+        }
+
+        transform.LocalRotation = -rotation;
+        Step(context);
+        body.Rotation.Should().Be(yaw);
+        body.Collider.Rotation.Should().Be(yaw);
+
+        AllocationTestHelper.MeasureSteadyState(() => Step(context)).Should().Be(0);
+        body.Rotation.Should().Be(yaw);
+    }
+
+    [Fact]
+    public void KinematicYaw_ShouldSurviveClippedTranslationAndAcceptANewHostRotation()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 16);
+        _ = CreateBodylessCircle(context, Vector2d.Zero);
+        Fixed64 yaw = Fixed64.FromRaw(123456789);
+        SolidBody2D body = CreateKinematicCircle(context, -Vector2d.Right * (Fixed64)4, yaw);
+        FixedTransform transform = body.Agent.Transform;
+        Fixed64 hostY = transform.WorldPosition.Y;
+        transform.LocalPositionXZ = Vector2d.Right * (Fixed64)4;
+
+        Step(context);
+
+        body.Position.Should().Be(-Vector2d.Right);
+        body.Rotation.Should().Be(yaw);
+        body.Collider.Rotation.Should().Be(yaw);
+        transform.WorldPosition.Should().Be(body.Position.ToVector3d(hostY));
+
+        transform.LocalRotationXZRadians = Fixed64.FromRaw(-500000000);
+        Fixed64 authoredProjection = transform.WorldRotationXZRadians;
+        authoredProjection.Should().NotBe(yaw);
+        Step(context);
+        body.Rotation.Should().Be(authoredProjection);
+        body.Collider.Rotation.Should().Be(authoredProjection);
+
+        Vector2d retreat = -Vector2d.Right * (Fixed64)2;
+        transform.LocalPositionXZ = retreat;
+        Step(context);
+        Step(context);
+        body.Position.Should().Be(retreat);
+        body.Rotation.Should().Be(authoredProjection);
+        body.Collider.Rotation.Should().Be(authoredProjection);
+        transform.WorldPosition.Should().Be(retreat.ToVector3d(hostY));
+    }
+
+    [Fact]
+    public void KinematicYaw_ShouldPreservePublishedParentedPoseAndAcceptAParentRotationEdit()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 16);
+        Fixed64 yaw = Fixed64.FromRaw(123456789);
+        var parent = new FixedTransform(Vector3d.Zero,
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.FromRaw(500000000)), Vector3d.One);
+        var transform = new FixedTransform(Vector3d.Up * (Fixed64)7, FixedQuaternion.Identity, Vector3d.One, parent);
+        var body = new SolidBody2D(new TestMatterAgent(context, transform), new LSCircleCollider2D(Fixed64.Half))
+        {
+            Mass = Fixed64.One,
+            ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
+        };
+        body.Initialize(Vector2d.Zero, yaw);
+        body.SetMotionType(PhysicsMobilityType.Kinematic);
+        FixedQuaternion published = transform.WorldRotation;
+
+        Step(context);
+        Step(context);
+
+        body.Rotation.Should().Be(yaw);
+        body.Collider.Rotation.Should().Be(yaw);
+        transform.WorldRotation.Should().Be(published);
+
+        parent.LocalRotationXZRadians = Fixed64.FromRaw(-1000000000);
+        Fixed64 authoredProjection = transform.WorldRotationXZRadians;
+        authoredProjection.Should().NotBe(yaw);
+        Step(context);
+        Step(context);
+
+        body.Rotation.Should().Be(authoredProjection);
+        body.Collider.Rotation.Should().Be(authoredProjection);
+        body.Position.Should().Be(Vector2d.Zero);
+        transform.WorldPosition.Should().Be(Vector3d.Up * (Fixed64)7);
+    }
+
+    [Fact]
     public void LateSimulate_ShouldIntegratePure2DForceVelocityAndPosition()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 4);
@@ -405,6 +506,19 @@ public sealed class Physics2DSimulationTests
     {
         context.Simulate();
         context.LateSimulate();
+    }
+
+    private static SolidBody2D CreateKinematicCircle(GravitasWorldContext context, Vector2d center, Fixed64 yaw)
+    {
+        var transform = new FixedTransform(center.ToVector3d((Fixed64)7),
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, -yaw), Vector3d.One);
+        var body = new SolidBody2D(new TestMatterAgent(context, transform), new LSCircleCollider2D(Fixed64.Half))
+        {
+            Mass = Fixed64.One,
+            ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
+        };
+        body.Initialize(center, yaw, PhysicsMobilityType.Kinematic);
+        return body;
     }
 
     private static SolidBody2D CreateCircle(

@@ -1730,6 +1730,18 @@ public sealed partial class ContinuousCollision2DTests
 
         blade.Rotation.Should().BeLessThan(FixedMath.DegToRad((Fixed64)90));
         blade.LastContinuousCollisionToiIterationCount.Should().Be(1);
+
+        Fixed64 clippedYaw = blade.Rotation;
+        FixedQuaternion publishedRotation = blade.Agent.Transform.WorldRotation;
+        for (int frame = 0; frame < 3; frame++)
+        {
+            context.Simulate();
+            context.LateSimulate();
+
+            blade.Rotation.Should().Be(clippedYaw);
+            blade.Collider.Rotation.Should().Be(clippedYaw);
+            blade.Agent.Transform.WorldRotation.Should().Be(publishedRotation);
+        }
     }
 
     [Theory]

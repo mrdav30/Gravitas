@@ -285,6 +285,30 @@ public sealed class SolidBody2DSerializationTests
 
     [Theory]
     [MemberData(nameof(Transports))]
+    public void Populate_WithKinematicYaw_ShouldPreserveTheRestoredAngleAcrossTheNextStep(
+        GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 16);
+        Fixed64 yaw = Fixed64.FromRaw(123456789);
+        SolidBody2D source = CreateCircle(sourceContext, PhysicsMobilityType.Kinematic);
+        source.SetRotation(yaw);
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 16);
+        SolidBody2D target = CreateCircle(targetContext, PhysicsMobilityType.Kinematic);
+        GravitasSerializationHarness.Populate(target, payload, transport);
+        target.Rotation.Should().Be(yaw);
+
+        targetContext.Simulate();
+        targetContext.LateSimulate();
+
+        target.Rotation.Should().Be(yaw);
+        target.Collider.Rotation.Should().Be(yaw);
+        target.Position.Should().Be(Vector2d.Zero);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
     public void Populate_ShouldRestoreAuthoritativeBodyAndColliderState(GravitasSerializationTransport transport)
     {
         using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);

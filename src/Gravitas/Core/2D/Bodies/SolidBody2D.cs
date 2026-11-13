@@ -23,6 +23,8 @@ public sealed partial class SolidBody2D : IRecordable
 {
     private Vector2d _position;
     private Fixed64 _rotation;
+    private Fixed64 _hostYawRotation;
+    private FixedQuaternion _hostYaw = FixedQuaternion.Identity;
     private Vector2d _linearVelocity;
     private Vector2d _linearAccelerationStore;
     private Vector2d _deltaAcceleration;
@@ -814,9 +816,6 @@ public sealed partial class SolidBody2D : IRecordable
         Vector2d startPosition = _position;
         Fixed64 startRotation = _rotation;
         FixedTransform transform = Agent.Transform;
-        Vector2d requestedHostPosition = transform.WorldPositionXZ;
-        Fixed64 requestedHostRotation = CanonicalizeRotation(
-            transform.WorldRotationXZRadians);
         Vector2d kinematicPosition = ContinuousCollisionFrameEnd;
         Fixed64 kinematicRotation = ContinuousCollisionFrameTargetRotation;
         if (startPosition == kinematicPosition && startRotation == kinematicRotation)
@@ -825,6 +824,8 @@ public sealed partial class SolidBody2D : IRecordable
             return;
         }
 
+        Vector2d requestedHostPosition = transform.WorldPositionXZ;
+        Fixed64 requestedHostRotation = ReadHostRotation(transform);
         Wake();
         Vector2d resolvedPosition = kinematicPosition;
         Fixed64 resolvedRotation = kinematicRotation;
@@ -861,16 +862,40 @@ public sealed partial class SolidBody2D : IRecordable
     private static Fixed64 CanonicalizeRotation(Fixed64 rotation) =>
         PlanarRotation.Canonicalize(rotation);
 
-    private static void SetHostWorldPose(
+    private Fixed64 ReadHostRotation(FixedTransform transform)
+    {
+        FixedQuaternion localYaw = GetHostYaw(_rotation);
+        // Match the parent-relative orientation written by FixedTransform.TrySetWorldPose.
+        if (transform.Parent is FixedTransform parent)
+            localYaw = (parent.WorldRotation.Inverse() * localYaw).Normalized;
+
+        // The host pose can already represent the accepted scalar even when atan2 would round it differently.
+        FixedQuaternion localRotation = transform.LocalRotation;
+        if (localRotation == localYaw || localRotation == -localYaw)
+            return _rotation;
+
+        return CanonicalizeRotation(transform.WorldRotationXZRadians);
+    }
+
+    private FixedQuaternion GetHostYaw(Fixed64 rotation)
+    {
+        if (_hostYawRotation != rotation)
+        {
+            _hostYaw = FixedQuaternion.FromAxisAngle(Vector3d.Up, -rotation).Normalized;
+            _hostYawRotation = rotation;
+        }
+        return _hostYaw;
+    }
+
+    private void SetHostWorldPose(
         FixedTransform transform,
         Vector2d position,
         Fixed64 rotation)
     {
         Vector3d currentWorldPosition = transform.WorldPosition;
         Vector3d worldPosition = new(position.X, currentWorldPosition.Y, position.Y);
-        FixedQuaternion worldRotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, -rotation);
         ChronicleGuard.ThrowIfTrue(
-            !transform.TrySetWorldPose(worldPosition, worldRotation),
+            !transform.TrySetWorldPose(worldPosition, GetHostYaw(rotation)),
             nameof(FixedTransform),
             "Host transform cannot represent the requested world-space 2D pose.");
     }
