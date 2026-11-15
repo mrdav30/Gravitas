@@ -26,6 +26,9 @@ public sealed class GravitasConstraint2DService
     private readonly SwiftDictionary<SolidBody2D, RagdollRuntime2D> _ragdollByBody = new();
     private readonly SwiftDictionary<int, RagdollRuntime2D> _ragdollsById = new();
     private readonly SwiftDictionary<ulong, int> _suppressedColliderPairs = new();
+
+    internal ulong LinkedCollisionProbeLimit => _suppressedColliderPairs.Count == 0
+        ? 0 : _suppressedColliderPairs.LookupProbeLimit;
     private Joint2D?[] _joints = new Joint2D?[DefaultJointCapacity];
     private RagdollRuntime2D? _firstRagdoll;
     private RagdollRuntime2D? _lastRagdoll;
@@ -294,7 +297,8 @@ public sealed class GravitasConstraint2DService
         if (colliderA.Id < 0 || colliderB.Id < 0 || colliderA.Id == colliderB.Id)
             return false;
 
-        return _suppressedColliderPairs.ContainsKey(CreateColliderPairKey(colliderA.Id, colliderB.Id));
+        return _suppressedColliderPairs.Count != 0
+            && _suppressedColliderPairs.ContainsKey(CreateColliderPairKey(colliderA.Id, colliderB.Id));
     }
 
     internal bool TryGetJointForSolver(int jointId, out Joint2D? joint)

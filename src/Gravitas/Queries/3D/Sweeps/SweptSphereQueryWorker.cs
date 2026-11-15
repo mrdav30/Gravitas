@@ -81,8 +81,7 @@ public sealed class SweptSphereQueryWorker
 
         try
         {
-            if (_length <= Fixed64.Epsilon
-                || !SweepBoundsUtility.OverlapsInclusive(_sweptBoundsMin, _sweptBoundsMax, collider.BoundsMin, collider.BoundsMax))
+            if (_length <= Fixed64.Epsilon || !BoundsOverlap(collider))
             {
                 return false;
             }
@@ -112,6 +111,9 @@ public sealed class SweptSphereQueryWorker
             _sweepDepth--;
         }
     }
+
+    internal bool BoundsOverlap(LSCollider collider) =>
+        SweepBoundsUtility.OverlapsInclusive(_sweptBoundsMin, _sweptBoundsMax, collider.BoundsMin, collider.BoundsMax);
 
     private bool TrySweepSphere(
         Vector3d center,

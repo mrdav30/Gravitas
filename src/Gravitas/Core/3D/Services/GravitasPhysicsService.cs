@@ -53,6 +53,8 @@ public sealed partial class GravitasPhysicsService
     private readonly SwiftList<StaticSurface> _staticSurfaces = new();
     private bool _collisionPositionPublicationPending;
 
+    internal bool IsCollisionPositionPublicationPending => _collisionPositionPublicationPending;
+
     /// <summary>
     /// Initializes a new physics service for the supplied context.
     /// </summary>

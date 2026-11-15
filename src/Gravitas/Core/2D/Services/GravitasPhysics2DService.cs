@@ -274,6 +274,8 @@ public sealed partial class GravitasPhysics2DService
 
     private bool _collisionPositionPublicationPending;
 
+    internal bool IsCollisionPositionPublicationPending => _collisionPositionPublicationPending;
+
     internal void MarkCollisionPositionPublicationPending() => _collisionPositionPublicationPending = true;
 
     internal void PublishCollisionPositionStates()

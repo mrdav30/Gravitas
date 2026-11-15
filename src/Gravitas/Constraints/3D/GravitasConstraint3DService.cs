@@ -297,8 +297,13 @@ public sealed class GravitasConstraint3DService
         if (colliderA.Id < 0 || colliderB.Id < 0 || colliderA.Id == colliderB.Id)
             return false;
 
-        return _suppressedColliderPairs.ContainsKey(CreateColliderPairKey(colliderA.Id, colliderB.Id));
+        return _suppressedColliderPairs.Count != 0
+            && _suppressedColliderPairs.ContainsKey(CreateColliderPairKey(colliderA.Id, colliderB.Id));
     }
+
+    internal ulong LinkedCollisionProbeLimit => _suppressedColliderPairs.Count == 0
+        ? 0
+        : _suppressedColliderPairs.LookupProbeLimit;
 
     internal bool TryGetJointForSolver(int jointId, out Joint3D? joint)
     {

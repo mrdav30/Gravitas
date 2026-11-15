@@ -1,0 +1,129 @@
+using FixedMathSharp;
+using Gravitas.Colliders;
+using Gravitas.Queries;
+using Gravitas.Support;
+using Gravitas.Tests.Support;
+using GridForge.Configuration;
+using Xunit;
+
+namespace Gravitas.Tests.Queries;
+
+public sealed class BoundedSweepSphereTests
+{
+    [Fact]
+    public void BoxFloorMatchesSynchronousSweepAndReplaysAtExactLimits()
+    {
+        using GravitasWorldContext context = CreateContext();
+        AddBoxFloor(context);
+        AddBoxFloor(context);
+        context.Simulate();
+        context.LateSimulate();
+
+        Assert.True(context.Query3D.SweepSphere(Vector3d.Up, Fixed64.Half,
+            Vector3d.Down, Fixed64.One, out Physics3DHit expected, PhysicsLayerMask.All));
+        Assert.Equal(Fixed64.Half, expected.Distance);
+        Assert.Equal(Vector3d.Zero, expected.Point);
+
+        var scratch = new PhysicsQueryScratch(512, 2);
+        var ample = new PhysicsQueryBudget(8192, 8192, 8192);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            Sweep(context, ample, scratch, out Physics3DHit? hit, out PhysicsQueryWork used));
+        Assert.Equal(expected, hit!.Value);
+
+        var exact = new PhysicsQueryBudget(used.Discovery, used.Candidates, used.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            Sweep(context, new PhysicsQueryBudget(used.Discovery, used.Candidates, used.Geometry - 1),
+                scratch, out hit, out PhysicsQueryWork failed));
+        Assert.Null(hit);
+        Assert.True(failed.Geometry < used.Geometry);
+
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            Sweep(context, new PhysicsQueryBudget(used.Discovery - 1, used.Candidates, used.Geometry),
+                scratch, out hit, out _));
+        Assert.Null(hit);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            Sweep(context, new PhysicsQueryBudget(used.Discovery, used.Candidates - 1, used.Geometry),
+                scratch, out hit, out _));
+        Assert.Null(hit);
+        Assert.Equal(PhysicsQueryExecutionStatus.ScratchCapacityExceeded,
+            Sweep(context, exact, new PhysicsQueryScratch(512, 1), out hit, out _));
+        Assert.Null(hit);
+
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            Sweep(context, exact, scratch, out hit, out PhysicsQueryWork replay));
+        Assert.Equal(expected, hit!.Value);
+        Assert.Equal(used, replay);
+    }
+
+    [Fact]
+    public void QueryWaitsForHostReconciliationAndDoesNotRunIt()
+    {
+        using GravitasWorldContext context = CreateContext();
+        AddBoxFloor(context);
+        context.Simulate();
+        context.LateSimulate();
+        Assert.True(context.World.TryAddGrid(
+            new GridConfiguration(new Vector3d(8, 8, 8), new Vector3d(12, 12, 12)), out _));
+
+        var scratch = new PhysicsQueryScratch(512, 1);
+        var ample = new PhysicsQueryBudget(8192, 8192, 8192);
+        for (int i = 0; i < 2; ++i)
+        {
+            Assert.Equal(PhysicsQueryExecutionStatus.WorldNotReady,
+                Sweep(context, ample, scratch, out Physics3DHit? hit, out PhysicsQueryWork work));
+            Assert.Null(hit);
+            Assert.Equal(default, work);
+        }
+
+        context.Simulate();
+        context.LateSimulate();
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            Sweep(context, ample, scratch, out Physics3DHit? recovered, out _));
+        Assert.Equal(Vector3d.Zero, recovered!.Value.Point);
+    }
+
+    [Fact]
+    public void UnprovedGeometryReturnsNoHitAndAnExcludedTargetLeavesTheFloor()
+    {
+        using GravitasWorldContext context = CreateContext();
+        AddBoxFloor(context);
+        var sphere = new LSSphereCollider { Radius = Fixed64.Half };
+        sphere.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        context.Simulate();
+        context.LateSimulate();
+
+        var scratch = new PhysicsQueryScratch(512, 2);
+        var ample = new PhysicsQueryBudget(8192, 8192, 8192);
+        Assert.Equal(PhysicsQueryExecutionStatus.UnsupportedGeometry,
+            Sweep(context, ample, scratch, out Physics3DHit? hit, out _));
+        Assert.Null(hit);
+
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            context.Query3D.SweepSphere(Vector3d.Up, Fixed64.Half, Vector3d.Down, Fixed64.One,
+                PhysicsLayerMask.All, sphere, ample, scratch, out hit, out _));
+        Assert.Equal(Vector3d.Zero, hit!.Value.Point);
+    }
+
+    private static PhysicsQueryExecutionStatus Sweep(
+        GravitasWorldContext context, PhysicsQueryBudget budget, PhysicsQueryScratch scratch,
+        out Physics3DHit? hit, out PhysicsQueryWork work) =>
+        context.Query3D.SweepSphere(Vector3d.Up, Fixed64.Half, Vector3d.Down, Fixed64.One,
+            PhysicsLayerMask.All, null, budget, scratch, out hit, out work);
+
+    private static GravitasWorldContext CreateContext()
+    {
+        GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.ThreeD;
+        Assert.True(context.World.TryAddGrid(
+            new GridConfiguration(new Vector3d(-4, -4, -4), new Vector3d(4, 4, 4)), out _));
+        return context;
+    }
+
+    private static void AddBoxFloor(GravitasWorldContext context)
+    {
+        var floor = new LSCuboidCollider { Size = new Vector3d(3, 1, 3) };
+        floor.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(-Vector3d.Up * Fixed64.Half, FixedQuaternion.Identity, Vector3d.One)));
+    }
+}

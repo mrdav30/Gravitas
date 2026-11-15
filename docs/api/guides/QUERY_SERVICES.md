@@ -440,6 +440,37 @@ the actor's host Y. As with other indexed queries, targets must be represented
 by physical grid cells. Candidate buffers are reused but may grow; this is a
 synchronous query without a hard work or allocation ceiling.
 
+## Bounded support queries
+
+The bounded overloads of `Query2D.QuerySupport` and `Query3D.SweepSphere`
+take a `PhysicsQueryBudget` and caller-owned `PhysicsQueryScratch`. Allocate
+the scratch during host setup and reuse it serially between complete fixed
+steps. The capacities are covered voxel references and unique collider IDs.
+The budget separately limits discovery inspections, candidate inspections,
+and geometry work. Scratch capacity and work exhaustion have distinct outcomes.
+
+The bounded 2D support query accepts box targets in a pure 2D world. The
+bounded directional 3D sphere sweep accepts cuboid targets in a pure 3D world.
+Both cover dense rectangular grids. Eligible geometry or grid storage outside
+those contracts can make the query incomplete. A complete result follows the
+corresponding synchronous query's hit selection, including its filters and
+ties. A `Completed` status with a null hit certifies a miss. Any other status
+clears the hit and reports the work already charged.
+
+The bounded query samples partitions at the host barrier and returns
+`WorldNotReady` when the world needs reconciliation. Advance the normal host
+step before retrying. A change to an acquired view returns `Stale`. Keep the
+query on the simulation thread and serialize it with world and collider
+mutation.
+
+Measured work can reflect physical storage history. For example, the query
+charges a conservative allowance for partition membership slots, including
+empty slots left by previous membership changes. Identical work and results
+assume the same registration and partition state as well as the same query
+inputs and limits. The counters describe bounded work and may include prepaid
+costs. Evaluate query and complete-step latency separately on representative
+workloads.
+
 ## Grid Changes And Query Readiness
 
 At stable between-frame boundaries, both dimensional indexes reconcile grid

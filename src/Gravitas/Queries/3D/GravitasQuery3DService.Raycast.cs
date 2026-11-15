@@ -187,9 +187,7 @@ public sealed partial class GravitasQuery3DService
             return false;
         }
 
-        Vector3d sweepDirection = direction.Normalized;
-        Vector3d requestedDisplacement = sweepDirection * maxDistance;
-        if (!Vector3d.TryAdd(origin, requestedDisplacement, out Vector3d end))
+        if (!TryGetSweepEndpoint(origin, direction, maxDistance, out Vector3d end))
         {
             ResetLastQueryCounters();
             sweepHit = default;
@@ -206,6 +204,10 @@ public sealed partial class GravitasQuery3DService
             sweepHit);
         return hit;
     }
+
+    private static bool TryGetSweepEndpoint(
+        Vector3d origin, Vector3d direction, Fixed64 maxDistance, out Vector3d end) =>
+        Vector3d.TryAdd(origin, direction.Normalized * maxDistance, out end);
 
     /// <summary>
     /// Sweeps a sphere between two points and writes hits from closest to farthest into caller-owned storage.
@@ -663,8 +665,7 @@ public sealed partial class GravitasQuery3DService
             return false;
         }
 
-        if (!Vector3d.TrySubtract(end, start, out Vector3d segment)
-            || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
+        if (!TryGetSweepSegment(start, end, out Vector3d segment, out Fixed64 segmentLength)
             || segmentLength <= Fixed64.Epsilon)
         {
             ResetLastQueryCounters();
@@ -681,6 +682,14 @@ public sealed partial class GravitasQuery3DService
         {
             EndQuery();
         }
+    }
+
+    private static bool TryGetSweepSegment(
+        Vector3d start, Vector3d end, out Vector3d segment, out Fixed64 segmentLength)
+    {
+        segmentLength = default;
+        return Vector3d.TrySubtract(end, start, out segment)
+            && Vector3d.TryGetMagnitude(segment, out segmentLength);
     }
 
     private bool TryFindClosestSweepHit(
@@ -823,10 +832,15 @@ public sealed partial class GravitasQuery3DService
         Vector3d direction,
         out Physics3DHit sweepHit)
     {
-        sweepHit = default;
-        bool found = _sweepWorker.TrySweep(collider, out Vector3d sweepCenter, out Fixed64 distance);
+        bool found = TryBuildPreparedSweepHit(collider, direction, out sweepHit);
         LastMeshTriangleCandidateCount += _sweepWorker.LastMeshTriangleCandidateCount;
-        if (!found)
+        return found;
+    }
+
+    private bool TryBuildPreparedSweepHit(LSCollider collider, Vector3d direction, out Physics3DHit sweepHit)
+    {
+        sweepHit = default;
+        if (!_sweepWorker.TrySweep(collider, out Vector3d sweepCenter, out Fixed64 distance))
             return false;
 
         // Admitted source/target reach bounds a hit's surface separation even at world limits.

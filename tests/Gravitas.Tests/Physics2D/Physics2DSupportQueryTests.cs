@@ -12,6 +12,82 @@ namespace Gravitas.Tests.Physics2D;
 
 public sealed class Physics2DSupportQueryTests
 {
+    [Fact]
+    public void BoundedFloor_ReplaysExactWitnessAndStopsBeforeUnchargedWork()
+    {
+        using var context = Physics2DTestWorld.CreateContext();
+        SolidBody2D source = Source(context);
+        var floor = new LSAABBoxCollider2D(new Vector2d(12, 1));
+        Initialize(context, floor, new Vector2d(Fixed64.Zero, -Fixed64.Half));
+        var request = Request(source, new Vector2d(Fixed64.Zero, Fixed64.One), Fixed64.One);
+        context.Simulate();
+        context.LateSimulate();
+        context.Query2D.QuerySupport(request, out var legacy).Should().Be(Physics2DSupportQueryStatus.Found);
+
+        var scratch = new PhysicsQueryScratch(128, 8);
+        var ample = new PhysicsQueryBudget(1024, 1024, 1024);
+        context.Query2D.QuerySupport(request, ample, scratch, out var hit, out var work)
+            .Should().Be(PhysicsQueryExecutionStatus.Completed);
+        hit!.Value.Hit.Collider.Should().BeSameAs(legacy.Hit.Collider);
+        hit.Value.Hit.Point.Should().Be(legacy.Hit.Point);
+        hit.Value.Hit.Normal.Should().Be(legacy.Hit.Normal);
+        hit.Value.Hit.Distance.Should().Be(legacy.Hit.Distance);
+        var exact = new PhysicsQueryBudget(work.Discovery, work.Candidates, work.Geometry);
+        foreach (var shortBudget in new[]
+        {
+            new PhysicsQueryBudget(work.Discovery - 1, work.Candidates, work.Geometry),
+            new PhysicsQueryBudget(work.Discovery, work.Candidates - 1, work.Geometry),
+            new PhysicsQueryBudget(work.Discovery, work.Candidates, work.Geometry - 1)
+        })
+        {
+            context.Query2D.QuerySupport(request, shortBudget, scratch, out hit, out var shortWork)
+                .Should().Be(PhysicsQueryExecutionStatus.WorkBudgetExceeded);
+            hit.Should().BeNull();
+            shortWork.Discovery.Should().BeLessThanOrEqualTo(shortBudget.DiscoveryLimit);
+            shortWork.Candidates.Should().BeLessThanOrEqualTo(shortBudget.CandidateLimit);
+            shortWork.Geometry.Should().BeLessThanOrEqualTo(shortBudget.GeometryLimit);
+        }
+        context.Query2D.QuerySupport(request, exact, new PhysicsQueryScratch(128, 0), out hit, out _)
+            .Should().Be(PhysicsQueryExecutionStatus.ScratchCapacityExceeded);
+        hit.Should().BeNull();
+        context.Query2D.QuerySupport(request, exact, new PhysicsQueryScratch(0, 8), out hit, out _)
+            .Should().Be(PhysicsQueryExecutionStatus.ScratchCapacityExceeded);
+        hit.Should().BeNull();
+        context.Query2D.QuerySupport(request, exact, scratch, out hit, out var used)
+            .Should().Be(PhysicsQueryExecutionStatus.Completed);
+        used.Should().Be(work);
+        hit!.Value.Hit.Point.Should().Be(legacy.Hit.Point);
+    }
+
+    [Fact]
+    public void BoundedFloor_WaitsForTheCompletedHostStepAndDoesNotAllocateWhenWarm()
+    {
+        using var context = Physics2DTestWorld.CreateContext();
+        SolidBody2D source = Source(context);
+        var floor = new LSAABBoxCollider2D(new Vector2d(12, 1));
+        Initialize(context, floor, new Vector2d(Fixed64.Zero, -Fixed64.Half));
+        var request = Request(source, new Vector2d(Fixed64.Zero, Fixed64.One), Fixed64.One);
+        var scratch = new PhysicsQueryScratch(128, 8);
+        var ample = new PhysicsQueryBudget(1024, 1024, 1024);
+        context.Simulate();
+        context.Query2D.QuerySupport(request, ample, scratch, out var hit, out var work)
+            .Should().Be(PhysicsQueryExecutionStatus.WorldNotReady);
+        hit.Should().BeNull();
+        work.Should().Be(default(PhysicsQueryWork));
+        context.LateSimulate();
+
+        for (int i = 0; i < 32; i++)
+            Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+                context.Query2D.QuerySupport(request, ample, scratch, out _, out _));
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        for (int i = 0; i < 32; i++)
+            if (context.Query2D.QuerySupport(request, ample, scratch, out hit, out _) != PhysicsQueryExecutionStatus.Completed
+                || hit.GetValueOrDefault().Hit.Collider != floor)
+                throw new InvalidOperationException("The bounded floor query must complete during the allocation sample.");
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        allocated.Should().Be(0);
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(256)]

@@ -15,6 +15,13 @@ public sealed partial class GravitasWorldContext
     private ulong _observedGridChangeSequence;
     private bool _queryPartitionTopologyChanged;
 
+    internal bool BoundedQueryPartitionsReady => IsBetweenFixedSteps && World.IsActive
+        && !_queryPartitionTopologyChanged && !Collisions2D.HasDeferredQueryPartitionUpdates
+        && !Physics.IsCollisionPositionPublicationPending && !Physics2D.IsCollisionPositionPublicationPending;
+
+    internal bool IsBoundedQueryViewCurrent(ulong changeSequence) =>
+        BoundedQueryPartitionsReady && _observedGridChangeSequence == changeSequence;
+
     private void OnQueryPartitionWorldChange(GridEventInfo change)
     {
         _observedGridChangeSequence = change.ChangeSequence;

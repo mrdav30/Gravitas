@@ -374,6 +374,8 @@ public sealed class GravitasCollision2DService
         _deferredPartitionRefreshIds.Clear();
     }
 
+    internal bool HasDeferredQueryPartitionUpdates => _deferredPartitionRefreshIds.Count != 0;
+
     internal void RebuildPartitionsAfterWorldChange()
     {
         DetachRetainedPartitions();

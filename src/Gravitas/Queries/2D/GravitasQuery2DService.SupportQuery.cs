@@ -23,24 +23,11 @@ public sealed partial class GravitasQuery2DService
     {
         support = default;
         LastQueryCandidateCount = 0;
-        ChronicleGuard.ThrowIfNull(request.Source, nameof(request));
-        ChronicleGuard.ThrowIfArgument(!request.Source.IsActive
-            || !_context.Physics2D.TryGetColliderById(request.Source.Id, out var registered)
-            || !ReferenceEquals(registered, request.Source), nameof(request),
-            "Support source must be an active collider registered in this context.");
+        ValidateSupportSource(request);
         if (!_context.RefreshQueryPartitions())
             return Physics2DSupportQueryStatus.WorldNotReady;
 
-        Vector2d direction = -request.Up;
-        if (!Fixed64.TryMultiplyAdd(direction.X, request.Distance, request.Center.X, out Fixed64 endX)
-            || !Fixed64.TryMultiplyAdd(direction.Y, request.Distance, request.Center.Y, out Fixed64 endY))
-            return Physics2DSupportQueryStatus.Unrepresentable;
-        Vector2d end = new(endX, endY);
-        Vector2d padding = new(request.Radius, request.Radius);
-        Vector2d centerMin = new(FixedMath.Min(request.Center.X, end.X), FixedMath.Min(request.Center.Y, end.Y));
-        Vector2d centerMax = new(FixedMath.Max(request.Center.X, end.X), FixedMath.Max(request.Center.Y, end.Y));
-        if (!Vector2d.TrySubtract(centerMin, padding, out Vector2d min)
-            || !Vector2d.TryAdd(centerMax, padding, out Vector2d max))
+        if (!TryGetSupportBounds(request, out var end, out var min, out var max))
             return Physics2DSupportQueryStatus.Unrepresentable;
 
         try
@@ -54,8 +41,7 @@ public sealed partial class GravitasQuery2DService
             for (int i = 0; i < _queryCandidates.Count; i++)
             {
                 LSCollider2D collider = _queryCandidates[i];
-                if (ReferenceEquals(collider, request.Source) || collider.IsTrigger
-                    || collider.Body?.MotionType == PhysicsMobilityType.Dynamic
+                if (!IsSupportCandidate(request, collider)
                     || !_context.Physics2D.RequireCollisionPair(request.Source, collider)
                     || !QueryDetection2D.TryFindSupport(request, end, collider, out Physics2DHit candidate)
                     || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
@@ -72,6 +58,34 @@ public sealed partial class GravitasQuery2DService
         {
             EndQuery();
         }
+    }
+
+    private void ValidateSupportSource(in Physics2DSupportQuery request)
+    {
+        ChronicleGuard.ThrowIfNull(request.Source, nameof(request));
+        ChronicleGuard.ThrowIfArgument(!request.Source.IsActive
+            || !_context.Physics2D.TryGetColliderById(request.Source.Id, out var registered)
+            || !ReferenceEquals(registered, request.Source), nameof(request),
+            "Support source must be an active collider registered in this context.");
+    }
+
+    private static bool IsSupportCandidate(in Physics2DSupportQuery request, LSCollider2D collider) =>
+        !ReferenceEquals(collider, request.Source) && !collider.IsTrigger
+        && collider.Body?.MotionType != PhysicsMobilityType.Dynamic;
+
+    private static bool TryGetSupportBounds(in Physics2DSupportQuery request,
+        out Vector2d end, out Vector2d min, out Vector2d max)
+    {
+        end = min = max = default;
+        Vector2d direction = -request.Up;
+        if (!Fixed64.TryMultiplyAdd(direction.X, request.Distance, request.Center.X, out Fixed64 endX)
+            || !Fixed64.TryMultiplyAdd(direction.Y, request.Distance, request.Center.Y, out Fixed64 endY))
+            return false;
+        end = new(endX, endY);
+        Vector2d padding = new(request.Radius, request.Radius);
+        Vector2d centerMin = new(FixedMath.Min(request.Center.X, end.X), FixedMath.Min(request.Center.Y, end.Y));
+        Vector2d centerMax = new(FixedMath.Max(request.Center.X, end.X), FixedMath.Max(request.Center.Y, end.Y));
+        return Vector2d.TrySubtract(centerMin, padding, out min) && Vector2d.TryAdd(centerMax, padding, out max);
     }
 }
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
