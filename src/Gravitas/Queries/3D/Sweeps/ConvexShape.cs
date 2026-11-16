@@ -210,10 +210,8 @@ internal readonly partial struct ConvexShape
 
         // Source offsets come from a chord whose magnitude was admitted by
         // Prepare, so a unit rotation cannot move them outside Fixed64.
-        _ = referenceRotation.Inverse().TryRotate(
-            _offset,
-            out Vector3d localOffset);
-        if (!Vector3d.TryAdd(relativeBounds.Min, localOffset, out min)
+        if (!referenceRotation.Inverse().TryRotate(_offset, out Vector3d localOffset)
+            || !Vector3d.TryAdd(relativeBounds.Min, localOffset, out min)
             || !Vector3d.TryAdd(relativeBounds.Max, localOffset, out max))
         {
             min = default;
@@ -361,9 +359,11 @@ internal readonly partial struct ConvexShape
 
                 // Sweep offsets come from a chord whose magnitude was admitted
                 // by Prepare, so a unit rotation preserves representability.
-                _ = cuboid.Rotation.Inverse().TryRotate(
-                    _offset,
-                    out Vector3d localTranslation);
+                if (!cuboid.Rotation.Inverse().TryRotate(_offset, out Vector3d localTranslation))
+                {
+                    closest = default;
+                    return false;
+                }
                 return cuboid.OrientedBox
                     .GetClosestPointAnchor(untranslatedPoint)
                     .WithLocalTranslation(localTranslation)

@@ -49,21 +49,21 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: mrdav30/FixedMathSharp
-          ref: e2c325a827506419b1a04b2427d9bc77e629ab6f
+          ref: 30d76f1b9d7dcc7c5939574353da36e0492dff3c
           path: FixedMathSharp
           persist-credentials: false
       - if: env.UseLocalLsfStack == 'true'
         uses: actions/checkout@v6
         with:
           repository: mrdav30/SwiftCollections
-          ref: d3ecac6b5f1b6d366091abc3f94b70e1e9dc0f01
+          ref: 53935383ab8fc64facf7aebd710fec9219ba9ba0
           path: SwiftCollections
           persist-credentials: false
       - if: env.UseLocalLsfStack == 'true'
         uses: actions/checkout@v6
         with:
           repository: mrdav30/GridForge
-          ref: 7f84f151bdc7a1e2216310bcf6c8ba8aae9d8d76
+          ref: 5799c46b90a5b4717053e3e3e3698efdf449fc0a
           path: GridForge
           persist-credentials: false
       - if: env.UseLocalLsfStack == 'true'

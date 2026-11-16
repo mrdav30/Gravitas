@@ -14,7 +14,6 @@ public sealed class SolidBodyIntegrationTests
 
     public static TheoryData<string, FixedQuaternion> RotationAdmissionCases => new()
     {
-        { "zero", FixedQuaternion.Zero },
         { "scaled", new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero, (Fixed64)2) },
         { "saturated", new FixedQuaternion(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue) },
         { "near-unit", new FixedQuaternion(Fixed64.Epsilon, Fixed64.Zero, Fixed64.Zero, Fixed64.One) }
@@ -47,6 +46,30 @@ public sealed class SolidBodyIntegrationTests
 
         body.Body.SetVisualRotation(admittedRotation);
         body.Body.VisualRotation.Should().Be(expected);
+    }
+
+    [Fact]
+    public void PoseAdmission_ShouldRejectExplicitZeroBeforePublishing()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var fresh = new SolidBody(new TestMatterAgent(scenario.Context), new LSSphereCollider());
+        fresh.Rotation.Should().Be(FixedQuaternion.Identity);
+        fresh.Forward.Should().Be(Vector3d.Forward);
+        Assert.Throws<ArgumentException>(() => fresh.Initialize(Vector3d.Zero, FixedQuaternion.Zero));
+        fresh.Active.Should().BeFalse();
+
+        SolidBody body = scenario.CreateSphere(Vector3d.Right).Body;
+        var hash = scenario.Context.ComputeReplayHash();
+        Assert.Throws<ArgumentException>(() => body.SetRotation(FixedQuaternion.Zero));
+        Assert.Throws<ArgumentException>(() => body.UpdateRotation(FixedQuaternion.Zero, Fixed64.One));
+        Assert.Throws<ArgumentException>(() => body.SetVisualRotation(FixedQuaternion.Zero));
+        Assert.Throws<ArgumentException>(() => body.ResetPosition(Vector3d.Zero, FixedQuaternion.Zero));
+        scenario.Context.ComputeReplayHash().Should().Be(hash);
+        body.VisualRotation.Should().Be(FixedQuaternion.Identity);
+
+        body.SetRotation(FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.HalfPi));
+        body.ResetPosition(Vector3d.Zero);
+        body.Rotation.Should().Be(FixedQuaternion.Identity);
     }
 
     [Fact]

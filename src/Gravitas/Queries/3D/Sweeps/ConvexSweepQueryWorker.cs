@@ -879,9 +879,8 @@ internal sealed partial class ConvexSweepQueryWorker
 
         // Prepare admitted the chord magnitude, so a unit rotation preserves
         // representability.
-        _ = mesh.Mesh.Rotation.Inverse().TryRotate(
-            _displacement,
-            out Vector3d localDisplacement);
+        Vector3d localDisplacement =
+            ConvexColliderSupport.GetLocalDisplacement(mesh.Mesh.Rotation, _displacement);
         SweepBoundsUtility.CreateSweptBounds(
             sourceMin,
             sourceMax,

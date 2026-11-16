@@ -110,7 +110,8 @@ public partial class SolidBody
         {
             ApplyLoadedMotionType(motionType);
             ContinuousCollisionMode = continuousCollisionMode;
-            _rotation = _rotation.Normalized;
+            // Schema 1 already restored zero poses as identity.
+            _rotation = _rotation == FixedQuaternion.Zero ? FixedQuaternion.Identity : _rotation.Normalized;
             _freezeAxes = freezeAxes;
             GroundingMode = groundingMode;
             GroundProbeMode = groundProbeMode;

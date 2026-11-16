@@ -763,18 +763,18 @@ public sealed class GravitasDiagnosticSinkTests
     }
 
     [Fact]
-    public void CaptureJoint_WithZeroAuthoredFrameRotation_ShouldEmitUnitAxisRays()
+    public void CaptureJoint_WithIdentityFrameRotation_ShouldEmitCanonicalAxisRays()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(2, 0, 0));
-        var zeroRotationFrame = new FixedTransform(Vector3d.Zero, default, Vector3d.One);
+        var identityFrame = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
         Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(
             new JointDefinition3D(
                 first.Body,
                 second.Body,
-                zeroRotationFrame,
-                zeroRotationFrame,
+                identityFrame,
+                identityFrame,
                 JointType3D.Hinge,
                 JointLimit3D.Unrestricted,
                 JointMotor3D.Disabled,

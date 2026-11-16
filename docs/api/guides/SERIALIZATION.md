@@ -2,15 +2,14 @@
 
 To resume a Gravitas simulation from a record, create the context and physics
 objects in your host first. Chronicler writes saved physics values into those
-existing objects, including their bodies and concrete collider shapes. Use
-the resulting state for save-state testing, replay, or rollback-style
-validation.
+existing objects, including their bodies and concrete collider shapes. Use the
+resulting state for save-state testing, replay, or rollback-style validation.
 
 ## Quick Read
 
 Advance a 3D crate through four fixed steps. Queue a torque for its next step,
-then save its body record. To replay from that point, prepare another crate
-with the same collider shape in a world on the matching frame and timeline.
+then save its body record. To replay from that point, prepare another crate with
+the same collider shape in a world on the matching frame and timeline.
 Populating the body record restores values such as mass and the queued torque
 into that existing crate. Step both worlds with the same subsequent commands.
 
@@ -23,10 +22,10 @@ flowchart TB
     Load --> Replay["Continue stepping"]
 ```
 
-The host supplies the timeline and object bindings. Compare replay hashes
-only once the worlds have equivalent continuation state, including any
-live contact caches that affect the next step. See the
-[restore order](#replay-workflow) and [hash comparison rules](#replay-hashes).
+The host supplies the timeline and object bindings. Compare replay hashes only
+once the worlds have equivalent continuation state, including any live contact
+caches that affect the next step. See the [restore order](#replay-workflow) and
+[hash comparison rules](#replay-hashes).
 
 ## Ownership Contract
 
@@ -43,8 +42,8 @@ live contact caches that affect the next step. See the
 
 ### Derived State And Host Bindings
 
-The following values stay outside the record. The runtime rebuilds derived
-state as needed, and the host supplies bindings and callbacks.
+The following values stay outside the record. The runtime rebuilds derived state
+as needed, and the host supplies bindings and callbacks.
 
 - context-local collider IDs and service indices.
 - GridForge partition coordinate lists and active partition payloads.
@@ -75,11 +74,11 @@ value does not replace its previously valid mode, and a rejected
 
 The `MotionType` field records the body's `PhysicsMobilityType` and defaults to
 `Dynamic` when the field is absent. The runtime validates motion type and freeze
-masks before publishing loaded body state. Loading a different role into an already
-registered shell reconciles simulated-body membership, partitions, CCD state,
-and solver caches through the same atomic lifecycle invariants as a public role
-transition. Undefined roles or freeze bits fail without partially publishing the
-new state.
+masks before publishing loaded body state. Loading a different role into an
+already registered shell reconciles simulated-body membership, partitions, CCD
+state, and solver caches through the same atomic lifecycle invariants as a
+public role transition. Undefined roles or freeze bits fail without partially
+publishing the new state.
 
 Mass retains its existing `"Mass"` record key. Loading writes backing state and
 refreshes derived inertia and awake membership at the final load commit; it
@@ -107,7 +106,9 @@ The 3D body record starts with `BodySchemaVersion = 1` and a signed 64-bit
 `LastGroundCheckFrame`. A nonnegative value is an absolute simulation frame;
 `-1` means no cached probe. Missing or unsupported schema versions and invalid
 negative stamps reject before any body fields are changed, consistently in JSON
-and MemoryPack. Unversioned narrow-frame body snapshots are not accepted.
+and MemoryPack. Unversioned narrow-frame body snapshots are not accepted. Schema
+1 loads a legacy zero body rotation as identity before publishing the restored
+pose.
 
 The 2D body does not persist its ground-check frame: its support lookup cache is
 invalidated on population and rebuilt by simulation. Its record shape is
@@ -151,10 +152,10 @@ such as joint solve metrics and additional solver bookkeeping.
 Retained manifold witnesses and witnesses in diagnostic cache sections are
 hashed as the canonical `Origin`, `Rotation`, `LocalPoint`, and
 `LocalDisplacement` components of their `ContactAnchor` or `ContactAnchor2D`
-frame. A clipped or
-unavailable rotated offset or absolute world point is not replay truth. Derived
-bounds and other rebuildable shape caches remain outside the authoritative shape
-hash and are covered only by their dedicated cache section.
+frame. A clipped or unavailable rotated offset or absolute world point is not
+replay truth. Derived bounds and other rebuildable shape caches remain outside
+the authoritative shape hash and are covered only by their dedicated cache
+section.
 
 Joint and ragdoll handles are valid serialization targets only while registered
 with their owning constraint service. Endpoint teardown removes dependent joints

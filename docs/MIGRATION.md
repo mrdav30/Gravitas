@@ -1,21 +1,32 @@
 # Gravitas Migration Guide
 
+## Upcoming release
+
+### Zero spatial rotations
+
+Supply `FixedQuaternion.Identity` for an unchanged pose. The 3D body rejects
+explicit zero quaternions at initialization and when setting, updating,
+resetting, or presenting a rotation. For an identity reset, call
+`ResetPosition(position)`. Rebuild callers that omitted the previous optional
+rotation because an already compiled call passes zero to the two-argument
+method. Body schema 1 still loads a saved zero body rotation as identity.
+
 ## From v1 to v2
 
 Use this guide when upgrading from Gravitas v1.x to v2.0, including
 `Gravitas.Lean`. Update Gravitas and its host adapters together and rebuild
-consuming assemblies. Before deploying, check [saved state and clock
-handling](#shared-simulation-timing), regenerate [replay hash
-baselines](#byte-backed-enums-and-replay-hashes), and validate any shapes or
-queries near the [geometry limits](#supported-effective-geometry).
+consuming assemblies. Before deploying, check
+[saved state and clock handling](#shared-simulation-timing), regenerate
+[replay hash baselines](#byte-backed-enums-and-replay-hashes), and validate any
+shapes or queries near the [geometry limits](#supported-effective-geometry).
 
 ### Body mobility enum
 
 Replace `BodyMotionType` with `PhysicsMobilityType` in both 2D and 3D host code,
 including calls to `Initialize(...)` and `SetMotionType(...)`. For example,
 `BodyMotionType.Kinematic` becomes `PhysicsMobilityType.Kinematic`. The
-`MotionType` property and recorded field retain their names, and the
-`Dynamic`, `Kinematic`, and `Static` values retain their numeric meanings.
+`MotionType` property and recorded field retain their names, and the `Dynamic`,
+`Kinematic`, and `Static` values retain their numeric meanings.
 
 ### Byte-backed enums and replay hashes
 
@@ -40,9 +51,9 @@ SwiftCollections; library-specific logger facades and channel names stay intact.
 
 Rebuild consumers and adapters together: moved types have new CLR identities,
 including types exposed in logger signatures. There are no forwarding wrappers.
-This extraction does not change recorded fields or record-hash identities.
-Use the Chronicler.Diagnostics version required by the v2 package when your
-host or adapter references it directly.
+This extraction does not change recorded fields or record-hash identities. Use
+the Chronicler.Diagnostics version required by the v2 package when your host or
+adapter references it directly.
 
 ### Supported effective geometry
 

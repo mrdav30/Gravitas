@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using System;
 using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
@@ -446,9 +447,8 @@ public static partial class CollisionDetectionMixed
         _ = embeddedPoint.TryGetOffsetFrom(
             cone.Center,
             out Vector3d centerToEmbedded);
-        _ = cone.Rotation.Inverse().TryRotate(
-            centerToEmbedded,
-            out Vector3d localEmbeddedPoint);
+        if (!cone.Rotation.Inverse().TryRotate(centerToEmbedded, out Vector3d localEmbeddedPoint))
+            throw new InvalidOperationException("The embedded point cannot be expressed in the cone frame.");
         _ = FixedSegment.TryGetClosestCenteredFiniteConeSurfaceOffset(
             localEmbeddedPoint,
             Vector3d.Zero,

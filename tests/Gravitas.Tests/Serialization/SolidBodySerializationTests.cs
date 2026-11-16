@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Chronicler.Serialization;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -66,6 +67,33 @@ public sealed class SolidBodySerializationTests
         target.IsSleeping.Should().BeTrue();
         target.GroundMinNormalDot.Should().Be(source.GroundMinNormalDot);
         targetScenario.Context.ComputeReplayHash().Should().Be(sourceScenario.Context.ComputeReplayHash());
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void Populate_LegacyZeroRotation_ShouldContinueLikeIdentity(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder control = PhysicsScenarioBuilder.Create();
+        SolidBody source = control.CreateSphere(Vector3d.Right).Body;
+        object saved = GravitasSerializationHarness.Serialize(source, transport);
+        object legacy = transport == GravitasSerializationTransport.Json
+            ? SerializationPayloadEditor.SetJsonValue((string)saved, FixedQuaternion.Zero, "Rotation")
+#if !GRAVITAS_DISABLE_MEMORYPACK
+            : SerializationPayloadEditor.SetMemoryPackValue((byte[])saved, FixedQuaternion.Zero, "Rotation");
+#else
+            : throw new NotSupportedException();
+#endif
+        using PhysicsScenarioBuilder restored = PhysicsScenarioBuilder.Create();
+        SolidBody target = restored.CreateSphere(Vector3d.Right).Body;
+        GravitasSerializationHarness.Populate(target, legacy, transport);
+        target.Rotation.Should().Be(FixedQuaternion.Identity);
+        restored.Context.ComputeReplayHash().Should().Be(control.Context.ComputeReplayHash());
+
+        control.Context.Simulate();
+        restored.Context.Simulate();
+        control.Context.LateSimulate();
+        restored.Context.LateSimulate();
+        restored.Context.ComputeReplayHash().Should().Be(control.Context.ComputeReplayHash());
     }
 
     [Theory]

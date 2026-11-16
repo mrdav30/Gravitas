@@ -324,7 +324,7 @@ public partial class SolidBody : IRecordable
     /// <summary>Gets whether an authoritative rotation change awaits presentation.</summary>
     public bool RotationChangePending => _rotationMutated || _rotationChangedBuffer;
 
-    private FixedQuaternion _rotation;
+    private FixedQuaternion _rotation = FixedQuaternion.Identity;
 
     /// <summary>Gets the authoritative world-space rotation.</summary>
     public FixedQuaternion Rotation
@@ -349,11 +349,11 @@ public partial class SolidBody : IRecordable
     /// <summary>Enables publishing interpolated rotations to <see cref="RotationTransform"/>.</summary>
     public bool CanSetVisualRotation;
 
-    private FixedQuaternion _visualRotation;
+    private FixedQuaternion _visualRotation = FixedQuaternion.Identity;
     /// <summary>Gets the current rotation interpolation endpoint.</summary>
     public FixedQuaternion VisualRotation => _visualRotation;
 
-    private FixedQuaternion _lastVisualRotation;
+    private FixedQuaternion _lastVisualRotation = FixedQuaternion.Identity;
     /// <summary>Gets the previous rotation interpolation endpoint.</summary>
     public FixedQuaternion LastVisualRotation => _lastVisualRotation;
 
@@ -628,6 +628,7 @@ public partial class SolidBody : IRecordable
     }
 
     /// <summary>Initializes and registers the body at an authoritative world pose.</summary>
+    /// <exception cref="ArgumentException"><paramref name="startRotation"/> is zero.</exception>
     public void Initialize(
         Vector3d startPosition,
         FixedQuaternion startRotation,
@@ -639,7 +640,7 @@ public partial class SolidBody : IRecordable
                 || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
             nameof(Collider),
             "Body collider must be unregistered and free of another host binding before initialization.");
-        FixedQuaternion normalizedRotation = startRotation.Normalized;
+        FixedQuaternion normalizedRotation = AdmitRotation(startRotation, nameof(startRotation));
         Collider.PreflightBodyInitialization(this, startPosition, normalizedRotation);
 
         _motionType = motionType;
@@ -873,9 +874,10 @@ public partial class SolidBody : IRecordable
     }
 
     /// <summary>Sets an authoritative target rotation and visual interpolation rate.</summary>
+    /// <exception cref="ArgumentException"><paramref name="targetRotation"/> is zero.</exception>
     public void UpdateRotation(FixedQuaternion targetRotation, Fixed64 bufferInterpolation)
     {
-        FixedQuaternion normalizedRotation = targetRotation.Normalized;
+        FixedQuaternion normalizedRotation = AdmitRotation(targetRotation, nameof(targetRotation));
         PreflightStaticPoseChange();
         bool preparedPose = PrepareExplicitBodyPose(
             Position3d,
@@ -964,9 +966,17 @@ public partial class SolidBody : IRecordable
     }
 
     /// <summary>Resets the authoritative pose, motion, grounding, and presentation state.</summary>
-    public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)
+    /// <param name="position">The new world-space position.</param>
+    /// <remarks>The new orientation is <see cref="FixedQuaternion.Identity"/>.</remarks>
+    public void ResetPosition(Vector3d position = default) => ResetPosition(position, FixedQuaternion.Identity);
+
+    /// <summary>Resets the authoritative pose, motion, grounding, and presentation state.</summary>
+    /// <param name="position">The new world-space position.</param>
+    /// <param name="rotation">The new orientation.</param>
+    /// <exception cref="ArgumentException"><paramref name="rotation"/> is zero.</exception>
+    public void ResetPosition(Vector3d position, FixedQuaternion rotation)
     {
-        FixedQuaternion normalizedRotation = rotation.Normalized;
+        FixedQuaternion normalizedRotation = AdmitRotation(rotation, nameof(rotation));
         PreflightResetPoseChange();
         SetTransformWorldPose(position, normalizedRotation);
         InvalidateContinuousCollisionTrajectory();
@@ -987,6 +997,13 @@ public partial class SolidBody : IRecordable
         PublishExplicitBodyPose(Active, poseChanged: true);
         if (wasSleeping)
             RefreshPartitionAwakeState();
+    }
+
+    private static FixedQuaternion AdmitRotation(FixedQuaternion rotation, string parameterName)
+    {
+        ChronicleGuard.ThrowIfArgument(rotation == FixedQuaternion.Zero, parameterName,
+            "A pose rotation must be nonzero. Use FixedQuaternion.Identity for an unchanged orientation.");
+        return rotation.Normalized;
     }
 
 }

@@ -124,9 +124,10 @@ public partial class SolidBody
     }
 
     /// <summary>Advances the rotation interpolation endpoints.</summary>
+    /// <exception cref="System.ArgumentException"><paramref name="rotation"/> is zero.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetVisualRotation(FixedQuaternion rotation) =>
-        StoreVisualRotation(rotation.Normalized);
+        StoreVisualRotation(AdmitRotation(rotation, nameof(rotation)));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void StoreVisualRotation(FixedQuaternion rotation)

@@ -357,10 +357,11 @@ public partial class SolidBody
     }
 
     /// <summary>Sets the authoritative world rotation and refreshes collider state.</summary>
+    /// <exception cref="ArgumentException"><paramref name="quaternion"/> is zero.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetRotation(FixedQuaternion quaternion)
     {
-        FixedQuaternion normalizedRotation = quaternion.Normalized;
+        FixedQuaternion normalizedRotation = AdmitRotation(quaternion, nameof(quaternion));
         PreflightStaticPoseChange();
         bool preparedPose = PrepareExplicitBodyPose(
             Position3d,
