@@ -44,6 +44,11 @@ public sealed class Physics2DSupportQueryTests
         liveFloor.Simulate();
         liveFloor.LocalOffset = Vector2d.Zero;
         liveFloor.Simulate();
+        var transient = new LSAABBoxCollider2D(Vector2d.One);
+        Initialize(live, transient, Vector2d.Forward * (Fixed64)2);
+        Assert.True(live.World.TryGetVoxel(Vector3d.Forward * (Fixed64)2, out var occupiedHistory));
+        Assert.NotNull(occupiedHistory!.GetPartitionOrDefault<PhysicsPartition2D>());
+        transient.Deactivate();
         live.Simulate();
         live.LateSimulate();
         GravitasSerializationHarness.Populate(restoredSource,
@@ -54,9 +59,12 @@ public sealed class Physics2DSupportQueryTests
             GravitasSerializationHarness.Serialize(liveSecond, transport), transport);
         restored.Simulate();
         restored.LateSimulate();
+        Assert.True(restored.World.TryGetVoxel(Vector3d.Forward * (Fixed64)2, out var untouched));
+        Assert.True(Assert.IsType<PhysicsPartition2D>(occupiedHistory.GetPartitionOrDefault<PhysicsPartition2D>()).IsEmpty);
+        Assert.Null(untouched!.GetPartitionOrDefault<PhysicsPartition2D>());
 
-        var liveRequest = Request(liveSource, Vector2d.Forward, Fixed64.One);
-        var restoredRequest = Request(restoredSource, Vector2d.Forward, Fixed64.One);
+        var liveRequest = Request(liveSource, Vector2d.Forward * (Fixed64)2, (Fixed64)2);
+        var restoredRequest = Request(restoredSource, Vector2d.Forward * (Fixed64)2, (Fixed64)2);
         var scratch = new PhysicsQueryScratch(128, 16);
         var ample = new PhysicsQueryBudget(8192, 8192, 8192);
         Assert.Equal(PhysicsQueryExecutionStatus.Completed,
@@ -71,14 +79,20 @@ public sealed class Physics2DSupportQueryTests
         Assert.Equal(hit.Value.Hit.Distance, replay.Value.Hit.Distance);
         Assert.Equal(hit.Value.Hit.Normal, replay.Value.Hit.Normal);
 
-        var oneBelow = new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry);
-        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
-            live.Query2D.QuerySupport(liveRequest, oneBelow, scratch, out replay, out used));
-        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
-            restored.Query2D.QuerySupport(restoredRequest, oneBelow, scratch, out hit, out expected));
-        Assert.Equal(expected, used);
-        Assert.Null(hit);
-        Assert.Null(replay);
+        foreach (var oneBelow in new[]
+        {
+            new PhysicsQueryBudget(expected.Discovery - 1, expected.Candidates, expected.Geometry),
+            new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry)
+        })
+        {
+            Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+                live.Query2D.QuerySupport(liveRequest, oneBelow, scratch, out replay, out used));
+            Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+                restored.Query2D.QuerySupport(restoredRequest, oneBelow, scratch, out hit, out var restoredWork));
+            Assert.Equal(restoredWork, used);
+            Assert.Null(hit);
+            Assert.Null(replay);
+        }
     }
 
     [Fact]

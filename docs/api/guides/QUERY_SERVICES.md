@@ -466,8 +466,10 @@ mutation.
 Within each partition and mobility class, bounded queries visit live collider
 IDs in ascending order. The candidate counter includes memberships, comparisons
 against retained IDs, and any shifts needed to insert a new ID. Removed
-memberships add no charge. Partition lookup and linked-collider filtering can
-still reflect physical storage history. Identical work and results assume
+memberships add no charge. Partition lookup reserves the same work whether
+the requested type is absent or retained empty. Other attached partitions
+contribute to the lookup allowance. Linked-collider filtering can still
+reflect physical storage history. Identical work and results assume
 matching collider order, equivalent query state, and the same inputs and
 limits. Evaluate query and complete-step latency separately on representative
 workloads.

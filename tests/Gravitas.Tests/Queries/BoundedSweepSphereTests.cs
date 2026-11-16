@@ -31,6 +31,12 @@ public sealed class BoundedSweepSphereTests
         Vector3d floorPosition = liveFloor.Position;
         liveFloor.Position = floorPosition + Vector3d.Right * (Fixed64)32;
         liveFloor.Position = floorPosition;
+        var transient = new LSCuboidCollider { Size = Vector3d.One };
+        transient.InitializeWithNoBody(new TestMatterAgent(live,
+            new FixedTransform(Vector3d.Up * (Fixed64)2, FixedQuaternion.Identity, Vector3d.One)));
+        Assert.True(live.World.TryGetVoxel(Vector3d.Up * (Fixed64)2, out var occupiedHistory));
+        Assert.NotNull(occupiedHistory!.GetPartitionOrDefault<PhysicsPartition>());
+        transient.Deactivate();
         live.Simulate();
         live.LateSimulate();
         GravitasSerializationHarness.Populate(restoredFloor,
@@ -39,29 +45,44 @@ public sealed class BoundedSweepSphereTests
             GravitasSerializationHarness.Serialize(liveSecond, transport), transport);
         restored.Simulate();
         restored.LateSimulate();
+        Assert.True(restored.World.TryGetVoxel(Vector3d.Up * (Fixed64)2, out var untouched));
+        Assert.True(Assert.IsType<PhysicsPartition>(occupiedHistory.GetPartitionOrDefault<PhysicsPartition>()).IsEmpty);
+        Assert.Null(untouched!.GetPartitionOrDefault<PhysicsPartition>());
 
         var scratch = new PhysicsQueryScratch(512, 16);
         var ample = new PhysicsQueryBudget(8192, 8192, 8192);
         Assert.Equal(PhysicsQueryExecutionStatus.Completed,
-            Sweep(restored, ample, scratch, out var hit, out var expected));
+            ReplaySweep(restored, ample, scratch, out var hit, out var expected));
         Assert.Same(restoredFloor, hit.GetValueOrDefault().Collider);
         var exact = new PhysicsQueryBudget(expected.Discovery, expected.Candidates, expected.Geometry);
         Assert.Equal(PhysicsQueryExecutionStatus.Completed,
-            Sweep(live, exact, scratch, out var replay, out var used));
+            ReplaySweep(live, exact, scratch, out var replay, out var used));
         Assert.Equal(expected, used);
         Assert.Same(liveFloor, replay.GetValueOrDefault().Collider);
         Assert.Equal(hit!.Value.Point, replay!.Value.Point);
         Assert.Equal(hit.Value.Distance, replay.Value.Distance);
         Assert.Equal(hit.Value.Normal, replay.Value.Normal);
 
-        var oneBelow = new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry);
-        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
-            Sweep(live, oneBelow, scratch, out replay, out used));
-        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
-            Sweep(restored, oneBelow, scratch, out hit, out expected));
-        Assert.Equal(expected, used);
-        Assert.Null(hit);
-        Assert.Null(replay);
+        foreach (var oneBelow in new[]
+        {
+            new PhysicsQueryBudget(expected.Discovery - 1, expected.Candidates, expected.Geometry),
+            new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry)
+        })
+        {
+            Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+                ReplaySweep(live, oneBelow, scratch, out replay, out used));
+            Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+                ReplaySweep(restored, oneBelow, scratch, out hit, out var restoredWork));
+            Assert.Equal(restoredWork, used);
+            Assert.Null(hit);
+            Assert.Null(replay);
+        }
+
+        static PhysicsQueryExecutionStatus ReplaySweep(
+            GravitasWorldContext context, PhysicsQueryBudget budget, PhysicsQueryScratch scratch,
+            out Physics3DHit? hit, out PhysicsQueryWork work) =>
+            context.Query3D.SweepSphere(Vector3d.Up * (Fixed64)2, Fixed64.Half, Vector3d.Down, (Fixed64)2,
+                PhysicsLayerMask.All, null, budget, scratch, out hit, out work);
     }
 
     [Fact]
