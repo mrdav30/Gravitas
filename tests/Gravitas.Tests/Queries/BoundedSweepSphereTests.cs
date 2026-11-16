@@ -1,5 +1,6 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.Constraints;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Serialization;
@@ -83,6 +84,81 @@ public sealed class BoundedSweepSphereTests
             out Physics3DHit? hit, out PhysicsQueryWork work) =>
             context.Query3D.SweepSphere(Vector3d.Up * (Fixed64)2, Fixed64.Half, Vector3d.Down, (Fixed64)2,
                 PhysicsLayerMask.All, null, budget, scratch, out hit, out work);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void BoundedSweep_ReplaysAfterRemovedLinksAndCheckpointRestore(GravitasSerializationTransport transport)
+    {
+        using var live = CreateContext();
+        using var restored = CreateContext();
+        var first = CreateLinkedFloorScene(live);
+        var second = CreateLinkedFloorScene(restored);
+        var discarded = new SolidBody[32];
+        for (int i = 0; i < discarded.Length; i++)
+        {
+            var body = new SolidBody(new TestMatterAgent(live), new LSSphereCollider { Radius = Fixed64.Half });
+            body.Initialize(new Vector3d(3, 3, 3), FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
+            discarded[i] = body;
+            Link(live, first.Source, body);
+        }
+        foreach (var body in discarded)
+            body.Deactivate();
+        Assert.Equal(1, live.Constraints3D.RegisteredJointCount);
+        GravitasSerializationHarness.Populate(second.Joint,
+            GravitasSerializationHarness.Serialize(first.Joint, transport), transport);
+        live.Simulate();
+        live.LateSimulate();
+        restored.Simulate();
+        restored.LateSimulate();
+
+        var scratch = new PhysicsQueryScratch(512, 4);
+        var ample = new PhysicsQueryBudget(8192, 8192, 8192);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            Sweep(restored, ample, scratch, out var hit, out var expected, second.Source.Collider));
+        Assert.Same(second.Floor, hit.GetValueOrDefault().Collider);
+        var exact = new PhysicsQueryBudget(expected.Discovery, expected.Candidates, expected.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            Sweep(live, exact, scratch, out var replay, out var used, first.Source.Collider));
+        Assert.Equal(expected, used);
+        Assert.Same(first.Floor, replay.GetValueOrDefault().Collider);
+        Assert.Equal(hit!.Value.Point, replay!.Value.Point);
+        Assert.Equal(hit.Value.Distance, replay.Value.Distance);
+        Assert.Equal(hit.Value.Normal, replay.Value.Normal);
+
+        var oneBelow = new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            Sweep(live, oneBelow, scratch, out replay, out used, first.Source.Collider));
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            Sweep(restored, oneBelow, scratch, out hit, out expected, second.Source.Collider));
+        Assert.Equal(expected, used);
+        Assert.Null(hit);
+        Assert.Null(replay);
+
+        static (SolidBody Source, LSCuboidCollider Floor, Joint3D Joint)
+            CreateLinkedFloorScene(GravitasWorldContext context)
+        {
+            context.Environment.Gravity = Fixed64.Zero;
+            var source = new SolidBody(new TestMatterAgent(context),
+                new LSSphereCollider { Radius = Fixed64.Half });
+            source.Initialize(new Vector3d(3, 3, 3), FixedQuaternion.Identity);
+            source.UseManualGrounding();
+            var linked = new SolidBody(new TestMatterAgent(context),
+                new LSCuboidCollider { Size = new Vector3d(3, 1, 3) });
+            linked.Initialize(-Vector3d.Up * Fixed64.Half, FixedQuaternion.Identity, PhysicsMobilityType.Kinematic);
+            var floor = AddBoxFloor(context);
+            return (source, floor, Link(context, source, linked));
+        }
+
+        static Joint3D Link(GravitasWorldContext context, SolidBody source, SolidBody target)
+        {
+            var frame = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+            Joint3D joint = context.Constraints3D.RegisterJoint(new JointDefinition3D(source, target,
+                frame, frame, JointType3D.BallSocket, JointLimit3D.Unrestricted,
+                JointMotor3D.Disabled, JointCollisionPolicy.SuppressLinked));
+            joint.IsEnabled = false;
+            return joint;
+        }
     }
 
     [Fact]
@@ -188,9 +264,9 @@ public sealed class BoundedSweepSphereTests
 
     private static PhysicsQueryExecutionStatus Sweep(
         GravitasWorldContext context, PhysicsQueryBudget budget, PhysicsQueryScratch scratch,
-        out Physics3DHit? hit, out PhysicsQueryWork work) =>
+        out Physics3DHit? hit, out PhysicsQueryWork work, LSCollider? excluded = null) =>
         context.Query3D.SweepSphere(Vector3d.Up, Fixed64.Half, Vector3d.Down, Fixed64.One,
-            PhysicsLayerMask.All, null, budget, scratch, out hit, out work);
+            PhysicsLayerMask.All, excluded, budget, scratch, out hit, out work);
 
     private static GravitasWorldContext CreateContext()
     {

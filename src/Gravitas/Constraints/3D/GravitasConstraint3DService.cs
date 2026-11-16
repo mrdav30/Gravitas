@@ -25,7 +25,7 @@ public sealed class GravitasConstraint3DService
     private readonly ConstraintEndpointJointIndex<SolidBody> _jointIdsByBody = new();
     private readonly SwiftDictionary<SolidBody, RagdollRuntime3D> _ragdollByBody = new();
     private readonly SwiftDictionary<int, RagdollRuntime3D> _ragdollsById = new();
-    private readonly SwiftDictionary<ulong, int> _suppressedColliderPairs = new();
+    private readonly SuppressedColliderPairs _suppressedColliderPairs = new();
     private Joint3D?[] _joints = new Joint3D?[DefaultJointCapacity];
     private RagdollRuntime3D? _firstRagdoll;
     private RagdollRuntime3D? _lastRagdoll;
@@ -97,7 +97,7 @@ public sealed class GravitasConstraint3DService
         _enabledJointCount++;
 
         if (joint.CollisionPolicy == JointCollisionPolicy.SuppressLinked)
-            AddSuppressedColliderPair(joint.BodyA.Collider, joint.BodyB.Collider);
+            _suppressedColliderPairs.Add(joint.BodyA.Collider.Id, joint.BodyB.Collider.Id);
 
         _context.Diagnostics.EmitJointRegistered(joint);
         return joint;
@@ -130,7 +130,7 @@ public sealed class GravitasConstraint3DService
         joint.IsActive = false;
         joint.ClearSolverCache();
         if (joint.CollisionPolicy == JointCollisionPolicy.SuppressLinked)
-            RemoveSuppressedColliderPair(joint.BodyA.Collider, joint.BodyB.Collider);
+            _suppressedColliderPairs.Remove(joint.BodyA.Collider.Id, joint.BodyB.Collider.Id);
 
         _context.Diagnostics.EmitJointRemoved(joint);
         return true;
@@ -292,18 +292,11 @@ public sealed class GravitasConstraint3DService
     /// </summary>
     public bool ShouldExcludeLinkedCollision(LSCollider colliderA, LSCollider colliderB)
     {
-        if (colliderA == null || colliderB == null)
-            return false;
-        if (colliderA.Id < 0 || colliderB.Id < 0 || colliderA.Id == colliderB.Id)
-            return false;
-
-        return _suppressedColliderPairs.Count != 0
-            && _suppressedColliderPairs.ContainsKey(CreateColliderPairKey(colliderA.Id, colliderB.Id));
+        return colliderA != null && colliderB != null
+            && _suppressedColliderPairs.Contains(colliderA.Id, colliderB.Id);
     }
 
-    internal ulong LinkedCollisionProbeLimit => _suppressedColliderPairs.Count == 0
-        ? 0
-        : _suppressedColliderPairs.LookupProbeLimit;
+    internal ulong LinkedCollisionProbeLimit => _suppressedColliderPairs.LookupProbeLimit;
 
     internal bool TryGetJointForSolver(int jointId, out Joint3D? joint)
     {
@@ -337,9 +330,9 @@ public sealed class GravitasConstraint3DService
             return;
 
         if (oldPolicy == JointCollisionPolicy.SuppressLinked)
-            RemoveSuppressedColliderPair(joint.BodyA.Collider, joint.BodyB.Collider);
+            _suppressedColliderPairs.Remove(joint.BodyA.Collider.Id, joint.BodyB.Collider.Id);
         if (newPolicy == JointCollisionPolicy.SuppressLinked)
-            AddSuppressedColliderPair(joint.BodyA.Collider, joint.BodyB.Collider);
+            _suppressedColliderPairs.Add(joint.BodyA.Collider.Id, joint.BodyB.Collider.Id);
     }
 
     internal void UpdateJointEnabledState(
@@ -414,13 +407,6 @@ public sealed class GravitasConstraint3DService
             writer.WriteInt32(ragdoll.LinkCount);
             writer.WriteInt32(ragdoll.JointCount);
         }
-    }
-
-    internal static ulong CreateColliderPairKey(int colliderAId, int colliderBId)
-    {
-        uint min = (uint)(colliderAId <= colliderBId ? colliderAId : colliderBId);
-        uint max = (uint)(colliderAId <= colliderBId ? colliderBId : colliderAId);
-        return ((ulong)min << 32) | max;
     }
 
     private void EnsureJointCapacity(int required)
@@ -566,7 +552,7 @@ public sealed class GravitasConstraint3DService
         for (int i = 0; i < links.Length; i++)
         {
             for (int j = i + 1; j < links.Length; j++)
-                AddSuppressedColliderPair(links[i].Collider, links[j].Collider);
+                _suppressedColliderPairs.Add(links[i].Collider.Id, links[j].Collider.Id);
         }
     }
 
@@ -582,9 +568,9 @@ public sealed class GravitasConstraint3DService
             {
                 for (int j = i + 1; j < ragdoll.LinkCount; j++)
                 {
-                    RemoveSuppressedColliderPair(
-                        ragdoll.GetLink(i).Collider,
-                        ragdoll.GetLink(j).Collider);
+                    _suppressedColliderPairs.Remove(
+                        ragdoll.GetLink(i).Collider.Id,
+                        ragdoll.GetLink(j).Collider.Id);
                 }
             }
         }
@@ -625,26 +611,5 @@ public sealed class GravitasConstraint3DService
             ragdoll.NextRegistered.PreviousRegistered = ragdoll.PreviousRegistered;
 
         _registeredRagdollCount--;
-    }
-
-    private void AddSuppressedColliderPair(LSCollider colliderA, LSCollider colliderB)
-    {
-        ulong key = CreateColliderPairKey(colliderA.Id, colliderB.Id);
-        if (_suppressedColliderPairs.TryGetValue(key, out int count))
-            _suppressedColliderPairs[key] = count + 1;
-        else
-            _suppressedColliderPairs.Add(key, 1);
-    }
-
-    private void RemoveSuppressedColliderPair(LSCollider colliderA, LSCollider colliderB)
-    {
-        ulong key = CreateColliderPairKey(colliderA.Id, colliderB.Id);
-        if (!_suppressedColliderPairs.TryGetValue(key, out int count))
-            return;
-
-        if (count <= 1)
-            _suppressedColliderPairs.Remove(key);
-        else
-            _suppressedColliderPairs[key] = count - 1;
     }
 }

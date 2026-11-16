@@ -338,14 +338,17 @@ public sealed class Constraint2DServiceTests
         Joint2D secondJoint = context.Constraints2D.RegisterJoint(definition);
 
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+        Assert.Equal(1UL, context.Constraints2D.LinkedCollisionProbeLimit);
 
         context.Constraints2D.RemoveJoint(firstJoint.Id).Should().BeTrue();
 
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeTrue();
+        Assert.Equal(1UL, context.Constraints2D.LinkedCollisionProbeLimit);
 
         context.Constraints2D.RemoveJoint(secondJoint.Id).Should().BeTrue();
 
         context.Constraints2D.ShouldExcludeLinkedCollision(first.Collider, second.Collider).Should().BeFalse();
+        Assert.Equal(0UL, context.Constraints2D.LinkedCollisionProbeLimit);
     }
 
     [Fact]

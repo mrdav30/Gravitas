@@ -409,6 +409,83 @@ public sealed class Physics2DSupportQueryTests
         Assert.Throws<ArgumentException>(() => context.Query2D.QuerySupport(request, out _));
     }
 
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void BoundedSupport_ReplaysAfterRemovedLinksAndCheckpointRestore(GravitasSerializationTransport transport)
+    {
+        using var live = Physics2DTestWorld.CreateContext();
+        using var restored = Physics2DTestWorld.CreateContext();
+        var first = CreateLinkedFloorScene(live);
+        var second = CreateLinkedFloorScene(restored);
+        var discarded = new SolidBody2D[32];
+        for (int i = 0; i < discarded.Length; i++)
+        {
+            var body = new SolidBody2D(new TestMatterAgent(context: live), new LSCircleCollider2D(Fixed64.Half));
+            body.Initialize(new Vector2d(15, 15), motionType: PhysicsMobilityType.Kinematic);
+            discarded[i] = body;
+            Link(live, first.Source, body);
+        }
+        foreach (var body in discarded)
+            body.Deactivate();
+        Assert.Equal(1, live.Constraints2D.RegisteredJointCount);
+        GravitasSerializationHarness.Populate(second.Joint,
+            GravitasSerializationHarness.Serialize(first.Joint, transport), transport);
+        live.Simulate();
+        live.LateSimulate();
+        restored.Simulate();
+        restored.LateSimulate();
+
+        var liveRequest = Request(first.Source, Vector2d.Forward, Fixed64.One);
+        var restoredRequest = Request(second.Source, Vector2d.Forward, Fixed64.One);
+        var scratch = new PhysicsQueryScratch(128, 4);
+        var ample = new PhysicsQueryBudget(8192, 8192, 8192);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            restored.Query2D.QuerySupport(restoredRequest, ample, scratch, out var hit, out var expected));
+        Assert.Same(second.Floor, hit.GetValueOrDefault().Hit.Collider);
+        var exact = new PhysicsQueryBudget(expected.Discovery, expected.Candidates, expected.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            live.Query2D.QuerySupport(liveRequest, exact, scratch, out var replay, out var used));
+        Assert.Equal(expected, used);
+        Assert.Same(first.Floor, replay.GetValueOrDefault().Hit.Collider);
+        Assert.Equal(hit!.Value.Hit.Point, replay!.Value.Hit.Point);
+        Assert.Equal(hit.Value.Hit.Distance, replay.Value.Hit.Distance);
+        Assert.Equal(hit.Value.Hit.Normal, replay.Value.Hit.Normal);
+
+        var oneBelow = new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            live.Query2D.QuerySupport(liveRequest, oneBelow, scratch, out replay, out used));
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            restored.Query2D.QuerySupport(restoredRequest, oneBelow, scratch, out hit, out expected));
+        Assert.Equal(expected, used);
+        Assert.Null(hit);
+        Assert.Null(replay);
+
+        static (SolidBody2D Source, LSAABBoxCollider2D Floor, Joint2D Joint)
+            CreateLinkedFloorScene(GravitasWorldContext context)
+        {
+            context.Environment.Gravity = Fixed64.Zero;
+            var source = Source(context);
+            source.SetMotionType(PhysicsMobilityType.Dynamic);
+            source.UseManualGrounding();
+            var floorPosition = new Vector2d(Fixed64.Zero, -Fixed64.Half);
+            var linked = new SolidBody2D(new TestMatterAgent(context: context),
+                new LSAABBoxCollider2D(new Vector2d(3, 1)));
+            linked.Initialize(floorPosition, motionType: PhysicsMobilityType.Kinematic);
+            var floor = new LSAABBoxCollider2D(new Vector2d(3, 1));
+            Initialize(context, floor, floorPosition);
+            return (source, floor, Link(context, source, linked));
+        }
+
+        static Joint2D Link(GravitasWorldContext context, SolidBody2D source, SolidBody2D target)
+        {
+            Joint2D joint = context.Constraints2D.RegisterJoint(new JointDefinition2D(source, target,
+                JointFrame2D.Identity, JointFrame2D.Identity, JointType2D.Pin, JointLimit2D.Unrestricted,
+                JointMotor2D.Disabled, JointCollisionPolicy.SuppressLinked));
+            joint.IsEnabled = false;
+            return joint;
+        }
+    }
+
     [Fact]
     public void LinkedSupport_UsesPhysicalJointExclusion()
     {
