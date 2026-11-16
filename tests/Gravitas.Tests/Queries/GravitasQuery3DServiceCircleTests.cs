@@ -672,7 +672,7 @@ public sealed class GravitasQuery3DServiceCircleTests
         {
             context.World.TryGetVoxel(collider.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
             voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
-            partition!.ContainedStaticObjects!.Add(collider.Id + 1).Should().BeTrue();
+            partition!.ContainedStaticObjects!.TryAddUnique(collider.Id + 1).Should().BeTrue();
         }
 
         context.Physics.TryGetColliderById(collider.Id + 1, out _).Should().BeFalse();

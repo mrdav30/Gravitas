@@ -100,15 +100,15 @@ public sealed partial class GravitasQuery2DService
     }
 
     private PhysicsQueryExecutionStatus VisitBoundedSupportMembership(
-        SwiftHashSet<int>? membership, in Physics2DSupportQuery request, Vector2d end, Vector2d min, Vector2d max,
+        SwiftSortedList<int>? membership, in Physics2DSupportQuery request, Vector2d end, Vector2d min, Vector2d max,
         PhysicsQueryScratch scratch, ref PhysicsQueryMeter meter, ref Physics2DHit? closest)
     {
         if (membership == null || membership.Count == 0)
             return PhysicsQueryExecutionStatus.Completed;
-        if (!meter.ChargeCandidates((ulong)membership.EnumerationSlotCount))
+        if (!meter.ChargeCandidates((ulong)membership.Count))
             return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
 
-        foreach (int id in membership)
+        foreach (int id in membership.AsReadOnlySpan())
         {
             if (!_context.Physics2D.TryGetColliderById(id, out var collider) || !collider!.IsActive
                 || !request.Layers.Includes(collider.Layer) || !IsSupportCandidate(request, collider)

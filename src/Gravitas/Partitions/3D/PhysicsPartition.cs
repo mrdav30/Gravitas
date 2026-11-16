@@ -31,7 +31,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>
     /// Stores context-local dynamic body IDs.
     /// </summary>
-    internal SwiftHashSet<int>? ContainedDynamicObjects;
+    internal SwiftSortedList<int>? ContainedDynamicObjects;
 
     /// <summary>
     /// Stores the subset of dynamic collider IDs whose bodies can currently drive collision work.
@@ -39,10 +39,10 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     internal SwiftHashSet<int>? ContainedAwakeDynamicObjects;
 
     /// <summary>Stores context-local kinematic collider IDs.</summary>
-    internal SwiftHashSet<int>? ContainedKinematicObjects;
+    internal SwiftSortedList<int>? ContainedKinematicObjects;
 
     /// <summary>Stores context-local static collider IDs.</summary>
-    internal SwiftHashSet<int>? ContainedStaticObjects;
+    internal SwiftSortedList<int>? ContainedStaticObjects;
 
     /// <summary>Gets the active-partition slot, or <c>-1</c> when inactive.</summary>
     public int ActivationId { get; private set; }
@@ -110,7 +110,6 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
 
         dynamicIds.FastClear();
         CopyIds(ContainedDynamicObjects, dynamicIds);
-        dynamicIds.SortInPlace();
         CopyStaticStyleColliderIds(staticIds);
 
         // Sleeping bodies stay query-visible in dynamic membership, while awake membership gates partition work.
@@ -149,13 +148,12 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         destination.SortInPlace();
     }
 
-    private static void CopyIds(SwiftHashSet<int>? source, SwiftList<int> destination)
+    private static void CopyIds(SwiftSortedList<int>? source, SwiftList<int> destination)
     {
         if (source == null)
             return;
 
-        foreach (int id in source)
-            destination.Add(id);
+        destination.AddRange(source.AsReadOnlySpan());
     }
 
     private void ProcessPair(int id1, int id2)
@@ -176,7 +174,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     {
         ChronicleGuard.ThrowIfNegative(item, nameof(item));
         ContainedDynamicObjects ??= new();
-        if (!ContainedDynamicObjects.Add(item))
+        if (!ContainedDynamicObjects.TryAddUnique(item))
             return;
 
         MarkOccupied();
@@ -191,7 +189,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     {
         ChronicleGuard.ThrowIfNegative(item, nameof(item));
         ContainedStaticObjects ??= new();
-        if (ContainedStaticObjects.Add(item))
+        if (ContainedStaticObjects.TryAddUnique(item))
             MarkOccupied();
     }
 
@@ -200,7 +198,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     {
         ChronicleGuard.ThrowIfNegative(item, nameof(item));
         ContainedKinematicObjects ??= new();
-        if (ContainedKinematicObjects.Add(item))
+        if (ContainedKinematicObjects.TryAddUnique(item))
             MarkOccupied();
     }
 

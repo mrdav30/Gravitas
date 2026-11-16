@@ -667,7 +667,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         dynamicIds.Count.Should().Be(0);
         staticIds.Count.Should().Be(0);
 
-        partition.ContainedDynamicObjects = new SwiftHashSet<int>();
+        partition.ContainedDynamicObjects = new SwiftSortedList<int>();
         partition.Distribute(dynamicIds, staticIds);
         dynamicIds.Count.Should().Be(0);
         staticIds.Count.Should().Be(0);

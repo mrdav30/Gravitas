@@ -1281,7 +1281,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         {
             context.World.TryGetVoxel(target.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
             voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
-            partition!.ContainedDynamicObjects!.Add(staleId).Should().BeTrue();
+            partition!.ContainedDynamicObjects!.TryAddUnique(staleId).Should().BeTrue();
         }
 
         context.Physics.TryGetColliderById(staleId, out _).Should().BeFalse();
@@ -1307,8 +1307,8 @@ public sealed class GravitasQuery3DServiceSweepTests
         {
             context.World.TryGetVoxel(dynamicTarget.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
             voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
-            partition!.ContainedStaticObjects ??= new SwiftHashSet<int>();
-            partition.ContainedStaticObjects.Add(dynamicTarget.Id).Should().BeTrue();
+            partition!.ContainedStaticObjects ??= new SwiftSortedList<int>();
+            partition.ContainedStaticObjects.TryAddUnique(dynamicTarget.Id).Should().BeTrue();
         }
 
         var hits = new SwiftList<Physics3DHit>();

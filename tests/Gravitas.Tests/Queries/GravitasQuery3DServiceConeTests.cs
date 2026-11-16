@@ -248,7 +248,7 @@ public sealed class GravitasQuery3DServiceConeTests
         {
             scenario.Context.World.TryGetVoxel(target.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
             voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
-            partition!.ContainedDynamicObjects!.Add(staleId).Should().BeTrue();
+            partition!.ContainedDynamicObjects!.TryAddUnique(staleId).Should().BeTrue();
         }
 
         scenario.Context.Physics.TryGetColliderById(staleId, out _).Should().BeFalse();

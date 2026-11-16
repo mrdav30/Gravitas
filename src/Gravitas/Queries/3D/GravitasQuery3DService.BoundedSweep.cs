@@ -123,16 +123,16 @@ public sealed partial class GravitasQuery3DService
     }
 
     private PhysicsQueryExecutionStatus ScanBoundedSweepMemberships(
-        SwiftHashSet<int>? memberships, Vector3d direction, PhysicsLayerMask layerMask,
+        SwiftSortedList<int>? memberships, Vector3d direction, PhysicsLayerMask layerMask,
         LSCollider? excludedCollider, PhysicsQueryScratch scratch, ref PhysicsQueryMeter meter,
         ref Physics3DHit? closest)
     {
         if (memberships == null || memberships.Count == 0)
             return PhysicsQueryExecutionStatus.Completed;
-        if (!meter.ChargeCandidates((ulong)memberships.EnumerationSlotCount))
+        if (!meter.ChargeCandidates((ulong)memberships.Count))
             return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
 
-        foreach (int id in memberships)
+        foreach (int id in memberships.AsReadOnlySpan())
         {
             if (!_context.Physics.TryGetColliderById(id, out LSCollider? collider)
                 || ReferenceEquals(collider, excludedCollider) || !layerMask.Includes(collider!.Layer))

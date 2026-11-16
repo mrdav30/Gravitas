@@ -266,7 +266,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForClosestHit(
-        SwiftHashSet<int>? colliderIds,
+        SwiftSortedList<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
@@ -300,7 +300,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForAllHits(
-        SwiftHashSet<int>? colliderIds,
+        SwiftSortedList<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         SwiftList<Physics3DHit> results)
@@ -345,7 +345,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForClosestSweepHit(
-        SwiftHashSet<int>? colliderIds,
+        SwiftSortedList<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
@@ -413,7 +413,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForAllSweepHits(
-        SwiftHashSet<int>? colliderIds,
+        SwiftSortedList<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         SwiftList<Physics3DHit> results)
@@ -429,7 +429,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForClosestConvexSweepHit(
-        SwiftHashSet<int>? colliderIds,
+        SwiftSortedList<int>? colliderIds,
         ref bool found,
         ref Physics3DHit closestHit)
     {
@@ -450,7 +450,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForAllConvexSweepHits(
-        SwiftHashSet<int>? colliderIds,
+        SwiftSortedList<int>? colliderIds,
         SwiftList<Physics3DHit> results)
     {
         if (colliderIds == null)

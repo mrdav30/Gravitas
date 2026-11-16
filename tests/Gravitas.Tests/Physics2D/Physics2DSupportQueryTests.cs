@@ -5,6 +5,7 @@ using Gravitas.Colliders;
 using Gravitas.Constraints;
 using Gravitas.Queries;
 using Gravitas.Support;
+using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
 using Xunit;
 
@@ -12,6 +13,74 @@ namespace Gravitas.Tests.Physics2D;
 
 public sealed class Physics2DSupportQueryTests
 {
+    public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void BoundedSupport_ReplaysAfterRemovedMembershipsAndCheckpointRestore(GravitasSerializationTransport transport)
+    {
+        using var live = Physics2DTestWorld.CreateContext();
+        using var restored = Physics2DTestWorld.CreateContext();
+        SolidBody2D liveSource = Source(live);
+        SolidBody2D restoredSource = Source(restored);
+        var liveFloor = new LSAABBoxCollider2D(new Vector2d(3, 1));
+        var restoredFloor = new LSAABBoxCollider2D(new Vector2d(3, 1));
+        var floorPosition = new Vector2d(Fixed64.Zero, -Fixed64.Half);
+        Initialize(live, liveFloor, floorPosition);
+        Initialize(restored, restoredFloor, floorPosition);
+        var liveSecond = new LSAABBoxCollider2D(new Vector2d(3, 1));
+        var restoredSecond = new LSAABBoxCollider2D(new Vector2d(3, 1));
+        Initialize(live, liveSecond, floorPosition);
+        Initialize(restored, restoredSecond, floorPosition);
+        var discarded = new LSAABBoxCollider2D[16];
+        for (int i = 0; i < discarded.Length; i++)
+        {
+            discarded[i] = new LSAABBoxCollider2D(new Vector2d(3, 1));
+            Initialize(live, discarded[i], floorPosition);
+        }
+        foreach (var collider in discarded)
+            collider.Deactivate();
+        liveFloor.LocalOffset = Vector2d.Right * (Fixed64)32;
+        liveFloor.Simulate();
+        liveFloor.LocalOffset = Vector2d.Zero;
+        liveFloor.Simulate();
+        live.Simulate();
+        live.LateSimulate();
+        GravitasSerializationHarness.Populate(restoredSource,
+            GravitasSerializationHarness.Serialize(liveSource, transport), transport);
+        GravitasSerializationHarness.Populate(restoredFloor,
+            GravitasSerializationHarness.Serialize(liveFloor, transport), transport);
+        GravitasSerializationHarness.Populate(restoredSecond,
+            GravitasSerializationHarness.Serialize(liveSecond, transport), transport);
+        restored.Simulate();
+        restored.LateSimulate();
+
+        var liveRequest = Request(liveSource, Vector2d.Forward, Fixed64.One);
+        var restoredRequest = Request(restoredSource, Vector2d.Forward, Fixed64.One);
+        var scratch = new PhysicsQueryScratch(128, 16);
+        var ample = new PhysicsQueryBudget(8192, 8192, 8192);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            restored.Query2D.QuerySupport(restoredRequest, ample, scratch, out var hit, out var expected));
+        Assert.Same(restoredFloor, hit.GetValueOrDefault().Hit.Collider);
+        var exact = new PhysicsQueryBudget(expected.Discovery, expected.Candidates, expected.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            live.Query2D.QuerySupport(liveRequest, exact, scratch, out var replay, out var used));
+        Assert.Equal(expected, used);
+        Assert.Same(liveFloor, replay.GetValueOrDefault().Hit.Collider);
+        Assert.Equal(hit!.Value.Hit.Point, replay!.Value.Hit.Point);
+        Assert.Equal(hit.Value.Hit.Distance, replay.Value.Hit.Distance);
+        Assert.Equal(hit.Value.Hit.Normal, replay.Value.Hit.Normal);
+
+        var oneBelow = new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            live.Query2D.QuerySupport(liveRequest, oneBelow, scratch, out replay, out used));
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            restored.Query2D.QuerySupport(restoredRequest, oneBelow, scratch, out hit, out expected));
+        Assert.Equal(expected, used);
+        Assert.Null(hit);
+        Assert.Null(replay);
+    }
+
     [Fact]
     public void BoundedFloor_ReplaysExactWitnessAndStopsBeforeUnchargedWork()
     {

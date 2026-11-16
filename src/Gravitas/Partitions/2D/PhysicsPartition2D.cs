@@ -34,17 +34,17 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
     /// <summary>Gets or sets whether this partition is attached to a voxel.</summary>
     public bool IsPartitioned { get; set; }
 
-    /// <summary>Stores context-local dynamic collider IDs.</summary>
-    internal SwiftHashSet<int>? ContainedDynamicObjects;
+    /// <summary>Stores unique context-local dynamic collider IDs in ascending order.</summary>
+    internal SwiftSortedList<int>? ContainedDynamicObjects;
 
     /// <summary>Stores the awake subset of the dynamic collider IDs.</summary>
     internal SwiftHashSet<int>? ContainedAwakeDynamicObjects;
 
     /// <summary>Stores context-local kinematic collider IDs.</summary>
-    internal SwiftHashSet<int>? ContainedKinematicObjects;
+    internal SwiftSortedList<int>? ContainedKinematicObjects;
 
     /// <summary>Stores context-local static collider IDs.</summary>
-    internal SwiftHashSet<int>? ContainedStaticObjects;
+    internal SwiftSortedList<int>? ContainedStaticObjects;
 
     /// <summary>Gets the active-partition slot, or <c>-1</c> when inactive.</summary>
     public int ActivationId { get; private set; }
@@ -107,7 +107,6 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
 
         dynamicIds.FastClear();
         CopyIds(ContainedDynamicObjects, dynamicIds);
-        dynamicIds.SortInPlace();
         CopyStaticStyleColliderIds(staticIds);
 
         for (int j = 0; j < dynamicIds.Count; j++)
@@ -140,13 +139,12 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
         destination.SortInPlace();
     }
 
-    private static void CopyIds(SwiftHashSet<int>? source, SwiftList<int> destination)
+    private static void CopyIds(SwiftSortedList<int>? source, SwiftList<int> destination)
     {
         if (source == null)
             return;
 
-        foreach (int id in source)
-            destination.Add(id);
+        destination.AddRange(source.AsReadOnlySpan());
     }
 
     /// <summary>Adds a dynamic collider ID to this partition.</summary>
@@ -154,7 +152,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
     {
         ChronicleGuard.ThrowIfNegative(item, nameof(item));
         ContainedDynamicObjects ??= new();
-        if (!ContainedDynamicObjects.Add(item))
+        if (!ContainedDynamicObjects.TryAddUnique(item))
             return;
 
         MarkOccupied();
@@ -169,7 +167,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
     {
         ChronicleGuard.ThrowIfNegative(item, nameof(item));
         ContainedStaticObjects ??= new();
-        if (ContainedStaticObjects.Add(item))
+        if (ContainedStaticObjects.TryAddUnique(item))
             MarkOccupied();
     }
 
@@ -178,7 +176,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
     {
         ChronicleGuard.ThrowIfNegative(item, nameof(item));
         ContainedKinematicObjects ??= new();
-        if (ContainedKinematicObjects.Add(item))
+        if (ContainedKinematicObjects.TryAddUnique(item))
             MarkOccupied();
     }
 

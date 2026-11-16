@@ -463,12 +463,13 @@ step before retrying. A change to an acquired view returns `Stale`. Keep the
 query on the simulation thread and serialize it with world and collider
 mutation.
 
-Measured work can reflect physical storage history. For example, the query
-charges a conservative allowance for partition membership slots, including
-empty slots left by previous membership changes. Identical work and results
-assume the same registration and partition state as well as the same query
-inputs and limits. The counters describe bounded work and may include prepaid
-costs. Evaluate query and complete-step latency separately on representative
+Within each partition and mobility class, bounded queries visit live collider
+IDs in ascending order. The candidate counter includes memberships, comparisons
+against retained IDs, and any shifts needed to insert a new ID. Removed
+memberships add no charge. Partition lookup and linked-collider filtering can
+still reflect physical storage history. Identical work and results assume
+matching collider order, equivalent query state, and the same inputs and
+limits. Evaluate query and complete-step latency separately on representative
 workloads.
 
 ## Grid Changes And Query Readiness

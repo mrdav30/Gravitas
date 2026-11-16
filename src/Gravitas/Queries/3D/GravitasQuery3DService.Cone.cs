@@ -197,7 +197,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessConeColliderListForClosestHit(
-        SwiftHashSet<int>? colliderIds,
+        SwiftSortedList<int>? colliderIds,
         Vector3d origin,
         Vector3d baseCenter,
         Vector3d direction,
@@ -225,7 +225,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessConeColliderListForAllHits(
-        SwiftHashSet<int>? colliderIds,
+        SwiftSortedList<int>? colliderIds,
         Vector3d origin,
         Vector3d baseCenter,
         Vector3d direction,

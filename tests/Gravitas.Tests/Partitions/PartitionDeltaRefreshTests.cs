@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -43,7 +45,7 @@ public sealed class PartitionDeltaRefreshTests
         for (int i = 0; i < coordinates.Count; i++)
             previousCoordinates[i] = coordinates[i];
         coordinates.Count.Should().BeGreaterThan(0);
-        SwiftHashSet<int> membership = GetDynamicMembership(context, coordinates[0], planar, mixed);
+        IReadOnlyCollection<int> membership = GetDynamicMembership(context, coordinates[0], planar, mixed);
         var enumeration = membership.GetEnumerator();
         uint version = planar ? body2D!.Collider.BroadPhaseVersion : body3D!.Collider.BroadPhaseVersion;
 
@@ -316,15 +318,15 @@ public sealed class PartitionDeltaRefreshTests
         }
     }
 
-    private static SwiftHashSet<int> GetDynamicMembership(
+    private static IReadOnlyCollection<int> GetDynamicMembership(
         GravitasWorldContext context, WorldVoxelIndex coordinate, bool planar, bool mixed)
     {
-        SwiftHashSet<int>? membership = FindDynamicMembership(context, coordinate, planar, mixed);
+        IReadOnlyCollection<int>? membership = FindDynamicMembership(context, coordinate, planar, mixed);
         membership.Should().NotBeNull();
         return membership!;
     }
 
-    private static SwiftHashSet<int>? FindDynamicMembership(
+    private static IReadOnlyCollection<int>? FindDynamicMembership(
         GravitasWorldContext context, WorldVoxelIndex coordinate, bool planar, bool mixed)
     {
         if (!context.World.TryGetVoxel(coordinate, out Voxel? voxel))

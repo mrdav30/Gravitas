@@ -311,7 +311,7 @@ public sealed class GravitasCollision2DService
     }
 
     private void CollectMembershipCandidates(
-        SwiftHashSet<int>? membership,
+        SwiftSortedList<int>? membership,
         Vector2d min,
         Vector2d max,
         PhysicsLayerMask layerMask,

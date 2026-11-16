@@ -54,16 +54,30 @@ public sealed class PhysicsQueryScratch
     internal PhysicsQueryExecutionStatus RememberCandidate(int id, ref PhysicsQueryMeter meter, out bool isNew)
     {
         isNew = false;
-        for (int i = 0; i < _candidateCount; i++)
+        int first = 0;
+        int last = _candidateCount - 1;
+        while (first <= last)
         {
             if (!meter.ChargeCandidate())
                 return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
-            if (_candidateIds[i] == id)
+            int middle = first + (last - first) / 2;
+            int candidate = _candidateIds[middle];
+            if (candidate == id)
                 return PhysicsQueryExecutionStatus.Completed;
+            if (candidate < id)
+                first = middle + 1;
+            else
+                last = middle - 1;
         }
         if (_candidateCount == _candidateIds.Length)
             return PhysicsQueryExecutionStatus.ScratchCapacityExceeded;
-        _candidateIds[_candidateCount++] = id;
+        int shifted = _candidateCount - first;
+        if (!meter.ChargeCandidates((ulong)shifted))
+            return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
+        if (shifted != 0)
+            Array.Copy(_candidateIds, first, _candidateIds, first + 1, shifted);
+        _candidateIds[first] = id;
+        _candidateCount++;
         isNew = true;
         return PhysicsQueryExecutionStatus.Completed;
     }

@@ -211,7 +211,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForAllSphereHits(
-        SwiftHashSet<int>? colliderIds,
+        SwiftSortedList<int>? colliderIds,
         Vector3d position,
         Fixed64 radius,
         SwiftList<Physics3DHit> results)

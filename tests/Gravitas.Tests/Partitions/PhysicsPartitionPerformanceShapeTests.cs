@@ -73,6 +73,7 @@ public sealed class PhysicsPartitionPerformanceShapeTests
         partition.AwakeDynamicObjectCount.Should().Be(1);
 
         partition.RemoveDynamicObject(2);
+        partition.RemoveDynamicObject(2);
 
         partition.ActivationId.Should().Be(-1);
         context.Collisions.ActivePartitionCount.Should().Be(0);
@@ -91,7 +92,7 @@ public sealed class PhysicsPartitionPerformanceShapeTests
         dynamicIds.Count.Should().Be(0);
         staticIds.Count.Should().Be(0);
 
-        partition.ContainedDynamicObjects = new SwiftHashSet<int>();
+        partition.ContainedDynamicObjects = new SwiftSortedList<int>();
         partition.Distribute(dynamicIds, staticIds);
         dynamicIds.Count.Should().Be(0);
         staticIds.Count.Should().Be(0);
