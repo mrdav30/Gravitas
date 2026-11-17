@@ -475,13 +475,14 @@ Within each partition and mobility class, bounded queries visit live collider
 IDs in ascending order. The candidate counter includes memberships, comparisons
 against retained IDs, and any shifts needed to insert a new ID. Removed
 memberships add no charge. Partition lookup reserves the same work whether
-the requested type is absent or retained empty. Other attached partitions
-contribute to the lookup allowance. Linked-collider filtering reserves the
-binary-search comparison bound from the live suppressed pair count. Multiple
-joints or ragdoll rules suppressing one pair share that entry. Identical work
-and results assume matching collider order, equivalent query state, and the
-same inputs and limits. Evaluate query and complete-step latency separately on representative
-workloads.
+the requested type is absent or retained empty. Native caches for the other
+dimension and for mixed physics are excluded from pure-mode discovery work.
+Host-defined partitions contribute to the lookup allowance. Linked-collider
+filtering reserves the binary-search comparison bound from the live suppressed
+pair count. Multiple joints or ragdoll rules suppressing one pair share that
+entry. Identical work and results assume matching collider order, equivalent
+query state, and the same inputs and limits. Evaluate query and complete-step
+latency separately on representative workloads.
 
 ## Bounded collider posture clearance
 

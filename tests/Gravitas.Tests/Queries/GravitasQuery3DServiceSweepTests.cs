@@ -3072,6 +3072,25 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorkerRefreshesSupportMappedSourceWhenTheSegmentReverses()
+    {
+        using var context = GravitasWorldContext.CreateOwned();
+        var target = CreateDynamicCollider(context, new LSCylinderCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        var start = Vector3d.Left * (Fixed64)2;
+        var end = -start;
+
+        worker.Prepare(start, end, Fixed64.Half);
+        Assert.True(worker.TrySweep(target, out Vector3d forward, out Fixed64 forwardDistance));
+        worker.Prepare(end, start, Fixed64.Half);
+        Assert.True(worker.TrySweep(target, out Vector3d reverse, out Fixed64 reverseDistance));
+
+        Assert.True(forward.X < Fixed64.Zero);
+        Assert.True(reverse.X > Fixed64.Zero);
+        Assert.Equal(forwardDistance, reverseDistance);
+    }
+
+    [Fact]
     public void SweptSphereWorker_ShouldDetectCylinderSideImpact()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

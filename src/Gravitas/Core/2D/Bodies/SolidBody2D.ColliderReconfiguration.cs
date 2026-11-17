@@ -236,7 +236,7 @@ public sealed partial class SolidBody2D
 
         // All geometry and mass work has succeeded on detached state. There are
         // no host callbacks until every authoritative view has been published.
-        if (!Agent.Transform.TrySetWorldPosition(worldPosition))
+        if (!Agent.Transform.TrySetWorldPositionWithStrictHierarchy(worldPosition))
             return false;
         _position = position;
         Collider.PublishBodyReconfigurationCandidate(candidate);

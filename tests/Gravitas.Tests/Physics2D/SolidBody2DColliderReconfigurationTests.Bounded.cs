@@ -12,14 +12,18 @@ namespace Gravitas.Tests.Physics2D;
 public sealed partial class SolidBody2DColliderReconfigurationTests
 {
     [Theory]
-    [InlineData(-1_000_000_000, 2, 500_000_000, 1_500_000_000)]
-    [InlineData(1_000_000_000, 1, -1_000_000_000, -1_500_000_000)]
+    [InlineData(-1_000_000_000, 2, 500_000_000, 1_500_000_000, 0)]
+    [InlineData(1_000_000_000, 1, -1_000_000_000, -1_500_000_000, 0)]
+    [InlineData(1_000_000_000, 1, 0, 1_500_000_000, -1_000_000_000)]
     public void UnrepresentableHostPoseLeavesTheCommittedPlanarPostureUnchanged(
-        int parentX, int scale, int localX, int positionX)
+        int parentX, int scale, int localX, int positionX, int grandparentX)
     {
         using GravitasWorldContext context = CreateContext(withGrid: false);
+        // Opposing ancestors can compose on their own while the requested child overflows in between.
+        FixedTransform? grandparent = grandparentX == 0 ? null :
+            new FixedTransform(new Vector3d(grandparentX, 0, 0), FixedQuaternion.Identity, Vector3d.One);
         var parent = new FixedTransform(new Vector3d(parentX, 0, 0),
-            FixedQuaternion.Identity, Vector3d.One * (Fixed64)scale);
+            FixedQuaternion.Identity, Vector3d.One * (Fixed64)scale, grandparent);
         var localPosition = new Vector3d(localX, 0, 0);
         var transform = new FixedTransform(localPosition, FixedQuaternion.Identity, Vector3d.One, parent);
         var body = new SolidBody2D(new TestMatterAgent(context, transform), new LSCircleCollider2D(Fixed64.Half))
@@ -28,14 +32,17 @@ public sealed partial class SolidBody2DColliderReconfigurationTests
         var before = context.ComputeReplayHash();
         var position = new Vector2d(positionX, 0);
         var budget = new PhysicsQueryBudget(2, 32, 32);
+        int publications = 0;
 
         body.TryReconfigureCollider(ColliderShapeDefinition2D.Circle(Fixed64.One), Vector2d.Zero, position, budget,
-            new PhysicsQueryScratch(0, 0), out var result, out var blocker, out var failure, out _)
+            new PhysicsQueryScratch(0, 0), out var result, out var blocker, out var failure, out _, () => publications++)
             .Should().Be(PhysicsQueryExecutionStatus.Unrepresentable);
 
         result.Should().BeNull();
         blocker.Should().BeNull();
         failure.Should().BeNull();
+        publications.Should().Be(0);
+        body.Position.Should().Be(Vector2d.Zero);
         transform.LocalPosition.Should().Be(localPosition);
         context.ComputeReplayHash().Should().Be(before);
     }

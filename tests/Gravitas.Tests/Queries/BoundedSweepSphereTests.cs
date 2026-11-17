@@ -41,6 +41,12 @@ public sealed class BoundedSweepSphereTests
         Assert.True(live.World.TryGetVoxel(Vector3d.Up * (Fixed64)2, out var occupiedHistory));
         Assert.NotNull(occupiedHistory!.GetPartitionOrDefault<PhysicsPartition>());
         transient.Deactivate();
+        var planarTransient = new LSCircleCollider2D(Fixed64.Half);
+        planarTransient.InitializeWithNoBody(new TestMatterAgent(live,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        Assert.True(live.World.TryGetVoxel(Vector3d.Zero, out var planarHistory));
+        Assert.NotNull(planarHistory!.GetPartitionOrDefault<PhysicsPartition2D>());
+        planarTransient.Deactivate();
         live.Simulate();
         live.LateSimulate();
         GravitasSerializationHarness.Populate(restoredFloor,
@@ -52,6 +58,9 @@ public sealed class BoundedSweepSphereTests
         Assert.True(restored.World.TryGetVoxel(Vector3d.Up * (Fixed64)2, out var untouched));
         Assert.True(Assert.IsType<PhysicsPartition>(occupiedHistory.GetPartitionOrDefault<PhysicsPartition>()).IsEmpty);
         Assert.Null(untouched!.GetPartitionOrDefault<PhysicsPartition>());
+        Assert.True(restored.World.TryGetVoxel(Vector3d.Zero, out var untouchedPlanar));
+        Assert.True(Assert.IsType<PhysicsPartition2D>(planarHistory.GetPartitionOrDefault<PhysicsPartition2D>()).IsEmpty);
+        Assert.Null(untouchedPlanar!.GetPartitionOrDefault<PhysicsPartition2D>());
 
         var scratch = new PhysicsQueryScratch(512, 16);
         var ample = new PhysicsQueryBudget(8192, 8192, 8192);

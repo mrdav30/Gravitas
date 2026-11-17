@@ -54,6 +54,12 @@ public sealed class Physics2DSupportQueryTests
         Assert.True(live.World.TryGetVoxel(Vector3d.Forward * (Fixed64)2, out var occupiedHistory));
         Assert.NotNull(occupiedHistory!.GetPartitionOrDefault<PhysicsPartition2D>());
         transient.Deactivate();
+        var spatialTransient = new LSCuboidCollider { Size = Vector3d.One };
+        spatialTransient.InitializeWithNoBody(new TestMatterAgent(live,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        Assert.True(live.World.TryGetVoxel(Vector3d.Zero, out var spatialHistory));
+        Assert.NotNull(spatialHistory!.GetPartitionOrDefault<PhysicsPartition>());
+        spatialTransient.Deactivate();
         live.Simulate();
         live.LateSimulate();
         GravitasSerializationHarness.Populate(restoredSource,
@@ -67,6 +73,9 @@ public sealed class Physics2DSupportQueryTests
         Assert.True(restored.World.TryGetVoxel(Vector3d.Forward * (Fixed64)2, out var untouched));
         Assert.True(Assert.IsType<PhysicsPartition2D>(occupiedHistory.GetPartitionOrDefault<PhysicsPartition2D>()).IsEmpty);
         Assert.Null(untouched!.GetPartitionOrDefault<PhysicsPartition2D>());
+        Assert.True(restored.World.TryGetVoxel(Vector3d.Zero, out var untouchedSpatial));
+        Assert.True(Assert.IsType<PhysicsPartition>(spatialHistory.GetPartitionOrDefault<PhysicsPartition>()).IsEmpty);
+        Assert.Null(untouchedSpatial!.GetPartitionOrDefault<PhysicsPartition>());
 
         var liveRequest = Request(liveSource, Vector2d.Forward * (Fixed64)2, (Fixed64)2);
         var restoredRequest = Request(restoredSource, Vector2d.Forward * (Fixed64)2, (Fixed64)2);

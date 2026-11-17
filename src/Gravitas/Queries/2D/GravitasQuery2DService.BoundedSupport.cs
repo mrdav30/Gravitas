@@ -7,7 +7,6 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
-using GridForge.Grids;
 using SwiftCollections;
 
 namespace Gravitas.Queries;
@@ -48,11 +47,10 @@ public sealed partial class GravitasQuery2DService
             Physics2DHit? closest = null;
             for (int i = 0; i < voxelCount; i++)
             {
-                var partitionStatus = scratch.Voxels[i]!.TryGetPartitionBounded<PhysicsPartition2D>(
-                    meter.DiscoveryRemaining, out ulong partitionWork, out var partition);
-                meter.AddDiscovery(partitionWork);
-                if (partitionStatus != GridBoundedVoxelStatus.Completed)
-                    return PhysicsQueryScratch.MapDiscoveryFailure(partitionStatus);
+                status = PhysicsQueryScratch.GetNativePartition<PhysicsPartition2D, PhysicsPartition>(
+                    scratch.Voxels[i]!, ref meter, out var partition);
+                if (status != PhysicsQueryExecutionStatus.Completed)
+                    return status;
                 if (partition == null)
                     continue;
 

@@ -9,6 +9,7 @@ using System;
 using System.Threading;
 using FixedMathSharp;
 using GridForge.Grids;
+using GridForge.Spatial;
 
 namespace Gravitas.Queries;
 
@@ -130,7 +131,19 @@ public sealed partial class PhysicsQueryScratch
         GravitasWorldContext context, ulong sequence, PhysicsQueryExecutionStatus unavailable) =>
         context.IsBoundedQueryViewCurrent(sequence) ? PhysicsQueryExecutionStatus.Completed : unavailable;
 
-    internal static PhysicsQueryExecutionStatus MapDiscoveryFailure(GridBoundedVoxelStatus status) => status switch
+    internal static PhysicsQueryExecutionStatus GetNativePartition<T, TOtherDimension>(
+        Voxel voxel, ref PhysicsQueryMeter meter, out T? partition)
+        where T : class, IVoxelPartition
+        where TOtherDimension : class, IVoxelPartition
+    {
+        var status = voxel.TryGetPartitionBounded<T, TOtherDimension, PhysicsMixedPartition>(
+            meter.DiscoveryRemaining, out ulong work, out partition);
+        meter.AddDiscovery(work);
+        return status == GridBoundedVoxelStatus.Completed
+            ? PhysicsQueryExecutionStatus.Completed : MapDiscoveryFailure(status);
+    }
+
+    private static PhysicsQueryExecutionStatus MapDiscoveryFailure(GridBoundedVoxelStatus status) => status switch
     {
         GridBoundedVoxelStatus.WorkBudgetExceeded => PhysicsQueryExecutionStatus.WorkBudgetExceeded,
         GridBoundedVoxelStatus.CapacityExceeded => PhysicsQueryExecutionStatus.ScratchCapacityExceeded,

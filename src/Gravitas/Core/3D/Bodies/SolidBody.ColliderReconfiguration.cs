@@ -258,7 +258,7 @@ public partial class SolidBody
     private bool TryCommitReconfigurationGeometry(ColliderShapeDefinition definition, Vector3d localOffset, Vector3d position)
     {
         Collider.PrepareBodyReconfiguration(definition, localOffset, position, Rotation);
-        if (!PositionTransform.TrySetWorldPosition(position))
+        if (!PositionTransform.TrySetWorldPositionWithStrictHierarchy(position, Agent.Transform))
             return false;
 
         Context.Constraints3D.ClearSolverCachesForBody(this);

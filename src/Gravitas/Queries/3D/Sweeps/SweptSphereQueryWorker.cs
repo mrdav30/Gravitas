@@ -32,6 +32,7 @@ public sealed class SweptSphereQueryWorker
     private Fixed64 _length;
     private Fixed64 _radius;
     private int _sweepDepth;
+    private bool _finiteAxisPrepared;
 
     internal int LastMeshTriangleCandidateCount { get; private set; }
 
@@ -43,6 +44,7 @@ public sealed class SweptSphereQueryWorker
         _start = start;
         _end = end;
         _radius = radius;
+        _finiteAxisPrepared = false;
 
         if (!Vector3d.TrySubtract(end, start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out _length))
@@ -58,10 +60,7 @@ public sealed class SweptSphereQueryWorker
             BoundsTolerance,
             out _sweptBoundsMin,
             out _sweptBoundsMax);
-        _finiteAxisConvexSweep.PrepareSphereSource(
-            start,
-            radius,
-            segment);
+        ChronicleGuard.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "Sphere sweep radius cannot be negative.");
     }
 
     /// <summary>
@@ -220,6 +219,12 @@ public sealed class SweptSphereQueryWorker
     {
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
+        if (!_finiteAxisPrepared)
+        {
+            // Prepare already admitted the full segment difference.
+            _finiteAxisConvexSweep.PrepareSphereSource(_start, _radius, _end - _start);
+            _finiteAxisPrepared = true;
+        }
         bool found = _finiteAxisConvexSweep.TrySweepPreparedSource(
                 target,
                 out Physics3DHit hit);
