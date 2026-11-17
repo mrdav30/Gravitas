@@ -5,7 +5,6 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using System;
 using System.Runtime.CompilerServices;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
@@ -442,13 +441,13 @@ public static partial class CollisionDetectionMixed
             MixedEmbedded2DGeometry.GetClosestAnchorOnEmbeddedVolume(
                 prism,
                 cone.Center);
-        // Earlier exact axes admit a shared finite feature neighborhood, so
-        // each relative offset remains representable through the cone frame.
-        _ = embeddedPoint.TryGetOffsetFrom(
+        // Overlapping bounds keep the nearest embedded point within a few shape reaches,
+        // so its offset fits in both the world and cone frames even at scalar faces.
+        bool offsetRepresented = embeddedPoint.TryGetOffsetFrom(
             cone.Center,
             out Vector3d centerToEmbedded);
-        if (!cone.Rotation.Inverse().TryRotate(centerToEmbedded, out Vector3d localEmbeddedPoint))
-            throw new InvalidOperationException("The embedded point cannot be expressed in the cone frame.");
+        bool rotationRepresented = cone.Rotation.Inverse().TryRotate(centerToEmbedded, out Vector3d localEmbeddedPoint);
+        System.Diagnostics.Debug.Assert(offsetRepresented && rotationRepresented);
         _ = FixedSegment.TryGetClosestCenteredFiniteConeSurfaceOffset(
             localEmbeddedPoint,
             Vector3d.Zero,

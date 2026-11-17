@@ -172,54 +172,26 @@ internal readonly partial struct ConvexShape
                 out _);
     }
 
-    public bool TryGetBoundsRelativeTo(
+    public FixedBoundBox GetSourceBoundsRelativeTo(
         Vector3d referenceOrigin,
-        FixedQuaternion referenceRotation,
-        out Vector3d min,
-        out Vector3d max)
+        FixedQuaternion referenceRotation)
     {
-        FixedBoundBox relativeBounds;
+        // Mesh candidate discovery starts at the committed pose and expands by the full chord.
+        System.Diagnostics.Debug.Assert(_offset == Vector3d.Zero);
         if (_kind is ConvexShapeKind.CircleSlab or ConvexShapeKind.Sphere)
         {
             Vector3d extents = _kind == ConvexShapeKind.Sphere
                 ? Vector3d.One * _radius
                 : new Vector3d(_radius, _halfHeight, _radius);
-            relativeBounds =
-                FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
-                    _center,
-                    FixedQuaternion.Identity,
-                    -extents,
-                    extents,
-                    referenceOrigin,
-                    referenceRotation);
-        }
-        else
-        {
-            relativeBounds = ColliderCanonicalBounds.GetRelativeBounds(
-                _collider!,
+            return FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
+                _center,
+                FixedQuaternion.Identity,
+                -extents,
+                extents,
                 referenceOrigin,
                 referenceRotation);
         }
-
-        if (_offset == Vector3d.Zero)
-        {
-            min = relativeBounds.Min;
-            max = relativeBounds.Max;
-            return true;
-        }
-
-        // Source offsets come from a chord whose magnitude was admitted by
-        // Prepare, so a unit rotation cannot move them outside Fixed64.
-        if (!referenceRotation.Inverse().TryRotate(_offset, out Vector3d localOffset)
-            || !Vector3d.TryAdd(relativeBounds.Min, localOffset, out min)
-            || !Vector3d.TryAdd(relativeBounds.Max, localOffset, out max))
-        {
-            min = default;
-            max = default;
-            return false;
-        }
-
-        return true;
+        return ColliderCanonicalBounds.GetRelativeBounds(_collider!, referenceOrigin, referenceRotation);
     }
 
     public ConvexShape WithSourceOffset(Vector3d additionalOffset) =>
@@ -357,13 +329,7 @@ internal readonly partial struct ConvexShape
                     return false;
                 }
 
-                // Sweep offsets come from a chord whose magnitude was admitted
-                // by Prepare, so a unit rotation preserves representability.
-                if (!cuboid.Rotation.Inverse().TryRotate(_offset, out Vector3d localTranslation))
-                {
-                    closest = default;
-                    return false;
-                }
+                Vector3d localTranslation = ConvexColliderSupport.GetLocalDisplacement(cuboid.Rotation, _offset);
                 return cuboid.OrientedBox
                     .GetClosestPointAnchor(untranslatedPoint)
                     .WithLocalTranslation(localTranslation)

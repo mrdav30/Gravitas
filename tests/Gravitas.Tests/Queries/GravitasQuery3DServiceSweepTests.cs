@@ -256,58 +256,33 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
-    public void ConvexShape_QuerySourceBoundsPreserveKindOffsetAndDomainAdmission()
+    public void ConvexShape_CommittedSourceBoundsPreserveShapeExtentsAndClipAtScalarFaces()
     {
         ConvexShape sphere = ConvexShape.CreateSphere(
             new Vector3d((Fixed64)3, (Fixed64)4, (Fixed64)5),
             (Fixed64)2);
         ConvexShape circleSlab = ConvexShape.CreateCircleSlab(
-                new Vector3d((Fixed64)3, (Fixed64)4, (Fixed64)5),
-                (Fixed64)2,
-                Fixed64.One)
-            .WithSourceOffset(Vector3d.Right);
-        ConvexShape clippedSphere = ConvexShape.CreateSphere(
-                new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
-                Fixed64.One)
-            .WithSourceOffset(Vector3d.Right);
-        ConvexShape negativeClippedSphere = ConvexShape.CreateSphere(
-                new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
-                Fixed64.One)
-            .WithSourceOffset(-Vector3d.Right);
+            new Vector3d((Fixed64)4, (Fixed64)4, (Fixed64)5),
+            (Fixed64)2,
+            Fixed64.One);
+        var positiveFace = ConvexShape.CreateSphere(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero), Fixed64.One);
+        var negativeFace = ConvexShape.CreateSphere(
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero), Fixed64.One);
 
-        sphere.TryGetBoundsRelativeTo(
-                Vector3d.Zero,
-                FixedQuaternion.Identity,
-                out Vector3d sphereMin,
-                out Vector3d sphereMax)
-            .Should()
-            .BeTrue();
-        circleSlab.TryGetBoundsRelativeTo(
-                Vector3d.Zero,
-                FixedQuaternion.Identity,
-                out Vector3d slabMin,
-                out Vector3d slabMax)
-            .Should()
-            .BeTrue();
-        clippedSphere.TryGetBoundsRelativeTo(
-                Vector3d.Zero,
-                FixedQuaternion.Identity,
-                out _,
-                out _)
-            .Should()
-            .BeFalse();
-        negativeClippedSphere.TryGetBoundsRelativeTo(
-                Vector3d.Zero,
-                FixedQuaternion.Identity,
-                out _,
-                out _)
-            .Should()
-            .BeFalse();
+        var sphereBounds = sphere.GetSourceBoundsRelativeTo(Vector3d.Zero, FixedQuaternion.Identity);
+        var slabBounds = circleSlab.GetSourceBoundsRelativeTo(Vector3d.Zero, FixedQuaternion.Identity);
+        var positiveBounds = positiveFace.GetSourceBoundsRelativeTo(Vector3d.Zero, FixedQuaternion.Identity);
+        var negativeBounds = negativeFace.GetSourceBoundsRelativeTo(Vector3d.Zero, FixedQuaternion.Identity);
 
-        sphereMin.Should().Be(new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3));
-        sphereMax.Should().Be(new Vector3d((Fixed64)5, (Fixed64)6, (Fixed64)7));
-        slabMin.Should().Be(new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)3));
-        slabMax.Should().Be(new Vector3d((Fixed64)6, (Fixed64)5, (Fixed64)7));
+        sphereBounds.Min.Should().Be(new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3));
+        sphereBounds.Max.Should().Be(new Vector3d((Fixed64)5, (Fixed64)6, (Fixed64)7));
+        slabBounds.Min.Should().Be(new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)3));
+        slabBounds.Max.Should().Be(new Vector3d((Fixed64)6, (Fixed64)5, (Fixed64)7));
+        positiveBounds.Min.X.Should().Be(Fixed64.MaxValue - Fixed64.One);
+        positiveBounds.Max.X.Should().Be(Fixed64.MaxValue);
+        negativeBounds.Min.X.Should().Be(Fixed64.MinValue);
+        negativeBounds.Max.X.Should().Be(Fixed64.MinValue + Fixed64.One);
     }
 
     [Fact]

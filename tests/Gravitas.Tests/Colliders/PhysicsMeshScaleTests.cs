@@ -599,6 +599,7 @@ public sealed class PhysicsMeshScaleTests
         invalidUpdate.Should().Throw<ArgumentException>().WithMessage("*normalized*");
         mesh.GetVertexWorld(0).Should().Be(priorVertex);
         mesh.Bounds.Should().Be(priorBounds);
+        mesh.GetFaceNormalWorld(0).Should().Be(Vector3d.Forward);
 
         FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
             (Fixed64)15,

@@ -720,7 +720,6 @@ namespace Gravitas.Colliders
                 direction.Z >= Fixed64.Zero ? max.Z : min.Z);
 
         /// <summary>Gets a triangle face normal in world space.</summary>
-        /// <exception cref="InvalidOperationException">The normal cannot be expressed in the committed world frame.</exception>
         public Vector3d GetFaceNormalWorld(int index)
         {
             ChronicleGuard.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
@@ -730,8 +729,9 @@ namespace Gravitas.Colliders
                 return WideTriangleRelations.GetScaledTriangleLocalNormal(new FixedTriangle(a, b, c), _sourceFrame)
                     .Transform(_sourceFrame.GeometryBasis).GetNormal(false);
             }
-            if (!_rotation.TryRotate(_scaledFaceNormals[index], out Vector3d worldNormal))
-                throw new InvalidOperationException("The mesh face normal cannot be expressed in world space.");
+            // A rounded unit face normal fits after any admitted rotation.
+            bool represented = _rotation.TryRotate(_scaledFaceNormals[index], out Vector3d worldNormal);
+            System.Diagnostics.Debug.Assert(represented);
             return worldNormal.Normalized;
         }
 

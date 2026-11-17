@@ -866,10 +866,9 @@ internal sealed partial class ConvexSweepQueryWorker
     {
         if (!mesh.Mesh.GeometryFrame.IsRigid)
         {
-            _ = sourceShape.TryGetBoundsRelativeTo(mesh.Mesh.Origin, FixedQuaternion.Identity,
-                out Vector3d worldMin, out Vector3d worldMax);
-            SweepBoundsUtility.CreateSweptBounds(worldMin, worldMax, _displacement,
-                ContactTolerance, out worldMin, out worldMax);
+            FixedBoundBox worldSourceBounds = sourceShape.GetSourceBoundsRelativeTo(mesh.Mesh.Origin, FixedQuaternion.Identity);
+            SweepBoundsUtility.CreateSweptBounds(worldSourceBounds.Min, worldSourceBounds.Max, _displacement,
+                ContactTolerance, out Vector3d worldMin, out Vector3d worldMax);
             bool represented = ScaledRigidFrame3d.Rigid(mesh.Mesh.Origin, FixedQuaternion.Identity)
                 .TryGetBoundsIn(worldMin, worldMax, mesh.Mesh.GeometryFrame, out FixedBoundBox bounds);
             System.Diagnostics.Debug.Assert(represented);
@@ -878,19 +877,17 @@ internal sealed partial class ConvexSweepQueryWorker
         }
         // Concave-target dispatch receives only the source's committed shape;
         // iterative chord offsets are introduced after broad-phase collection.
-        _ = sourceShape.TryGetBoundsRelativeTo(
+        FixedBoundBox sourceBounds = sourceShape.GetSourceBoundsRelativeTo(
             mesh.Mesh.Origin,
-            mesh.Mesh.Rotation,
-            out Vector3d sourceMin,
-            out Vector3d sourceMax);
+            mesh.Mesh.Rotation);
 
         // Prepare admitted the chord magnitude, so a unit rotation preserves
         // representability.
         Vector3d localDisplacement =
             ConvexColliderSupport.GetLocalDisplacement(mesh.Mesh.Rotation, _displacement);
         SweepBoundsUtility.CreateSweptBounds(
-            sourceMin,
-            sourceMax,
+            sourceBounds.Min,
+            sourceBounds.Max,
             localDisplacement,
             ContactTolerance,
             out min,
