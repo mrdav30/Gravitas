@@ -31,6 +31,12 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
     private Fixed64 _preparedAxisLength;
     private Vector2d _preparedAxis;
 
+    internal void SetDetachedPostureDimensions(ColliderShapeDefinition2D definition)
+    {
+        _radius = definition.Radius;
+        _height = definition.Size.Y;
+    }
+
     /// <summary>Creates a pure 2D capsule with authored dimensions.</summary>
     public LSCapsuleCollider2D(Fixed64 radius, Fixed64 height)
     {

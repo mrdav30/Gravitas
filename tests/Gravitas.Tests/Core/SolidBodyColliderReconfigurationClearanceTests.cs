@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Core;
 
-public sealed class SolidBodyColliderReconfigurationClearanceTests
+public sealed partial class SolidBodyColliderReconfigurationClearanceTests
 {
     [Theory]
     [InlineData(-1L, ColliderReconfigurationStatus.Blocked)]

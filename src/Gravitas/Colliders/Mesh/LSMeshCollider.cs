@@ -313,13 +313,16 @@ public sealed class LSMeshCollider : LSCollider
 
     internal override FixedPointAnchor GetClosestSurfaceAnchor(
         Vector3d queryPoint,
-        out Vector3d normal)
+        out Vector3d normal) => GetClosestSurfaceAnchor(queryPoint, out normal, null);
+
+    internal FixedPointAnchor GetClosestSurfaceAnchor(Vector3d queryPoint, out Vector3d normal, MeshQueryScratch? scratch)
     {
         FindClosestPointAnchor(
             queryPoint,
-            _triangleQueryBuffer,
+            scratch?.Triangles ?? _triangleQueryBuffer,
             out FixedPointAnchor closest,
-            out normal);
+            out normal,
+            scratch?.Traversal);
         return closest;
     }
 
@@ -337,7 +340,8 @@ public sealed class LSMeshCollider : LSCollider
         Vector3d queryPoint,
         SwiftList<int> triangleBuffer,
         out FixedPointAnchor closest,
-        out Vector3d normal)
+        out Vector3d normal,
+        int[]? traversal = null)
     {
         if (!Mesh.GeometryFrame.IsRigid || !Mesh.TryConvertWorldToRigidGeometry(
                 queryPoint,
@@ -347,7 +351,8 @@ public sealed class LSMeshCollider : LSCollider
                 queryPoint,
                 triangleBuffer,
                 out closest,
-                out normal);
+                out normal,
+                traversal);
             return;
         }
 
@@ -381,7 +386,7 @@ public sealed class LSMeshCollider : LSCollider
         }
         else
         {
-            Mesh.GetTrianglesInGeometryBounds(queryBounds, triangleBuffer);
+            Mesh.GetTrianglesInGeometryBounds(queryBounds, triangleBuffer, traversal);
             for (int i = 0; i < triangleBuffer.Count; i++)
             {
                 _ = KeepClosestPointOnTriangle(
@@ -401,7 +406,8 @@ public sealed class LSMeshCollider : LSCollider
         Vector3d queryPoint,
         SwiftList<int> triangleBuffer,
         out FixedPointAnchor closest,
-        out Vector3d normal)
+        out Vector3d normal,
+        int[]? traversal)
     {
         var queryAnchor = new FixedPointAnchor(
             queryPoint,
@@ -426,7 +432,7 @@ public sealed class LSMeshCollider : LSCollider
         FixedBoundVolume bounds = default;
         bool bounded = closest.TryGetPoint(out Vector3d firstPoint)
             && TryCreateClosestPointSearchBounds(queryPoint, firstPoint, out bounds);
-        if (bounded) Mesh.GetTrianglesInWorldBounds(bounds, triangleBuffer);
+        if (bounded) Mesh.GetTrianglesInWorldBounds(bounds, triangleBuffer, traversal);
         int bestTriangle = 0;
         int count = bounded ? triangleBuffer.Count : Mesh.TriangleCount;
         for (int index = 0; index < count; index++)

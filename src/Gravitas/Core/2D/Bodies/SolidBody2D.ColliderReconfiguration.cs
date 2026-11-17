@@ -9,6 +9,7 @@ using System;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Queries;
 using SwiftCollections;
 
 namespace Gravitas;
@@ -57,6 +58,113 @@ public sealed partial class SolidBody2D
             Context.Settings.RuntimeMode != PhysicsRuntimeMode.TwoD,
             nameof(Context.Settings.RuntimeMode),
             "Native 2D collider reconfiguration requires pure TwoD runtime mode.");
+        ValidateReconfigurationFamily(definition);
+        bool representable = TryGetReconfigurationWorldPosition(position, out Vector3d worldPosition);
+        ChronicleGuard.ThrowIfTrue(!representable, nameof(position),
+            "The host transform cannot represent the requested 2D body-root position.");
+
+        LSCollider2D candidate = definition.CreateRuntimeCollider();
+        candidate.PrepareDetachedBodyReconfigurationCandidate(this, localOffset, position);
+        if (MatchesReconfiguration(candidate, position))
+        {
+            notificationException = CompleteColliderReconfiguration(ColliderReconfigurationStatus.Unchanged, publishSynchronizedState);
+            return ColliderReconfigurationStatus.Unchanged;
+        }
+
+        PhysicsQueryMeter meter = default;
+        FindColliderReconfigurationBlocker(candidate, ref meter, bounded: false, out blocker);
+        if (blocker != null)
+            return ColliderReconfigurationStatus.Blocked;
+
+        ChronicleGuard.ThrowIfTrue(!TryCommitReconfigurationGeometry(candidate, position, worldPosition),
+            nameof(position), "The host transform cannot represent the requested 2D body-root position.");
+        notificationException = CompleteColliderReconfiguration(ColliderReconfigurationStatus.Applied, publishSynchronizedState);
+        return ColliderReconfigurationStatus.Applied;
+    }
+
+    /// <summary>Attempts to replace registered circle or capsule geometry and its root pose within a bounded clearance query.</summary>
+    /// <remarks>
+    /// The caller serializes this operation with world and collider mutation. An incomplete query leaves the
+    /// live state unchanged and clears outcome outputs. Work limits cover detached preparation and clearance.
+    /// Successful publication, mass properties, pair cleanup, and host notifications follow clearance.
+    /// </remarks>
+    public PhysicsQueryExecutionStatus TryReconfigureCollider(
+        ColliderShapeDefinition2D definition, Vector2d localOffset, Vector2d position,
+        in PhysicsQueryBudget budget, PhysicsQueryScratch scratch,
+        out ColliderReconfigurationStatus? result, out LSCollider2D? blocker,
+        out Exception? notificationException, out PhysicsQueryWork work,
+        Action? publishSynchronizedState = null)
+    {
+        result = null;
+        blocker = null;
+        notificationException = null;
+        work = default;
+        ChronicleGuard.ThrowIfNull(scratch, nameof(scratch));
+        definition.EnsureDefined();
+        ThrowIfRuntimeRegistrationMissing();
+        if (Context.Settings.RuntimeMode != PhysicsRuntimeMode.TwoD)
+            return PhysicsQueryExecutionStatus.UnsupportedRuntimeMode;
+        ValidateReconfigurationFamily(definition);
+
+        var meter = new PhysicsQueryMeter(budget);
+        LSCollider2D? candidate = null;
+        scratch.Borrow();
+        try
+        {
+            ulong sequence = Context.ObservedGridChangeSequence;
+            var status = PhysicsQueryScratch.CheckView(Context, sequence, ref meter, PhysicsQueryExecutionStatus.WorldNotReady);
+            if (status != PhysicsQueryExecutionStatus.Completed)
+                return status;
+            if (!PhysicsQueryScratch.ChargePosturePreparation(Agent.Transform, ref meter))
+                return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
+            if (!TryGetReconfigurationWorldPosition(position, out Vector3d worldPosition))
+                return PhysicsQueryExecutionStatus.Unrepresentable;
+
+            candidate = scratch.GetPostureCandidate(definition);
+            try
+            {
+                candidate.PrepareDetachedBodyReconfigurationCandidate(this, localOffset, position);
+            }
+            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
+            {
+                return PhysicsQueryExecutionStatus.Unrepresentable;
+            }
+
+            bool unchanged = MatchesReconfiguration(candidate, position);
+            LSCollider2D? found = null;
+            if (!unchanged)
+            {
+                status = FindColliderReconfigurationBlocker(candidate, ref meter, bounded: true, out found);
+                if (status != PhysicsQueryExecutionStatus.Completed)
+                    return status;
+            }
+            status = PhysicsQueryScratch.CheckView(Context, sequence, ref meter);
+            if (status != PhysicsQueryExecutionStatus.Completed)
+                return status;
+            if (found != null)
+            {
+                blocker = found;
+                result = ColliderReconfigurationStatus.Blocked;
+                return PhysicsQueryExecutionStatus.Completed;
+            }
+
+            if (!unchanged && !TryCommitReconfigurationGeometry(candidate, position, worldPosition))
+                return PhysicsQueryExecutionStatus.Unrepresentable;
+            result = unchanged ? ColliderReconfigurationStatus.Unchanged : ColliderReconfigurationStatus.Applied;
+        }
+        finally
+        {
+            candidate?.ClearBindingState();
+            scratch.Release(0);
+            work = meter.Work;
+        }
+
+        notificationException = CompleteColliderReconfiguration(result.Value, publishSynchronizedState);
+        return PhysicsQueryExecutionStatus.Completed;
+    }
+
+    private void ValidateReconfigurationFamily(ColliderShapeDefinition2D definition)
+    {
         ColliderType2D expectedShape = definition.Kind switch
         {
             ColliderShapeDefinition2DKind.Circle => ColliderType2D.Circle,
@@ -67,42 +175,57 @@ public sealed partial class SolidBody2D
             expectedShape == ColliderType2D.None || Collider.Shape != expectedShape,
             nameof(definition),
             "2D collider reconfiguration requires the existing circle or capsule family.");
+    }
 
+    private bool TryGetReconfigurationWorldPosition(Vector2d position, out Vector3d worldPosition)
+    {
         FixedTransform transform = Agent.Transform;
-        Vector3d worldPosition = new(position.X, transform.WorldPosition.Y, position.Y);
+        worldPosition = new(position.X, transform.WorldPosition.Y, position.Y);
         FixedTransform? parent = transform.Parent;
-        ChronicleGuard.ThrowIfTrue(
-            parent != null && (!parent.TryInverseTransformPoint(worldPosition, out Vector3d localPosition)
-                || !parent.TryTransformPoint(localPosition, out Vector3d roundTrip)
-                || !roundTrip.FuzzyEqualAbsolute(worldPosition, Fixed64.Epsilon)),
-            nameof(position),
-            "The host transform cannot represent the requested 2D body-root position.");
+        return parent == null || (parent.TryInverseTransformPoint(worldPosition, out Vector3d localPosition)
+            && parent.TryTransformPoint(localPosition, out Vector3d roundTrip)
+            && roundTrip.FuzzyEqualAbsolute(worldPosition, Fixed64.Epsilon));
+    }
 
-        LSCollider2D candidate = definition.CreateRuntimeCollider();
-        candidate.PrepareDetachedBodyReconfigurationCandidate(this, localOffset, position);
-        if (_position == position && Collider.MatchesCommittedReconfigurationCandidate(candidate))
-        {
-            SwiftList<Exception>? unchangedFailures = null;
-            CaptureSynchronizedStatePublication(publishSynchronizedState, ref unchangedFailures);
-            notificationException = CollisionNotificationExceptions.ToException(unchangedFailures);
-            return ColliderReconfigurationStatus.Unchanged;
-        }
+    private bool MatchesReconfiguration(LSCollider2D candidate, Vector2d position) =>
+        _position == position && Collider.MatchesCommittedReconfigurationCandidate(candidate);
 
+    private PhysicsQueryExecutionStatus FindColliderReconfigurationBlocker(
+        LSCollider2D candidate, ref PhysicsQueryMeter meter, bool bounded, out LSCollider2D? blocker)
+    {
+        blocker = null;
         // The grid-backed query index excludes unpartitioned colliders. A rare
         // explicit posture transaction must not omit those registered blockers.
-        int count = Context.Physics2D.ColliderCount;
-        for (int i = 0; i < count; i++)
+        var physics = Context.Physics2D;
+        int count = physics.ColliderCount;
+        int cursor = bounded ? physics.FirstColliderRegistrationId : 0;
+        while (bounded ? cursor >= 0 : cursor < count)
         {
-            LSCollider2D other = Context.Physics2D.GetColliderByServiceIndex(i);
-            if (ReferenceEquals(other, Collider) || other.IsTrigger
-                || !Context.Physics2D.RequireCollisionPair(Collider, other)
-                || !CollisionDetection2D.DoesPostureCandidatePenetrate(candidate, other))
+            if (bounded && !meter.ChargeCandidate())
+                return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
+            LSCollider2D other = bounded ? physics.GetColliderByRegistrationId(cursor, out cursor)
+                : physics.GetColliderByServiceIndex(cursor++);
+            if (ReferenceEquals(other, Collider) || other.IsTrigger)
+                continue;
+            if (bounded && !meter.ChargeCandidates(Context.Constraints2D.LinkedCollisionProbeLimit))
+                return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
+            if (!physics.RequireCollisionPair(Collider, other))
+                continue;
+
+            var status = CollisionDetection2D.CheckPostureCandidatePenetration(candidate, other, ref meter, bounded, out bool penetrates);
+            if (status != PhysicsQueryExecutionStatus.Completed)
+                return status;
+            if (!penetrates)
                 continue;
 
             blocker = other;
-            return ColliderReconfigurationStatus.Blocked;
+            break;
         }
+        return PhysicsQueryExecutionStatus.Completed;
+    }
 
+    private bool TryCommitReconfigurationGeometry(LSCollider2D candidate, Vector2d position, Vector3d worldPosition)
+    {
         Vector2d centerOfMass = _centerOfMassOffsetExplicit
             ? _localCenterOfMassOffset
             : candidate.CalculateLocalCenterOfMassOffset();
@@ -113,26 +236,33 @@ public sealed partial class SolidBody2D
 
         // All geometry and mass work has succeeded on detached state. There are
         // no host callbacks until every authoritative view has been published.
-        ChronicleGuard.ThrowIfTrue(!transform.TrySetWorldPosition(worldPosition), nameof(position),
-            "The host transform cannot represent the requested 2D body-root position.");
+        if (!Agent.Transform.TrySetWorldPosition(worldPosition))
+            return false;
         _position = position;
         Collider.PublishBodyReconfigurationCandidate(candidate);
         _localCenterOfMassOffset = centerOfMass;
         _momentOfInertia = moment;
         _inverseMomentOfInertia = inverseMoment;
-        Context.Constraints2D.ClearSolverCachesForBody(this);
-        Context.Physics2D.InvalidateContinuousCollisionStateForBodyMutation(this, DynamicId);
-        InvalidateContinuousCollisionFrame();
-        Context.Collisions2D.RefreshColliderPartitionAfterShapeChange(Collider);
-        Wake();
+        return true;
+    }
 
-        var registration = new ColliderLifetimeToken2D(Collider);
+    private Exception? CompleteColliderReconfiguration(ColliderReconfigurationStatus result, Action? publisher)
+    {
+        if (result == ColliderReconfigurationStatus.Applied)
+        {
+            Context.Constraints2D.ClearSolverCachesForBody(this);
+            Context.Physics2D.InvalidateContinuousCollisionStateForBodyMutation(this, DynamicId);
+            InvalidateContinuousCollisionFrame();
+            Context.Collisions2D.RefreshColliderPartitionAfterShapeChange(Collider);
+            Wake();
+        }
+
+        var registration = result == ColliderReconfigurationStatus.Applied ? new ColliderLifetimeToken2D(Collider) : default;
         SwiftList<Exception>? failures = null;
-        CaptureSynchronizedStatePublication(publishSynchronizedState, ref failures);
-        if (registration.IsCurrentLifetime)
+        CaptureSynchronizedStatePublication(publisher, ref failures);
+        if (result == ColliderReconfigurationStatus.Applied && registration.IsCurrentLifetime)
             Context.Physics2D.InvalidatePairsForColliderReconfiguration(Collider, ref failures);
-        notificationException = CollisionNotificationExceptions.ToException(failures);
-        return ColliderReconfigurationStatus.Applied;
+        return CollisionNotificationExceptions.ToException(failures);
     }
 
     private static void CaptureSynchronizedStatePublication(

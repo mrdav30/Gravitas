@@ -27,6 +27,13 @@ internal sealed partial class ConvexSweepQueryWorker
 {
     private const int MaxGjkIterations = 32;
     private const int MaxConservativeAdvancementIterations = 32;
+    // Each GJK round uses two supports, at most four duplicate checks, four
+    // tetrahedron containment tests, four face reductions (a feature test and
+    // two passes over three vertices), and eight final simplex vertex visits.
+    // Each GJK call may also gather four witnesses and blend four sets of four.
+    internal const ulong PrimitiveSweepWork =
+        (2 * MaxConservativeAdvancementIterations + 1)
+        * (MaxGjkIterations * (2 + 4 + 4 + 4 * (1 + 2 * 3) + 8) + 4 + 4 * 4 + 1) + 3;
     private static readonly Fixed64 DistanceTolerance =
         Fixed64.FromFraction(1, 1_048_576);
     internal static readonly Fixed64 ContactTolerance = Fixed64.FromFraction(1, 4096);

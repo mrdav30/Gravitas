@@ -9,6 +9,7 @@ using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 
 namespace Gravitas.CollisionHandling;
 
@@ -18,10 +19,14 @@ internal static partial class CollisionDetection2D
     // The caller has validated the candidate's circle/capsule family and the
     // physical pair policy. Clearance uses exact classification, not the
     // rounded translation that the ordinary contact solver needs.
-    internal static bool DoesPostureCandidatePenetrate(LSCollider2D candidate, LSCollider2D other)
+    internal static PhysicsQueryExecutionStatus CheckPostureCandidatePenetration(LSCollider2D candidate, LSCollider2D other,
+        ref PhysicsQueryMeter meter, bool bounded, out bool penetrates)
     {
+        penetrates = false;
+        if (bounded && !meter.ChargeGeometry(1))
+            return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
         if (!BoundsOverlap(candidate, other))
-            return false;
+            return PhysicsQueryExecutionStatus.Completed;
 
         Fixed64 axisLength = candidate is LSCapsuleCollider2D capsule
             ? capsule.AxisLength : Fixed64.Zero;
@@ -33,15 +38,44 @@ internal static partial class CollisionDetection2D
             // Compound definitions contain leaves, not nested compounds.
             for (int i = 0; i < compound.PartCount; i++)
             {
+                if (bounded && !meter.ChargeGeometry(1))
+                    return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
                 LSCollider2D part = compound.GetPartCollider(i);
-                if (BoundsOverlap(candidate, part)
-                    && DoesPostureCapsulePenetrate(candidate, candidate.Center, axisLength, radius, part))
-                    return true;
+                if (!BoundsOverlap(candidate, part))
+                    continue;
+                var status = CheckPostureCapsulePenetration(candidate, axisLength, radius, part, ref meter, bounded, out penetrates);
+                if (status != PhysicsQueryExecutionStatus.Completed || penetrates)
+                    return status;
             }
-            return false;
+            return PhysicsQueryExecutionStatus.Completed;
         }
 
-        return DoesPostureCapsulePenetrate(candidate, candidate.Center, axisLength, radius, other);
+        return CheckPostureCapsulePenetration(candidate, axisLength, radius, other, ref meter, bounded, out penetrates);
+    }
+
+    private static PhysicsQueryExecutionStatus CheckPostureCapsulePenetration(LSCollider2D candidate,
+        Fixed64 axisLength, Fixed64 radius, LSCollider2D other, ref PhysicsQueryMeter meter, bool bounded,
+        out bool penetrates)
+    {
+        penetrates = false;
+        if (bounded)
+        {
+            ulong units = 1;
+            if (other is not (LSCircleCollider2D or LSCapsuleCollider2D))
+            {
+                ulong vertices = (ulong)other.VertexCount;
+                // Face axes each project all vertices. Up to three additional axes,
+                // the face loop, and the closest-vertex scan each cost another pass.
+                units += vertices * (vertices + 5);
+                if (other is LSAABBoxCollider2D)
+                    units += vertices;
+            }
+            if (!meter.ChargeGeometry(units))
+                return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
+        }
+
+        penetrates = DoesPostureCapsulePenetrate(candidate, candidate.Center, axisLength, radius, other);
+        return PhysicsQueryExecutionStatus.Completed;
     }
 
     // A recovery certificate tests the proposed center without publishing a

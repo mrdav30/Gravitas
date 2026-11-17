@@ -9,31 +9,82 @@ using System;
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 
 namespace Gravitas.CollisionHandling;
 
 /// <content>Classifies posture clearance before solver contact rounding.</content>
 public static partial class CollisionDetection
 {
+    internal static bool DoesPostureCandidatePenetrate(LSCollider candidate, LSCollider other)
+    {
+        PhysicsQueryMeter meter = default;
+        CheckPostureCandidatePenetration(candidate, other, ref meter, bounded: false, out bool penetrates);
+        return penetrates;
+    }
+
     // The transaction admits sphere, capsule and finite-cylinder candidates.
     // Pair policy, supported collision types, root bounds and root ordering are
     // checked by SolidBody. Compound parts are geometry only and must retain
     // their parent's blocker identity.
-    internal static bool DoesPostureCandidatePenetrate(LSCollider candidate, LSCollider other)
+    internal static PhysicsQueryExecutionStatus CheckPostureCandidatePenetration(LSCollider candidate, LSCollider other,
+        ref PhysicsQueryMeter meter, bool bounded, out bool penetrates)
     {
+        penetrates = false;
         if (other is LSCompoundCollider compound)
         {
             for (int i = 0; i < compound.PartCount; i++)
             {
+                if (bounded && !meter.ChargeGeometry(1))
+                    return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
                 LSCollider part = compound.GetPartCollider(i);
-                if (candidate.Bounds.Intersects(part.Bounds)
-                    && DoesPostureLeafPenetrate(candidate, part))
-                    return true;
+                if (!candidate.Bounds.Intersects(part.Bounds))
+                    continue;
+                var status = CheckPostureLeafPenetration(candidate, part, ref meter, bounded, out penetrates);
+                if (status != PhysicsQueryExecutionStatus.Completed || penetrates)
+                    return status;
             }
-            return false;
+            return PhysicsQueryExecutionStatus.Completed;
         }
-        return DoesPostureLeafPenetrate(candidate, other);
+        return CheckPostureLeafPenetration(candidate, other, ref meter, bounded, out penetrates);
     }
+
+    private static PhysicsQueryExecutionStatus CheckPostureLeafPenetration(LSCollider candidate, LSCollider other,
+        ref PhysicsQueryMeter meter, bool bounded, out bool penetrates)
+    {
+        penetrates = false;
+        if (bounded)
+        {
+            ulong units = 1; // Every primitive leaf uses a fixed-shape exact classification.
+            if (other is LSMeshCollider meshCollider)
+            {
+                PhysicsMesh mesh = meshCollider.Mesh;
+                ulong triangles = (ulong)mesh.Triangles.Length / 3;
+                if (meshCollider.Mode == MeshColliderMode.Convex && meshCollider.IsClosedSurface)
+                {
+                    ulong vertices = (ulong)mesh.GeometryVertices.Length;
+                    ulong edges = (ulong)mesh.ConvexSatEdgeVertexPairs.Length / 2;
+                    units = GetPostureMeshWork(triangles, vertices, edges);
+                }
+                else
+                {
+                    // Each triangle uses the same strict hull test with three vertices and edges.
+                    units += triangles * GetPostureMeshWork(1, 3, 3);
+                }
+            }
+            if (!meter.ChargeGeometry(units))
+                return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
+        }
+
+        penetrates = DoesPostureLeafPenetrate(candidate, other);
+        return PhysicsQueryExecutionStatus.Completed;
+    }
+
+    // One face axis per triangle, up to three axes per edge and one per vertex.
+    // Each axis can inspect three defining vertices, project both capsule endpoints,
+    // and project every mesh vertex. Admitted meshes have at most 131,072 triangles.
+    private static ulong GetPostureMeshWork(ulong triangles, ulong vertices, ulong edges) =>
+        (1 + triangles + vertices + 3 * edges) * (1 + 3 + 2 + vertices);
 
     private static bool DoesPostureLeafPenetrate(LSCollider candidate, LSCollider other)
     {

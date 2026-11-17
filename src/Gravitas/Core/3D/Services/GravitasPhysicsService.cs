@@ -412,6 +412,10 @@ public sealed partial class GravitasPhysicsService
 
     internal LSCollider GetColliderByServiceIndex(int serviceIndex) => _colliders[serviceIndex];
 
+    internal int FirstColliderRegistrationId => _colliders.FirstRegistrationId;
+
+    internal LSCollider GetColliderByRegistrationId(int id, out int nextId) => _colliders.GetAtRegistration(id, out nextId);
+
     internal SwiftList<LSCollider> PrepareReplayColliders() => _colliders.PrepareReplayColliders();
 
     private void AddServiceRefreshCollider(LSCollider collider)

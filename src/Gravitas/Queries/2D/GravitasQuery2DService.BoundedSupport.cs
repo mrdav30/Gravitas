@@ -15,15 +15,9 @@ namespace Gravitas.Queries;
 /// <content>Queries planar support through bounded world and candidate traversal.</content>
 public sealed partial class GravitasQuery2DService
 {
-    // The AABB vertex source writes at most four vertices. Charge one fixed
-    // overlap kernel (its axis and projection scans are limited by those four
-    // vertices), then reserve the four-edge containment scan and the sweep's
-    // four finite-axis tests and fixed four-vertex witness reduction.
-    private const ulong BoxSupportGeometry = 1 + 4 + 4 + 1;
-
     /// <summary>Finds the nearest eligible support within caller-owned work and scratch limits.</summary>
     /// <remarks>
-    /// Requires pure 2D, a stable between-step host phase, dense rectangular grids, and box targets.
+    /// Requires pure 2D and a stable between-step host phase.
     /// Completed with null support is a proven miss. Other outcomes clear support.
     /// Serialize this call with world and collider mutation.
     /// </remarks>
@@ -47,13 +41,10 @@ public sealed partial class GravitasQuery2DService
             if (!TryGetSupportBounds(request, out var end, out var min, out var max))
                 return PhysicsQueryExecutionStatus.Unrepresentable;
 
-            var status = scratch.Discover(_context.World, new Vector3d(min.X, Fixed64.Zero, min.Y),
+            var status = scratch.Discover(_context, new Vector3d(min.X, Fixed64.Zero, min.Y),
                 new Vector3d(max.X, Fixed64.Zero, max.Y), planar: true, ref meter, out voxelCount, out ulong sequence);
             if (status != PhysicsQueryExecutionStatus.Completed)
                 return status;
-            if (!_context.IsBoundedQueryViewCurrent(sequence))
-                return PhysicsQueryExecutionStatus.Stale;
-
             Physics2DHit? closest = null;
             for (int i = 0; i < voxelCount; i++)
             {
@@ -61,7 +52,7 @@ public sealed partial class GravitasQuery2DService
                     meter.DiscoveryRemaining, out ulong partitionWork, out var partition);
                 meter.AddDiscovery(partitionWork);
                 if (partitionStatus != GridBoundedVoxelStatus.Completed)
-                    return PhysicsQueryScratch.MapDiscoveryStatus(partitionStatus);
+                    return PhysicsQueryScratch.MapDiscoveryFailure(partitionStatus);
                 if (partition == null)
                     continue;
 
@@ -70,9 +61,7 @@ public sealed partial class GravitasQuery2DService
                     return status;
             }
 
-            status = PhysicsQueryScratch.CheckSnapshot(_context.World, sequence);
-            if (!_context.IsBoundedQueryViewCurrent(sequence))
-                return PhysicsQueryExecutionStatus.Stale;
+            status = PhysicsQueryScratch.CheckView(_context, sequence, ref meter);
             if (status == PhysicsQueryExecutionStatus.Completed && closest.HasValue)
                 support = new Physics2DSupportHit(closest.Value, _context.FrameCount);
             return status;
@@ -137,11 +126,9 @@ public sealed partial class GravitasQuery2DService
             return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
         if (!_context.Physics2D.RequireCollisionPair(request.Source, collider))
             return PhysicsQueryExecutionStatus.Completed;
-        if (collider is not LSAABBoxCollider2D)
-            return PhysicsQueryExecutionStatus.UnsupportedGeometry;
-
-        if (!meter.ChargeGeometry(BoxSupportGeometry))
-            return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
+        var status = QueryDetection2D.ReserveSupportGeometry(collider, ref meter);
+        if (status != PhysicsQueryExecutionStatus.Completed)
+            return status;
         if (QueryDetection2D.TryFindSupport(request, end, collider, out var hit)
             && PhysicsHitSelectionPolicy.ShouldReplace(hit, closest.HasValue, closest.GetValueOrDefault()))
             closest = hit;

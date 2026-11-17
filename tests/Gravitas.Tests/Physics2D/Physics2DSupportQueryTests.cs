@@ -7,6 +7,11 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
+using GridForge.Grids;
+using GridForge.Grids.Storage;
+using GridForge.Grids.Topology;
+using GridForge.Spatial;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -82,7 +87,8 @@ public sealed class Physics2DSupportQueryTests
         foreach (var oneBelow in new[]
         {
             new PhysicsQueryBudget(expected.Discovery - 1, expected.Candidates, expected.Geometry),
-            new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry)
+            new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry),
+            new PhysicsQueryBudget(expected.Discovery, expected.Candidates, expected.Geometry - 1)
         })
         {
             Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
@@ -90,6 +96,8 @@ public sealed class Physics2DSupportQueryTests
             Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
                 restored.Query2D.QuerySupport(restoredRequest, oneBelow, scratch, out hit, out var restoredWork));
             Assert.Equal(restoredWork, used);
+            if (oneBelow.GeometryLimit < expected.Geometry)
+                Assert.InRange(used.Geometry, 1UL, expected.Geometry - 1);
             Assert.Null(hit);
             Assert.Null(replay);
         }
@@ -116,6 +124,20 @@ public sealed class Physics2DSupportQueryTests
         hit.Value.Hit.Normal.Should().Be(legacy.Hit.Normal);
         hit.Value.Hit.Distance.Should().Be(legacy.Hit.Distance);
         var exact = new PhysicsQueryBudget(work.Discovery, work.Candidates, work.Geometry);
+
+        // Allow complete voxel discovery with no remaining partition lookup work.
+        var voxels = new Voxel?[scratch.TraversalCapacity];
+        Assert.Equal(GridBoundedVoxelStatus.Completed, context.World.CollectCoveredVoxelsBounded(
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, -Fixed64.Half),
+            new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.One + Fixed64.Half),
+            true, ample.DiscoveryLimit, voxels, out ulong voxelDiscovery, out int voxelCount, out _));
+        Assert.True(voxelCount > 0);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            context.Query2D.QuerySupport(request, new PhysicsQueryBudget(voxelDiscovery, work.Candidates, work.Geometry),
+                scratch, out hit, out var discoveryOnly));
+        Assert.Null(hit);
+        Assert.Equal(new PhysicsQueryWork(voxelDiscovery, 0, 0), discoveryOnly);
+
         foreach (var shortBudget in new[]
         {
             new PhysicsQueryBudget(work.Discovery - 1, work.Candidates, work.Geometry),
@@ -212,6 +234,186 @@ public sealed class Physics2DSupportQueryTests
         support.Hit.Collider.Should().BeSameAs(compound);
         support.Hit.Point.Should().Be(new Vector2d(Fixed64.Half, Fixed64.Zero));
         support.Hit.Normal.Should().Be(Vector2d.Forward);
+
+        AssertReadyBoundedWitness(context, request);
+    }
+
+    [Theory]
+    [InlineData(ColliderType2D.Circle)]
+    [InlineData(ColliderType2D.Capsule)]
+    [InlineData(ColliderType2D.ConvexPolygon)]
+    [InlineData(ColliderType2D.Compound)]
+    public void BoundedSupport_MatchesNativeShapeWitnessAndRejectsIncompleteGeometry(ColliderType2D shape)
+    {
+        using var context = Physics2DTestWorld.CreateContext();
+        SolidBody2D source = Source(context);
+        Vector2d[] vertices =
+        [
+            new(-2, -1), new(2, -1), new(3, 0), new(3, 1),
+            new(2, 2), new(-2, 2), new(-3, 1), new(-3, 0)
+        ];
+        LSCollider2D target = shape switch
+        {
+            ColliderType2D.Circle => new LSCircleCollider2D(Fixed64.Half),
+            ColliderType2D.Capsule => new LSCapsuleCollider2D(Fixed64.Half, Fixed64.Two),
+            ColliderType2D.ConvexPolygon => new LSPolygonCollider2D(vertices),
+            _ => new LSCompoundCollider2D(
+                CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Right * (Fixed64)4),
+                CompoundColliderPart2D.ConvexPolygon(vertices, Vector2d.Zero))
+        };
+        Initialize(context, target, Vector2d.Zero);
+        context.Simulate();
+        context.LateSimulate();
+        Fixed64 top = shape switch
+        {
+            ColliderType2D.Circle => Fixed64.Half,
+            ColliderType2D.Capsule => Fixed64.One,
+            _ => Fixed64.Two
+        };
+        var scratch = new PhysicsQueryScratch(128, 8);
+        var ample = new PhysicsQueryBudget(8192, 8192, 8192);
+        foreach (Fixed64 travel in new[] { Fixed64.Zero, Fixed64.One })
+        {
+            var request = Request(source, Vector2d.Forward * (top + Fixed64.Half + travel), Fixed64.One);
+            Assert.Equal(Physics2DSupportQueryStatus.Found, context.Query2D.QuerySupport(request, out var expected));
+            Assert.Same(target, expected.Hit.Collider);
+            Assert.Equal(travel, expected.Hit.Distance);
+
+            Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+                context.Query2D.QuerySupport(request, ample, scratch, out var actual, out var used));
+            AssertSupportWitness(expected, actual);
+
+            var shortGeometry = new PhysicsQueryBudget(used.Discovery, used.Candidates, used.Geometry - 1);
+            Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+                context.Query2D.QuerySupport(request, shortGeometry, scratch, out actual, out var partial));
+            Assert.Null(actual);
+            Assert.True(partial.Geometry < used.Geometry);
+            if (shape == ColliderType2D.Compound)
+            {
+                Assert.True(partial.Geometry > 0);
+                Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+                    context.Query2D.QuerySupport(request, new PhysicsQueryBudget(used.Discovery, used.Candidates, 0),
+                        scratch, out actual, out var beforePartVisits));
+                Assert.Null(actual);
+                Assert.Equal(0UL, beforePartVisits.Geometry);
+            }
+
+            var exact = new PhysicsQueryBudget(used.Discovery, used.Candidates, used.Geometry);
+            Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+                context.Query2D.QuerySupport(request, exact, scratch, out actual, out var replayed));
+            Assert.Equal(used, replayed);
+            AssertSupportWitness(expected, actual);
+        }
+    }
+
+    [Theory]
+    [InlineData(GridTopologyKind.RectangularPrism, HexOrientation.PointyTop, GridStorageKind.Sparse)]
+    [InlineData(GridTopologyKind.HexPrism, HexOrientation.PointyTop, GridStorageKind.Dense)]
+    [InlineData(GridTopologyKind.HexPrism, HexOrientation.FlatTop, GridStorageKind.Dense)]
+    [InlineData(GridTopologyKind.HexPrism, HexOrientation.PointyTop, GridStorageKind.Sparse)]
+    [InlineData(GridTopologyKind.HexPrism, HexOrientation.FlatTop, GridStorageKind.Sparse)]
+    public void BoundedSupport_MatchesPhysicalPresenceOnSparseAndHexGrids(
+        GridTopologyKind topology, HexOrientation orientation, GridStorageKind storage)
+    {
+        using var context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        var metrics = topology == GridTopologyKind.HexPrism
+            ? GridTopologyMetrics.Hex(Fixed64.One, Fixed64.One, orientation)
+            : default;
+        Assert.True(context.World.TryAddGrid(new GridConfiguration(Vector3d.Zero, new Vector3d(24, 0, 24),
+            topologyKind: topology, topologyMetrics: metrics, storageKind: storage), out ushort gridIndex));
+        var grid = context.World.ActiveGrids[gridIndex];
+        var floorIndex = new VoxelIndex(4, 0, 4);
+        var neighborIndex = new VoxelIndex(5, 0, 4);
+        if (storage == GridStorageKind.Sparse)
+        {
+            Assert.True(grid.TryAddVoxel(floorIndex, out _));
+            Assert.True(grid.TryAddVoxel(neighborIndex, out _));
+        }
+        Assert.True(grid.TryGetVoxel(floorIndex, out var floorVoxel));
+        Assert.True(grid.TryGetVoxel(neighborIndex, out var neighbor));
+        Vector3d floorPosition = Vector3d.Midpoint(floorVoxel!.WorldPosition, neighbor!.WorldPosition);
+        if (storage == GridStorageKind.Sparse)
+        {
+            Assert.True(grid.TryRemoveVoxel(floorIndex));
+            Assert.True(grid.TryRemoveVoxel(neighborIndex));
+        }
+
+        SolidBody2D source = Source(context);
+        var floorCenter = new Vector2d(floorPosition.X, floorPosition.Z);
+        var floor = new LSAABBoxCollider2D(Vector2d.One);
+        Initialize(context, floor, floorCenter);
+        var request = Request(source, floorCenter + Vector2d.Forward * (Fixed64.One + Fixed64.Half), Fixed64.One);
+        var scratch = new PhysicsQueryScratch(128, 8);
+        var ample = new PhysicsQueryBudget(8192, 8192, 8192);
+        context.Simulate();
+        context.LateSimulate();
+        if (storage == GridStorageKind.Sparse)
+        {
+            Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+                context.Query2D.QuerySupport(request, ample, scratch, out var absent, out var missWork));
+            Assert.Null(absent);
+            Assert.Equal(0UL, missWork.Geometry);
+            Assert.Equal(Physics2DSupportQueryStatus.NoSupport, context.Query2D.QuerySupport(request, out _));
+
+            PhysicsQueryExecutionStatus? callbackStatus = null;
+            context.World.OnActiveGridChange += change =>
+            {
+                if (change.ChangeKind == GridEventKind.SparseVoxelAdded)
+                    callbackStatus = context.Query2D.QuerySupport(request, ample, scratch, out _, out _);
+            };
+            Assert.True(grid.TryAddVoxel(floorIndex, out _));
+            Assert.Equal(PhysicsQueryExecutionStatus.WorldNotReady, callbackStatus);
+            Assert.Equal(PhysicsQueryExecutionStatus.WorldNotReady,
+                context.Query2D.QuerySupport(request, ample, scratch, out absent, out var pendingWork));
+            Assert.Null(absent);
+            Assert.Equal(default, pendingWork);
+            context.Simulate();
+            context.LateSimulate();
+        }
+
+        Assert.Equal(Physics2DSupportQueryStatus.Found, context.Query2D.QuerySupport(request, out var expected));
+        Assert.Same(floor, expected.Hit.Collider);
+        Assert.Equal(Fixed64.Half, expected.Hit.Distance);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            context.Query2D.QuerySupport(request, ample, scratch, out var actual, out var used));
+        AssertSupportWitness(expected, actual);
+
+        var shortDiscovery = new PhysicsQueryBudget(used.Discovery - 1, used.Candidates, used.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            context.Query2D.QuerySupport(request, shortDiscovery, scratch, out actual, out var partial));
+        Assert.Null(actual);
+        Assert.True(partial.Discovery < used.Discovery);
+
+        var exact = new PhysicsQueryBudget(used.Discovery, used.Candidates, used.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            context.Query2D.QuerySupport(request, exact, scratch, out actual, out var replayed));
+        Assert.Equal(used, replayed);
+        AssertSupportWitness(expected, actual);
+    }
+
+    private static void AssertReadyBoundedWitness(GravitasWorldContext context, in Physics2DSupportQuery request)
+    {
+        context.Simulate();
+        context.LateSimulate();
+        Assert.Equal(Physics2DSupportQueryStatus.Found, context.Query2D.QuerySupport(request, out var expected));
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            context.Query2D.QuerySupport(request, new PhysicsQueryBudget(8192, 8192, 8192),
+                new PhysicsQueryScratch(128, 8), out var bounded, out _));
+        AssertSupportWitness(expected, bounded);
+    }
+
+    private static void AssertSupportWitness(in Physics2DSupportHit expected, Physics2DSupportHit? actual)
+    {
+        Assert.True(actual.HasValue);
+        var support = actual.Value;
+        Assert.Same(expected.Hit.Collider, support.Hit.Collider);
+        Assert.Equal(expected.Hit.Point, support.Hit.Point);
+        Assert.Equal(expected.Hit.Anchor, support.Hit.Anchor);
+        Assert.Equal(expected.Hit.Normal, support.Hit.Normal);
+        Assert.Equal(expected.Hit.Distance, support.Hit.Distance);
+        Assert.Equal(expected.SampledFrame, support.SampledFrame);
+        Assert.True(support.IsCurrentLifetime);
     }
 
     [Fact]
@@ -261,6 +463,7 @@ public sealed class Physics2DSupportQueryTests
         support.Hit.Distance.Should().Be(distance);
         support.Hit.Point.Should().Be(new Vector2d(Fixed64.Zero, top));
         support.Hit.Normal.Should().Be(Vector2d.Forward);
+        AssertReadyBoundedWitness(context, request);
     }
 
     [Theory]
@@ -304,6 +507,7 @@ public sealed class Physics2DSupportQueryTests
         context.Query2D.QuerySupport(request, out var support).Should().Be(Physics2DSupportQueryStatus.Found);
         support.Hit.Collider.Should().BeSameAs(floor);
         support.Hit.Distance.Should().Be((Fixed64)3);
+        AssertReadyBoundedWitness(context, request);
     }
 
     [Theory]
@@ -325,13 +529,24 @@ public sealed class Physics2DSupportQueryTests
         support.IsCurrentLifetime.Should().BeFalse();
         context.Query2D.QuerySupport(request, out var fresh).Should().Be(Physics2DSupportQueryStatus.Found);
         fresh.IsCurrentLifetime.Should().BeTrue();
+        AssertReadyBoundedWitness(context, request);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            context.Query2D.QuerySupport(request, new PhysicsQueryBudget(8192, 0, 8192),
+                new PhysicsQueryScratch(128, 8), out var bounded, out var work));
+        Assert.Null(bounded);
+        Assert.Equal(0UL, work.Candidates);
+        Assert.Equal(0UL, work.Geometry);
     }
 
     [Fact]
     public void OpenStep_IsNotACompleteNoSupportResult()
     {
         using var context = Physics2DTestWorld.CreateContext();
+        context.Environment.Gravity = Fixed64.Zero;
         SolidBody2D source = Source(context);
+        var floor = new SolidBody2D(new TestMatterAgent(context: context), new LSAABBoxCollider2D(new Vector2d(12, 1)));
+        floor.Initialize(Vector2d.Zero, motionType: PhysicsMobilityType.Dynamic);
+        floor.UseManualGrounding();
         var request = Request(source, Vector2d.Forward, Fixed64.One);
         context.Simulate();
         context.Query2D.QuerySupport(request, out var pending).Should().Be(Physics2DSupportQueryStatus.WorldNotReady);
@@ -339,6 +554,20 @@ public sealed class Physics2DSupportQueryTests
         context.LateSimulate();
         context.Query2D.QuerySupport(request, out var absent).Should().Be(Physics2DSupportQueryStatus.NoSupport);
         absent.IsCurrentLifetime.Should().BeFalse();
+
+        var scratch = new PhysicsQueryScratch(128, 8);
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            context.Query2D.QuerySupport(request, new PhysicsQueryBudget(8192, 8192, 8192),
+                scratch, out var bounded, out var completeWork));
+        Assert.Null(bounded);
+        Assert.True(completeWork.Candidates > 0);
+        Assert.Equal(0UL, completeWork.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            context.Query2D.QuerySupport(request, new PhysicsQueryBudget(completeWork.Discovery, 0, 8192),
+                scratch, out bounded, out var partialWork));
+        Assert.Null(bounded);
+        Assert.Equal(0UL, partialWork.Candidates);
+        Assert.Equal(0UL, partialWork.Geometry);
     }
 
     [Theory]
@@ -353,6 +582,24 @@ public sealed class Physics2DSupportQueryTests
         context.Query2D.QuerySupport(request, out var support).Should().Be(Physics2DSupportQueryStatus.Unrepresentable);
         support.IsCurrentLifetime.Should().BeFalse();
         support.Hit.Collider.Should().BeNull();
+        Assert.Equal(PhysicsQueryExecutionStatus.Unrepresentable,
+            context.Query2D.QuerySupport(request, default, new PhysicsQueryScratch(0, 0), out var bounded, out var used));
+        Assert.Null(bounded);
+        Assert.Equal(default, used);
+    }
+
+    [Fact]
+    public void BoundedSupport_RejectsNonpureRuntimeBeforeCharging()
+    {
+        using var context = Physics2DTestWorld.CreateContext();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Both;
+        SolidBody2D source = Source(context);
+        var request = Request(source, Vector2d.Forward, Fixed64.One);
+
+        Assert.Equal(PhysicsQueryExecutionStatus.UnsupportedRuntimeMode,
+            context.Query2D.QuerySupport(request, default, new PhysicsQueryScratch(0, 0), out var bounded, out var used));
+        Assert.Null(bounded);
+        Assert.Equal(default, used);
     }
 
     [Theory]
@@ -380,6 +627,11 @@ public sealed class Physics2DSupportQueryTests
         var request = Request(source, new Vector2d(Fixed64.Half, Fixed64.Half), Fixed64.One);
         context.Query2D.QuerySupport(request, out var support).Should().Be(Physics2DSupportQueryStatus.NoSupport);
         support.Hit.Collider.Should().BeNull();
+        Assert.Equal(PhysicsQueryExecutionStatus.Completed,
+            context.Query2D.QuerySupport(request, new PhysicsQueryBudget(8192, 8192, 8192),
+                new PhysicsQueryScratch(128, 8), out var bounded, out var work));
+        Assert.Null(bounded);
+        Assert.True(work.Geometry > 0);
     }
 
     [Fact]
@@ -451,6 +703,18 @@ public sealed class Physics2DSupportQueryTests
         Assert.Equal(hit.Value.Hit.Distance, replay.Value.Hit.Distance);
         Assert.Equal(hit.Value.Hit.Normal, replay.Value.Hit.Normal);
 
+        // The kinematic membership fits. The first linked-pair comparison does not.
+        var beforePairFilter = new PhysicsQueryBudget(expected.Discovery, 1, expected.Geometry);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            live.Query2D.QuerySupport(liveRequest, beforePairFilter, scratch, out replay, out used));
+        Assert.Equal(1UL, used.Candidates);
+        Assert.Equal(0UL, used.Geometry);
+        Assert.Null(replay);
+        Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
+            restored.Query2D.QuerySupport(restoredRequest, beforePairFilter, scratch, out var partialHit, out var partialWork));
+        Assert.Equal(used, partialWork);
+        Assert.Null(partialHit);
+
         var oneBelow = new PhysicsQueryBudget(expected.Discovery, expected.Candidates - 1, expected.Geometry);
         Assert.Equal(PhysicsQueryExecutionStatus.WorkBudgetExceeded,
             live.Query2D.QuerySupport(liveRequest, oneBelow, scratch, out replay, out used));
@@ -519,6 +783,7 @@ public sealed class Physics2DSupportQueryTests
         context.Query2D.QuerySupport(request, out var support).Should().Be(Physics2DSupportQueryStatus.Found);
         support.Hit.Collider.Should().BeSameAs(closerSecond ? second : first);
         support.Hit.Distance.Should().Be(closerSecond ? Fixed64.One : Fixed64.Two);
+        AssertReadyBoundedWitness(context, request);
     }
 
     [Fact]

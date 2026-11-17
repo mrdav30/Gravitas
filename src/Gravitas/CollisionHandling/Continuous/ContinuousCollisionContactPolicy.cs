@@ -8,6 +8,7 @@
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using Gravitas.Queries;
 
 namespace Gravitas.CollisionHandling;
 
@@ -19,7 +20,8 @@ internal static class ContinuousCollisionContactPolicy
         Vector3d sphereCenterAtImpact,
         Vector3d direction,
         out ContactAnchor targetAnchor,
-        out Vector3d normal)
+        out Vector3d normal,
+        MeshQueryScratch? scratch = null)
     {
         if (target is LSSphereCollider or LSCapsuleCollider)
         {
@@ -88,10 +90,7 @@ internal static class ContinuousCollisionContactPolicy
 
         if (target is LSMeshCollider mesh)
         {
-            mesh.FindClosestPointAnchor(
-                sphereCenterAtImpact,
-                out FixedPointAnchor meshPoint,
-                out normal);
+            FixedPointAnchor meshPoint = mesh.GetClosestSurfaceAnchor(sphereCenterAtImpact, out normal, scratch);
             normal = ResolveSurfaceNormal(meshPoint, sphereCenterAtImpact, normal);
             targetAnchor = new ContactAnchor(meshPoint);
             return true;
@@ -100,7 +99,7 @@ internal static class ContinuousCollisionContactPolicy
         if (target is LSCompoundCollider compound)
         {
             FixedPointAnchor surfacePoint = compound.GetClosestSurfaceAnchor(
-                sphereCenterAtImpact, out normal, out LSCollider surfaceOwner);
+                sphereCenterAtImpact, out normal, out LSCollider surfaceOwner, scratch);
             if (surfaceOwner is LSMeshCollider)
                 normal = ResolveSurfaceNormal(surfacePoint, sphereCenterAtImpact, normal);
             // Keep the selected part's witness and outward primitive normal.

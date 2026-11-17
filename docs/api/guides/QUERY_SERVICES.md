@@ -445,17 +445,25 @@ synchronous query without a hard work or allocation ceiling.
 The bounded overloads of `Query2D.QuerySupport` and `Query3D.SweepSphere`
 take a `PhysicsQueryBudget` and caller-owned `PhysicsQueryScratch`. Allocate
 the scratch during host setup and reuse it serially between complete fixed
-steps. The capacities are covered voxel references and unique collider IDs.
-The budget separately limits discovery inspections, candidate inspections,
-and geometry work. Scratch capacity and work exhaustion have distinct outcomes.
+steps. The budget separately limits discovery, candidate, and geometry work.
+Scratch capacity and work exhaustion have distinct outcomes.
 
-The bounded 2D support query accepts box targets in a pure 2D world. The
-bounded directional 3D sphere sweep accepts cuboid targets in a pure 3D world.
-Both cover dense rectangular grids. Eligible geometry or grid storage outside
-those contracts can make the query incomplete. A complete result follows the
-corresponding synchronous query's hit selection, including its filters and
-ties. A `Completed` status with a null hit certifies a miss. Any other status
-clears the hit and reports the work already charged.
+The 2D support query accepts boxes, circles, capsules, convex polygons, and
+their authored compounds in a pure 2D world. The 3D sphere sweep accepts
+cuboids, spheres, capsules, finite cylinders and cones, triangle meshes, and
+authored compounds in a pure 3D world. Both cover physically present voxels
+in dense and sparse rectangular and hexagonal grids. A complete result follows
+the synchronous query's hit selection, filters, and ties. A `Completed`
+status with a null hit certifies a miss. An incomplete status clears the hit
+and reports the work already charged.
+
+Size scratch for covered voxel references and distinct collider IDs. To admit
+meshes in 3D, pass the third constructor argument `meshTriangleCapacity`.
+Size it to the largest mesh the query may need to examine, including mesh
+parts of compounds. The sweep and closest-witness pass reuse that space.
+Geometry charges reserve conservative work for an admitted shape before
+running its narrowphase. Mesh charges include the whole authored mesh and
+both BVH traversals, even when bounds prune most triangles.
 
 The bounded query samples partitions at the host barrier and returns
 `WorldNotReady` when the world needs reconciliation. Advance the normal host
@@ -474,6 +482,22 @@ joints or ragdoll rules suppressing one pair share that entry. Identical work
 and results assume matching collider order, equivalent query state, and the
 same inputs and limits. Evaluate query and complete-step latency separately on representative
 workloads.
+
+## Bounded collider posture clearance
+
+`SolidBody2D.TryReconfigureCollider` and `SolidBody.TryReconfigureCollider`
+also accept a budget and scratch. The bounded overloads admit same-family
+circle or capsule replacements in pure 2D and sphere or capsule replacements
+in pure 3D. Use the synchronous overload for 3D finite-cylinder replacement.
+
+Clearance checks registered blockers in registration order, including colliders
+outside the grid. The first proven penetration completes the query with that
+blocker. Exact touching permits clearance. An incomplete query leaves the collider, body
+pose, memberships, and publication untouched. On completion, the nullable
+reconfiguration result distinguishes applied, unchanged, and blocked. The
+work allowance covers candidate preparation and clearance. Successful
+publication and its host callbacks are part of the same posture transaction
+and occur after that decision.
 
 ## Grid Changes And Query Readiness
 

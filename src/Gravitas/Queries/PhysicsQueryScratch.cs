@@ -13,7 +13,7 @@ using GridForge.Grids;
 namespace Gravitas.Queries;
 
 /// <summary>Provides fixed, exclusively borrowed storage for a bounded physics query.</summary>
-public sealed class PhysicsQueryScratch
+public sealed partial class PhysicsQueryScratch
 {
     private readonly Voxel?[] _voxels;
     private readonly int[] _candidateIds;
@@ -22,11 +22,25 @@ public sealed class PhysicsQueryScratch
 
     /// <summary>Creates scratch with the requested voxel and unique collider capacities.</summary>
     public PhysicsQueryScratch(int traversalCapacity, int candidateCapacity)
+        : this(traversalCapacity, candidateCapacity, 0)
+    {
+    }
+
+    /// <summary>Creates scratch with space for voxels, unique colliders, and one mesh at a time.</summary>
+    /// <param name="traversalCapacity">The number of covered voxels discovery can retain.</param>
+    /// <param name="candidateCapacity">The number of distinct collider identities the query can retain.</param>
+    /// <param name="meshTriangleCapacity">The maximum triangle count of any admitted mesh.</param>
+    public PhysicsQueryScratch(int traversalCapacity, int candidateCapacity, int meshTriangleCapacity)
     {
         ChronicleGuard.ThrowIfNegative(traversalCapacity, nameof(traversalCapacity));
         ChronicleGuard.ThrowIfNegative(candidateCapacity, nameof(candidateCapacity));
+        ChronicleGuard.ThrowIfArgumentOutOfRange(
+            meshTriangleCapacity < 0 || meshTriangleCapacity > Colliders.PhysicsMesh.MaxTriangleCount,
+            meshTriangleCapacity, nameof(meshTriangleCapacity), "Capacity must be within the supported mesh triangle range.");
         _voxels = new Voxel?[traversalCapacity];
         _candidateIds = new int[candidateCapacity];
+        if (meshTriangleCapacity != 0)
+            Mesh = new MeshQueryScratch(meshTriangleCapacity);
     }
 
     /// <summary>Gets the maximum covered voxels that discovery can retain.</summary>
@@ -34,6 +48,11 @@ public sealed class PhysicsQueryScratch
 
     /// <summary>Gets the maximum distinct collider identities the query can retain.</summary>
     public int CandidateCapacity => _candidateIds.Length;
+
+    /// <summary>Gets the maximum triangle count of any mesh the query can examine.</summary>
+    public int MeshTriangleCapacity => Mesh?.Capacity ?? 0;
+
+    internal MeshQueryScratch? Mesh { get; }
 
     internal Span<Voxel?> Voxels => _voxels;
 
@@ -83,27 +102,39 @@ public sealed class PhysicsQueryScratch
     }
 
     internal PhysicsQueryExecutionStatus Discover(
-        GridWorld world, Vector3d min, Vector3d max, bool planar,
+        GravitasWorldContext context, Vector3d min, Vector3d max, bool planar,
         ref PhysicsQueryMeter meter, out int voxelCount, out ulong changeSequence)
     {
-        var status = world.CollectCoveredVoxelsBounded(min, max, planar,
+        var status = context.World.CollectCoveredVoxelsBounded(min, max, planar,
             meter.DiscoveryRemaining, _voxels, out ulong spent, out voxelCount, out changeSequence);
         meter.AddDiscovery(spent);
-        return MapDiscoveryStatus(status);
+        return status == GridBoundedVoxelStatus.Completed
+            ? ObservedViewStatus(context, changeSequence, PhysicsQueryExecutionStatus.Stale)
+            : MapDiscoveryFailure(status);
     }
 
-    internal static PhysicsQueryExecutionStatus CheckSnapshot(GridWorld world, ulong changeSequence) =>
-        world.CheckBoundedVoxelSnapshot(changeSequence) == GridBoundedVoxelStatus.Completed
-            ? PhysicsQueryExecutionStatus.Completed : PhysicsQueryExecutionStatus.Stale;
-
-    internal static PhysicsQueryExecutionStatus MapDiscoveryStatus(GridBoundedVoxelStatus status) => status switch
+    internal static PhysicsQueryExecutionStatus CheckView(GravitasWorldContext context, ulong sequence,
+        ref PhysicsQueryMeter meter, PhysicsQueryExecutionStatus unavailable = PhysicsQueryExecutionStatus.Stale)
     {
-        GridBoundedVoxelStatus.Completed => PhysicsQueryExecutionStatus.Completed,
+        var observed = ObservedViewStatus(context, sequence, unavailable);
+        if (observed != PhysicsQueryExecutionStatus.Completed)
+            return observed;
+        if (meter.DiscoveryRemaining == 0)
+            return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
+        meter.AddDiscovery(1);
+        return context.World.CheckBoundedVoxelSnapshot(sequence) == GridBoundedVoxelStatus.Completed
+            ? ObservedViewStatus(context, sequence, unavailable) : unavailable;
+    }
+
+    private static PhysicsQueryExecutionStatus ObservedViewStatus(
+        GravitasWorldContext context, ulong sequence, PhysicsQueryExecutionStatus unavailable) =>
+        context.IsBoundedQueryViewCurrent(sequence) ? PhysicsQueryExecutionStatus.Completed : unavailable;
+
+    internal static PhysicsQueryExecutionStatus MapDiscoveryFailure(GridBoundedVoxelStatus status) => status switch
+    {
         GridBoundedVoxelStatus.WorkBudgetExceeded => PhysicsQueryExecutionStatus.WorkBudgetExceeded,
         GridBoundedVoxelStatus.CapacityExceeded => PhysicsQueryExecutionStatus.ScratchCapacityExceeded,
-        GridBoundedVoxelStatus.Stale => PhysicsQueryExecutionStatus.Stale,
         GridBoundedVoxelStatus.Unrepresentable => PhysicsQueryExecutionStatus.Unrepresentable,
-        GridBoundedVoxelStatus.UnsupportedGrid => PhysicsQueryExecutionStatus.UnsupportedTopology,
         _ => PhysicsQueryExecutionStatus.WorldNotReady
     };
 }

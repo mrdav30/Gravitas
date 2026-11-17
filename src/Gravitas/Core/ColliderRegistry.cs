@@ -20,6 +20,8 @@ internal sealed partial class ColliderRegistry<TCollider>
     private readonly SwiftSlotMap<TCollider> _byId;
     private readonly SwiftList<TCollider> _liveColliders;
     private readonly SwiftList<TCollider> _replayColliders;
+    private int _firstRegistrationId = -1;
+    private int _lastRegistrationId = -1;
     private int _nextReplayOrder;
 
     public ColliderRegistry(int capacity = SwiftSlotMap<TCollider>.DefaultCapacity)
@@ -32,6 +34,8 @@ internal sealed partial class ColliderRegistry<TCollider>
     public int Count => _liveColliders.Count;
 
     public int PeakCount => _byId.PeakCount;
+
+    public int FirstRegistrationId => _firstRegistrationId;
 
     public TCollider this[int serviceIndex]
     {
@@ -47,6 +51,15 @@ internal sealed partial class ColliderRegistry<TCollider>
         int serviceIndex = _liveColliders.Count;
         collider.SetRegistryState(id, serviceIndex, _nextReplayOrder++);
         _liveColliders.Add(collider);
+
+        collider.PreviousRegistrationId = _lastRegistrationId;
+        collider.NextRegistrationId = -1;
+        if (_lastRegistrationId < 0)
+            _firstRegistrationId = id;
+        else
+            _byId[_lastRegistrationId].NextRegistrationId = id;
+        _lastRegistrationId = id;
+
         return id;
     }
 
@@ -57,6 +70,17 @@ internal sealed partial class ColliderRegistry<TCollider>
         int id = collider.Id;
         if (!TryGetById(id, out TCollider? registered) || !ReferenceEquals(registered, collider))
             return false;
+
+        int previous = collider.PreviousRegistrationId;
+        int next = collider.NextRegistrationId;
+        if (previous < 0)
+            _firstRegistrationId = next;
+        else
+            _byId[previous].NextRegistrationId = next;
+        if (next < 0)
+            _lastRegistrationId = previous;
+        else
+            _byId[next].PreviousRegistrationId = previous;
 
         RemoveLiveCollider(collider);
         _byId.RemoveAt(id);
@@ -73,6 +97,8 @@ internal sealed partial class ColliderRegistry<TCollider>
         // Replay gathers can leave a larger previous snapshot beyond Count.
         _replayColliders.Clear(clearRetainedReferences: true);
         _byId.Clear();
+        _firstRegistrationId = -1;
+        _lastRegistrationId = -1;
         _nextReplayOrder = 0;
     }
 
@@ -105,14 +131,21 @@ internal sealed partial class ColliderRegistry<TCollider>
     {
         _replayColliders.FastClear();
         _replayColliders.EnsureCapacity(_liveColliders.Count);
-        for (int i = 0; i < _liveColliders.Count; i++)
-            _replayColliders.Add(_liveColliders[i]);
-
-        _replayColliders.SortInPlace(default(ReplayOrderComparer<TCollider>));
-        for (int i = 0; i < _replayColliders.Count; i++)
-            _replayColliders[i].SetRegistryReplayOrdinal(i);
+        for (int id = _firstRegistrationId; id >= 0;)
+        {
+            TCollider collider = GetAtRegistration(id, out id);
+            collider.SetRegistryReplayOrdinal(_replayColliders.Count);
+            _replayColliders.Add(collider);
+        }
 
         return _replayColliders;
+    }
+
+    public TCollider GetAtRegistration(int id, out int nextId)
+    {
+        TCollider collider = _byId[id];
+        nextId = collider.NextRegistrationId;
+        return collider;
     }
 
     private void RemoveLiveCollider(TCollider collider)

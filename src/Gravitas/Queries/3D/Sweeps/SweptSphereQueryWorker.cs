@@ -70,7 +70,14 @@ public sealed class SweptSphereQueryWorker
     public bool TrySweep(
         LSCollider collider,
         out Vector3d sphereCenterAtImpact,
-        out Fixed64 impactDistance)
+        out Fixed64 impactDistance) =>
+        TrySweep(collider, out sphereCenterAtImpact, out impactDistance, null);
+
+    internal bool TrySweep(
+        LSCollider collider,
+        out Vector3d sphereCenterAtImpact,
+        out Fixed64 impactDistance,
+        MeshQueryScratch? scratch)
     {
         if (_sweepDepth == 0)
             LastMeshTriangleCandidateCount = 0;
@@ -93,8 +100,8 @@ public sealed class SweptSphereQueryWorker
                 LSCuboidCollider cuboid => TrySweepCuboid(cuboid, out sphereCenterAtImpact, out impactDistance),
                 LSCylinderCollider cylinder => TrySweepCylinder(cylinder, out sphereCenterAtImpact, out impactDistance),
                 LSConeCollider cone => TrySweepCone(cone, out sphereCenterAtImpact, out impactDistance),
-                LSMeshCollider mesh => TrySweepMesh(mesh, out sphereCenterAtImpact, out impactDistance),
-                LSCompoundCollider compound => TrySweepCompound(compound, out sphereCenterAtImpact, out impactDistance),
+                LSMeshCollider mesh => TrySweepMesh(mesh, out sphereCenterAtImpact, out impactDistance, out _, null, scratch),
+                LSCompoundCollider compound => TrySweepCompound(compound, out sphereCenterAtImpact, out impactDistance, scratch),
                 _ => false
             };
 
@@ -261,21 +268,17 @@ public sealed class SweptSphereQueryWorker
         return TrySweepMesh(mesh, out _, out _, out hit, admit);
     }
 
-    private bool TrySweepMesh(
-        LSMeshCollider mesh,
-        out Vector3d sphereCenterAtImpact,
-        out Fixed64 impactDistance) => TrySweepMesh(mesh, out sphereCenterAtImpact, out impactDistance, out _, null);
-
     private bool TrySweepMesh(LSMeshCollider mesh, out Vector3d sphereCenterAtImpact, out Fixed64 impactDistance,
-        out Physics3DHit admittedHit, ContinuousSurfaceTriangleAdmission? admit)
+        out Physics3DHit admittedHit, ContinuousSurfaceTriangleAdmission? admit, MeshQueryScratch? scratch = null)
     {
         admittedHit = default;
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.MaxValue;
 
         CreateSweepBounds(_start, _end, _radius, out Vector3d min, out Vector3d max);
-        mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleBuffer);
-        LastMeshTriangleCandidateCount += _meshTriangleBuffer.Count;
+        SwiftList<int> triangles = scratch?.Triangles ?? _meshTriangleBuffer;
+        mesh.Mesh.GetTrianglesInWorldBounds(new FixedBoundVolume(min, max), triangles, scratch?.Traversal);
+        LastMeshTriangleCandidateCount += triangles.Count;
 
         var startAnchor = new FixedPointAnchor(
             _start,
@@ -301,8 +304,8 @@ public sealed class SweptSphereQueryWorker
         }
 
         ReadOnlySpan<int> corners = default;
-        if (admit == null && _meshTriangleBuffer.Count > 2
-            && _meshTriangleBuffer.Count == mesh.Mesh.TriangleCount && mesh.Mesh.HasSingleConvexCoplanarPatch)
+        if (admit == null && triangles.Count > 2
+            && triangles.Count == mesh.Mesh.TriangleCount && mesh.Mesh.HasSingleConvexCoplanarPatch)
         {
             CreateSweepBounds(_start, _start, _radius, out Vector3d initialMin, out Vector3d initialMax);
             if (!SweepBoundsUtility.OverlapsInclusive(initialMin, initialMax, mesh.Bounds.Min, mesh.Bounds.Max))
@@ -310,10 +313,10 @@ public sealed class SweptSphereQueryWorker
         }
 
         bool found = false;
-        int triangleCount = corners.IsEmpty ? _meshTriangleBuffer.Count : corners.Length - 2;
+        int triangleCount = corners.IsEmpty ? triangles.Count : corners.Length - 2;
         for (int i = 0; i < triangleCount; i++)
         {
-            int triangleIndex = corners.IsEmpty ? _meshTriangleBuffer[i] : -1;
+            int triangleIndex = corners.IsEmpty ? triangles[i] : -1;
             Vector3d first, second, third, normal;
             if (corners.IsEmpty)
             {
@@ -410,7 +413,8 @@ public sealed class SweptSphereQueryWorker
     private bool TrySweepCompound(
         LSCompoundCollider compound,
         out Vector3d sphereCenterAtImpact,
-        out Fixed64 impactDistance)
+        out Fixed64 impactDistance,
+        MeshQueryScratch? scratch)
     {
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.MaxValue;
@@ -419,7 +423,7 @@ public sealed class SweptSphereQueryWorker
         for (int i = 0; i < compound.PartCount; i++)
         {
             found |= TryKeepEarlierSweep(
-                TrySweep(compound.GetPartCollider(i), out Vector3d partHit, out Fixed64 partDistance),
+                TrySweep(compound.GetPartCollider(i), out Vector3d partHit, out Fixed64 partDistance, scratch),
                 partHit,
                 partDistance,
                 ref sphereCenterAtImpact,

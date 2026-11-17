@@ -837,10 +837,11 @@ public sealed partial class GravitasQuery3DService
         return found;
     }
 
-    private bool TryBuildPreparedSweepHit(LSCollider collider, Vector3d direction, out Physics3DHit sweepHit)
+    private bool TryBuildPreparedSweepHit(LSCollider collider, Vector3d direction, out Physics3DHit sweepHit,
+        MeshQueryScratch? scratch = null)
     {
         sweepHit = default;
-        if (!_sweepWorker.TrySweep(collider, out Vector3d sweepCenter, out Fixed64 distance))
+        if (!_sweepWorker.TrySweep(collider, out Vector3d sweepCenter, out Fixed64 distance, scratch))
             return false;
 
         // Admitted source/target reach bounds a hit's surface separation even at world limits.
@@ -849,7 +850,8 @@ public sealed partial class GravitasQuery3DService
                 sweepCenter,
                 direction,
                 out ContactAnchor anchor,
-                out Vector3d normal);
+                out Vector3d normal,
+                scratch);
         System.Diagnostics.Debug.Assert(resolved);
 
         sweepHit = new Physics3DHit(collider, anchor, normal, distance, direction);

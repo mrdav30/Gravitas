@@ -14,6 +14,23 @@ namespace Gravitas.Tests.Colliders;
 public sealed class LSMeshColliderQueryTests
 {
     [Fact]
+    public void FixedTriangleTraversalRefusesAnUndersizedStack()
+    {
+        var mesh = CreateTriangleMesh();
+        var bounds = new FixedBoundVolume(-Vector3d.One, Vector3d.One);
+        var results = new SwiftList<int>(mesh.Mesh.TriangleCount);
+        int capacity = results.Capacity;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            mesh.Mesh.GetTrianglesInGeometryBounds(bounds, results, Array.Empty<int>()));
+        Assert.Empty(results);
+        Assert.Equal(capacity, results.Capacity);
+
+        mesh.Mesh.GetTrianglesInGeometryBounds(bounds, results, new int[mesh.Mesh.TriangleCount]);
+        Assert.Equal(0, Assert.Single(results));
+    }
+
+    [Fact]
     public void ColliderOverlapsRay_ShouldReturnTriangleIntersectionPoint()
     {
         LSMeshCollider mesh = CreateTriangleMesh();

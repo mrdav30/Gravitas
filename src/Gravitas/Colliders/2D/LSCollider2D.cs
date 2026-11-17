@@ -541,6 +541,10 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     int IPhysicsColliderRegistryItem.ReplayOrder => _replayOrder;
 
+    int IPhysicsColliderRegistryItem.PreviousRegistrationId { get; set; } = -1;
+
+    int IPhysicsColliderRegistryItem.NextRegistrationId { get; set; } = -1;
+
     void IPhysicsColliderRegistryItem.SetRegistryServiceIndex(int serviceIndex) =>
         SetServiceIndex(serviceIndex);
 

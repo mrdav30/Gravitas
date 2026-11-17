@@ -983,6 +983,10 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     int IPhysicsColliderRegistryItem.ReplayOrder => _replayOrder;
 
+    int IPhysicsColliderRegistryItem.PreviousRegistrationId { get; set; } = -1;
+
+    int IPhysicsColliderRegistryItem.NextRegistrationId { get; set; } = -1;
+
     void IPhysicsColliderRegistryItem.SetRegistryServiceIndex(int serviceIndex) =>
         SetServiceIndex(serviceIndex);
 

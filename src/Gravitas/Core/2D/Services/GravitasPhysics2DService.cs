@@ -369,6 +369,10 @@ public sealed partial class GravitasPhysics2DService
 
     internal LSCollider2D GetColliderByServiceIndex(int serviceIndex) => _colliders[serviceIndex];
 
+    internal int FirstColliderRegistrationId => _colliders.FirstRegistrationId;
+
+    internal LSCollider2D GetColliderByRegistrationId(int id, out int nextId) => _colliders.GetAtRegistration(id, out nextId);
+
     internal SwiftList<LSCollider2D> PrepareReplayColliders() => _colliders.PrepareReplayColliders();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

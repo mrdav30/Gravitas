@@ -487,7 +487,7 @@ ColliderReconfigurationStatus result = body.TryReconfigureCollider(
 
 `Applied` means the geometry and pose were published together. `Unchanged` means
 the requested authored and committed state already matched. `Blocked` returns
-the first physically eligible collider, in stable registration order, that the
+the first physically eligible collider in current service order that the
 candidate would positively penetrate. Exact touching at a support or floor
 contact is accepted, and trigger volumes do not block reconfiguration.
 
@@ -508,6 +508,29 @@ replacement in pure `TwoD` mode. A capsule with height `2 * radius` is a compact
 posture of the same collider, not a replacement identity. Host world Y and the
 accepted rotation are retained. Other runtime modes reject rather than omit
 potential cross-dimensional blockers.
+
+#### Bounding Posture Clearance
+
+Supply a `PhysicsQueryBudget` and reusable `PhysicsQueryScratch` to opt in to
+bounded clearance. The bounded overload accepts circle and capsule changes in
+pure `TwoD`, and sphere and capsule changes in pure `ThreeD`. It tests all
+physically eligible registered colliders, including those outside voxel
+coverage. Registration order is retained through removal and ID reuse.
+
+`PhysicsQueryExecutionStatus.Completed` carries `Applied`, `Unchanged`, or
+`Blocked` in the nullable transaction result. Any other execution status clears
+the result, blocker, and notification exception and leaves the live transaction
+untouched. `PhysicsQueryWork` is returned for every outcome. The discovery budget
+pays for the initial and final world-view checks, the candidate budget covers
+registry and linked-collision filter visits, and the geometry budget covers
+detached preparation and strict clearance. Bounds for compound and mesh work
+can be charged in advance, so charged work can exceed the actual passes.
+
+Construct scratch once and reuse it sequentially. Posture scans require no
+voxel or candidate storage capacity. Call between steps and serialize with
+world and collider mutation. Successful physical publication, mass updates,
+pair cleanup, and host notifications are outside the clearance work limits.
+The scratch is available again by the time host notifications run.
 
 #### What Counts As A Blocker
 

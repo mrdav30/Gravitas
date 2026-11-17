@@ -18,6 +18,10 @@ internal interface IPhysicsColliderRegistryItem
 
     int ReplayOrder { get; }
 
+    int PreviousRegistrationId { get; set; }
+
+    int NextRegistrationId { get; set; }
+
     void SetRegistryState(int id, int serviceIndex, int replayOrder);
 
     void SetRegistryServiceIndex(int serviceIndex);

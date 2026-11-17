@@ -93,6 +93,10 @@ public sealed class ColliderRegistryTests
 
         public int ReplayOrder { get; private set; } = -1;
 
+        public int PreviousRegistrationId { get; set; } = -1;
+
+        public int NextRegistrationId { get; set; } = -1;
+
         public int ReplayOrdinal { get; private set; } = -1;
 
         public void SetRegistryState(int id, int serviceIndex, int replayOrder)

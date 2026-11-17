@@ -351,6 +351,20 @@ public abstract partial class LSCollider
     internal bool MatchesCommittedReconfigurationCandidate(LSCollider candidate) =>
         !_runtimeShapeState.ShouldRebuild(candidate._preparedSnapshot);
 
+    internal void SetDetachedPostureDimensions(ColliderShapeDefinition definition)
+    {
+        _radius = definition.Radius;
+        _size = definition.Size;
+    }
+
+    internal void ReleaseDetachedBodyReconfigurationCandidate()
+    {
+        _body = null;
+        _agent = null;
+        _context = null;
+        _preparedContext = null;
+    }
+
     internal void PrepareBodyReconfiguration(
         ColliderShapeDefinition definition,
         Vector3d localOffset,

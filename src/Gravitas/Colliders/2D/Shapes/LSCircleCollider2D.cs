@@ -21,6 +21,9 @@ public sealed class LSCircleCollider2D : LSCollider2D
     private Fixed64 _scaledRadius;
     private Fixed64 _preparedRadius;
 
+    internal void SetDetachedPostureDimensions(ColliderShapeDefinition2D definition) =>
+        _radius = definition.Radius;
+
     /// <summary>Creates a pure 2D circle with an authored radius.</summary>
     public LSCircleCollider2D(Fixed64 radius)
     {

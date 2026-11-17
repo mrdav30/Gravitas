@@ -44,10 +44,13 @@ public partial class PhysicsMesh
         new FixedPointAnchor(worldPoint, FixedQuaternion.Identity, Vector3d.Zero)
             .TryGetLocalPointIn(_geometryFrame.RigidOrigin, _geometryFrame.Rotation, out point);
 
-    internal void GetTrianglesInGeometryBounds(FixedBoundVolume bounds, SwiftList<int> result)
+    internal void GetTrianglesInGeometryBounds(FixedBoundVolume bounds, SwiftList<int> result, int[]? traversal = null)
     {
         result.FastClear();
-        TriangleBVH.Query(bounds, result);
+        if (traversal == null)
+            TriangleBVH.Query(bounds, result);
+        else if (!TriangleBVH.TryQuery(bounds, result, traversal))
+            throw new InvalidOperationException("The mesh traversal exceeds its admitted capacity.");
     }
 
     private void SelectPreparedGeometryFrame(Vector3d center, FixedQuaternion rotation)

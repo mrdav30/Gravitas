@@ -736,16 +736,18 @@ namespace Gravitas.Colliders
         }
 
         /// <summary>Writes triangle indices overlapping world-space bounds into a caller-owned buffer.</summary>
-        public void GetTrianglesInWorldBounds(FixedBoundVolume worldBounds, SwiftList<int> result)
+        public void GetTrianglesInWorldBounds(FixedBoundVolume worldBounds, SwiftList<int> result) =>
+            GetTrianglesInWorldBounds(worldBounds, result, null);
+
+        internal void GetTrianglesInWorldBounds(FixedBoundVolume worldBounds, SwiftList<int> result, int[]? traversal)
         {
-            result.FastClear();
             if (!_geometryFrame.IsRigid)
             {
                 // Collider admission requires positive scale; inverse bounds
                 // clip to the source domain and cannot be singular here.
                 bool inverted = _sourceFrame.TryGetSourceBounds(worldBounds.Min, worldBounds.Max, out FixedBoundBox sourceBounds);
                 System.Diagnostics.Debug.Assert(inverted);
-                TriangleBVH.Query(new FixedBoundVolume(sourceBounds.Min, sourceBounds.Max), result);
+                GetTrianglesInGeometryBounds(new FixedBoundVolume(sourceBounds.Min, sourceBounds.Max), result, traversal);
                 return;
             }
             FixedBoundBox localBounds =
@@ -756,9 +758,9 @@ namespace Gravitas.Colliders
                     worldBounds.Max,
                     _geometryFrame.RigidOrigin,
                     _rotation);
-            TriangleBVH.Query(
+            GetTrianglesInGeometryBounds(
                 new FixedBoundVolume(localBounds.Min, localBounds.Max),
-                result);
+                result, traversal);
         }
 
         /// <summary>Writes triangle indices overlapping scaled-local bounds into a caller-owned buffer.</summary>

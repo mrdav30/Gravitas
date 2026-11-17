@@ -22,6 +22,8 @@ public sealed partial class GravitasWorldContext
     internal bool IsBoundedQueryViewCurrent(ulong changeSequence) =>
         BoundedQueryPartitionsReady && _observedGridChangeSequence == changeSequence;
 
+    internal ulong ObservedGridChangeSequence => _observedGridChangeSequence;
+
     private void OnQueryPartitionWorldChange(GridEventInfo change)
     {
         _observedGridChangeSequence = change.ChangeSequence;

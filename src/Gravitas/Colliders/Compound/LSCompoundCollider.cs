@@ -320,23 +320,18 @@ public sealed class LSCompoundCollider : LSCollider
     internal FixedPointAnchor GetClosestSurfaceAnchor(
         Vector3d point,
         out Vector3d normal,
-        out LSCollider surfaceOwner)
+        out LSCollider surfaceOwner,
+        MeshQueryScratch? scratch = null)
     {
         var reference = new FixedPointAnchor(
             point,
             FixedQuaternion.Identity,
             Vector3d.Zero);
         surfaceOwner = _partColliders[0];
-        FixedPointAnchor closest =
-            surfaceOwner.GetClosestSurfaceAnchor(
-                point,
-                out normal);
+        FixedPointAnchor closest = GetPartSurfaceAnchor(surfaceOwner, out normal);
         for (int i = 1; i < _partColliders.Length; i++)
         {
-            FixedPointAnchor candidate =
-                _partColliders[i].GetClosestSurfaceAnchor(
-                    point,
-                    out Vector3d candidateNormal);
+            FixedPointAnchor candidate = GetPartSurfaceAnchor(_partColliders[i], out Vector3d candidateNormal);
             if (reference.CompareSquaredDistance(
                     candidate,
                     closest) >= 0)
@@ -350,6 +345,11 @@ public sealed class LSCompoundCollider : LSCollider
         }
 
         return closest;
+
+        FixedPointAnchor GetPartSurfaceAnchor(LSCollider part, out Vector3d partNormal) =>
+            part is LSMeshCollider mesh
+                ? mesh.GetClosestSurfaceAnchor(point, out partNormal, scratch)
+                : part.GetClosestSurfaceAnchor(point, out partNormal);
     }
 
     /// <inheritdoc/>

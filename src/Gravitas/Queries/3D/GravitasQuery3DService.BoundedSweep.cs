@@ -21,13 +21,22 @@ public sealed partial class GravitasQuery3DService
     // and solves at most seven intervals (three axis terms and one fixed-width
     // quadratic per interval). Reserve one worker bounds check and one contact reduction.
     private const ulong CuboidSweepGeometry = 6 + 15 + 6 + 7 * (3 + 1) + 2;
+    // Each includes the worker bounds test, entry roots, containment and contact.
+    private const ulong SphereSweepGeometry = 5;
+    private const ulong CapsuleSweepGeometry = 10;
+    // Rigid triangles visit the initial witness, two faces, three edges and
+    // three vertices, with eight hit reductions. The affine fallback can
+    // inspect three vertices twice, seven features with three roots each,
+    // and three edge constraints per face root.
+    private const ulong MeshTriangleSweepGeometry =
+        (3 + 1 + 2 + 3 * CapsuleSweepGeometry + 3 * SphereSweepGeometry + 8)
+        + (6 + 7 * (1 + 3) + 3 * 3);
 
     /// <summary>Finds the closest swept-sphere hit within caller-owned work and storage limits.</summary>
     /// <remarks>
-    /// Run on the simulation thread between completed pure 3D fixed steps on dense rectangular grids.
-    /// Admits cuboid targets and returns an incomplete status for other eligible
-    /// geometry inside the sweep bounds. Only <see cref="PhysicsQueryExecutionStatus.Completed"/>
-    /// certifies a result. A null hit on completion means the sweep missed.
+    /// Run on the simulation thread between completed pure 3D fixed steps.
+    /// Only <see cref="PhysicsQueryExecutionStatus.Completed"/> certifies a result.
+    /// A null hit on completion means the sweep missed.
     /// </remarks>
     public PhysicsQueryExecutionStatus SweepSphere(
         Vector3d origin, Fixed64 radius, Vector3d direction, Fixed64 maxDistance,
@@ -62,22 +71,17 @@ public sealed partial class GravitasQuery3DService
                 || !Vector3d.TryAdd(Vector3d.Max(origin, end), extents, out Vector3d max))
                 return PhysicsQueryExecutionStatus.Unrepresentable;
 
-            PhysicsQueryExecutionStatus status = scratch.Discover(_context.World, min, max, false,
+            PhysicsQueryExecutionStatus status = scratch.Discover(_context, min, max, false,
                 ref meter, out voxelCount, out ulong changeSequence);
             if (status != PhysicsQueryExecutionStatus.Completed)
                 return status;
-            if (!_context.IsBoundedQueryViewCurrent(changeSequence))
-                return PhysicsQueryExecutionStatus.Stale;
-
             _sweepWorker.Prepare(origin, end, radius);
             status = ScanBoundedSweepVoxels(voxelCount, segment.Normalized, layerMask,
                 excludedCollider, scratch, ref meter, out Physics3DHit? closest);
             if (status != PhysicsQueryExecutionStatus.Completed)
                 return status;
 
-            status = _context.IsBoundedQueryViewCurrent(changeSequence)
-                ? PhysicsQueryScratch.CheckSnapshot(_context.World, changeSequence)
-                : PhysicsQueryExecutionStatus.Stale;
+            status = PhysicsQueryScratch.CheckView(_context, changeSequence, ref meter);
             if (status == PhysicsQueryExecutionStatus.Completed)
                 hit = closest;
             return status;
@@ -101,7 +105,7 @@ public sealed partial class GravitasQuery3DService
                 meter.DiscoveryRemaining, out ulong partitionWork, out PhysicsPartition? partition);
             meter.AddDiscovery(partitionWork);
             if (partitionStatus != GridBoundedVoxelStatus.Completed)
-                return PhysicsQueryScratch.MapDiscoveryStatus(partitionStatus);
+                return PhysicsQueryScratch.MapDiscoveryFailure(partitionStatus);
             if (partition == null)
                 continue;
 
@@ -154,15 +158,73 @@ public sealed partial class GravitasQuery3DService
                 return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
             if (!_sweepWorker.BoundsOverlap(collider!))
                 continue;
-            if (collider is not LSCuboidCollider)
-                return PhysicsQueryExecutionStatus.UnsupportedGeometry;
-            if (!meter.ChargeGeometry(CuboidSweepGeometry))
-                return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
-            if (TryBuildPreparedSweepHit(collider, direction, out Physics3DHit candidate)
+            status = ChargeSweepGeometry(collider!, scratch.Mesh, ref meter);
+            if (status != PhysicsQueryExecutionStatus.Completed)
+                return status;
+            if (TryBuildPreparedSweepHit(collider, direction, out Physics3DHit candidate, scratch.Mesh)
                 && PhysicsHitSelectionPolicy.ShouldReplace(candidate, closest.HasValue, closest.GetValueOrDefault()))
                 closest = candidate;
         }
 
         return PhysicsQueryExecutionStatus.Completed;
+    }
+
+    private static PhysicsQueryExecutionStatus ChargeSweepGeometry(
+        LSCollider collider, MeshQueryScratch? meshScratch, ref PhysicsQueryMeter meter)
+    {
+        if (collider is LSCompoundCollider compound)
+        {
+            // Prepay the admission, sweep and witness passes before accessing any part.
+            if (!meter.ChargeGeometry(3 * (ulong)compound.PartCount + 1))
+                return PhysicsQueryExecutionStatus.WorkBudgetExceeded;
+            for (int i = 0; i < compound.PartCount; i++)
+            {
+                var status = ChargeSweepLeaf(compound.GetPartCollider(i), meshScratch, ref meter);
+                if (status != PhysicsQueryExecutionStatus.Completed)
+                    return status;
+            }
+            return PhysicsQueryExecutionStatus.Completed;
+        }
+
+        return ChargeSweepLeaf(collider, meshScratch, ref meter);
+    }
+
+    private static PhysicsQueryExecutionStatus ChargeSweepLeaf(
+        LSCollider collider, MeshQueryScratch? meshScratch, ref PhysicsQueryMeter meter)
+    {
+        ulong geometry;
+        switch (collider)
+        {
+            case LSCuboidCollider:
+                geometry = CuboidSweepGeometry;
+                break;
+            case LSSphereCollider:
+                geometry = SphereSweepGeometry;
+                break;
+            case LSCapsuleCollider:
+                geometry = CapsuleSweepGeometry;
+                break;
+            case LSCylinderCollider or LSConeCollider:
+                geometry = ConvexSweepQueryWorker.PrimitiveSweepWork;
+                break;
+            default:
+                // Compounds contain only native leaves. Mesh is the remaining native leaf.
+                var mesh = (LSMeshCollider)collider;
+                ulong triangles = (ulong)mesh.Mesh.TriangleCount;
+                if (meshScratch == null || (ulong)meshScratch.Capacity < triangles)
+                    return PhysicsQueryExecutionStatus.ScratchCapacityExceeded;
+                // Two traversals, each with a push, pop and bounds test per node
+                // and at most one output per leaf. A patch fan has at most
+                // three authored corners per triangle and the patch check scans
+                // the triangle owners. Each witness visit fetches three vertices,
+                // checks a face and three edges, and reduces the nearest point.
+                ulong traversal = 2 * (3 * (2 * triangles - 1) + triangles);
+                geometry = traversal + triangles + 3 * triangles * MeshTriangleSweepGeometry
+                    + (triangles + 1) * (3 + 1 + 3 + 2) + 2;
+                break;
+        }
+
+        return meter.ChargeGeometry(geometry)
+            ? PhysicsQueryExecutionStatus.Completed : PhysicsQueryExecutionStatus.WorkBudgetExceeded;
     }
 }
