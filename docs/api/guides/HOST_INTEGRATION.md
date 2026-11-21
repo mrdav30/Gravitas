@@ -244,8 +244,9 @@ Initialization binds the body and collider to `agent.Context`, allocates
 context-local body/collider IDs, calculates runtime shape data, and partitions
 the collider. `FixedTransform` and Gravitas body admission both preserve a
 normalized orientation invariant. Scaled or extreme finite quaternion inputs are
-scale-safely normalized, and a zero quaternion resolves to identity before
-runtime shape state is published.
+scale-safely normalized. Explicit zero pose rotations are rejected before
+runtime shape state is published. Fresh bodies and omitted reset rotations use
+identity; legacy schema 1 zero rotations are migrated to identity when loading.
 
 ### 2D Body
 

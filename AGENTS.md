@@ -651,10 +651,14 @@ similar slices) unless the physics model is intentionally asymmetric, such as
 3D-only height/visual interpolation state. Do not create a service just to avoid
 a partial if the service would mostly shuttle private body state around.
 
-Reduce duplicate code when the shared behavior is genuinely type-neutral,
-deterministic, and allocation-free. Do not force a shared abstraction when the
-2D, 3D, or mixed implementations need different physical semantics or when the
-abstraction would hide ordering, units, or mutation rules.
+For 2D/3D/mixed parity, first reuse existing types and logic whose contracts
+match. Share enums, policies, filtering, validation, and algorithms at their
+common owner when semantics are dimension-independent. Shared behavior must
+preserve determinism, allocation guarantees, ordering, units, and mutation rules.
+Keep dimension-specific code where geometry, physical state, or lifecycle
+requires it. Dimensional naming or matching file structure alone does not
+justify duplication. Verify shared changes through the affected 2D, 3D, and
+mixed production callers.
 
 ## Testing Workflow
 
