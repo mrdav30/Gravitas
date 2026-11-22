@@ -131,7 +131,11 @@ jobs:
       - name: Run Tests and capture replay observations
         id: tests
         # A discovery crash must fail this step even when VSTest reports no tests.
-        run: dotnet test Gravitas.slnx --configuration ${{ matrix.configuration }} --no-build --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} -p:DisableTransitiveProjectReferences=${{ env.UseLocalLsfStack }} --verbosity normal -- RunConfiguration.TreatNoTestsAsError=true
+        run: dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration ${{ matrix.configuration }} --no-build --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} -p:DisableTransitiveProjectReferences=${{ env.UseLocalLsfStack }} --verbosity normal --collect:"XPlat Code Coverage" --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/coverage -- RunConfiguration.TreatNoTestsAsError=true
+
+      - name: Enforce full coverage
+        shell: pwsh
+        run: ./.assets/scripts/assert-full-coverage.ps1 -CoverageDirectory artifacts/coverage
 
       - name: Retain replay observations and actual process provenance
         if: ${{ always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}

@@ -725,9 +725,21 @@ Important notes:
   source map and compare loaded release identities. An explicit local comparator
   submatrix reports omitted lanes; do not describe it as completion of the full
   native matrix.
+- Require 100% reported line, branch and executable-method coverage for the
+  `Gravitas` assembly in Release and ReleaseLean. Collect the unit test project
+  with its existing runsettings and run
+  `.assets/scripts/assert-full-coverage.ps1` against fresh results for each
+  configuration. Every native build/test lane and the Pages workflow enforce
+  the same raw-count and individual-point gate. Sibling assemblies are outside
+  this repository's measured scope; no-test failures and native replay gates
+  remain required. See [coverage commands](CONTRIBUTING.md#coverage-gate).
+- Review cyclomatic complexity above 10. Accepted exceptions justify cohesive
+  methods and their invariants, never uncovered code or a coverage waiver.
+  Test reachable gaps or prove and remove unreachable runtime branches; do not
+  accept uncovered guards or add exclusions.
 - After a successful `main` push, the
-  [coverage workflow](.github/workflows/coverage.yml) enforces 100% reachable
-  line, branch, and method coverage, builds DocFX with warnings as errors,
+  [coverage workflow](.github/workflows/coverage.yml) enforces the same gate,
+  builds DocFX with warnings as errors,
   verifies the branded resources and local links, then publishes the DocFX site
   and the coverage report beneath `/coverage` as one GitHub Pages artifact.
 

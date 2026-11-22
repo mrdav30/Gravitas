@@ -38,6 +38,32 @@ dotnet tool run docfx docs/api/docfx.json --warningsAsErrors
 See [AGENTS.md](AGENTS.md) for the full architecture, determinism, testing,
 serialization, benchmark, and local LSF stack guidance.
 
+## Coverage gate
+
+Require 100% reported line, branch and executable-method coverage for the
+`Gravitas` assembly in Release and ReleaseLean. The unit test project owns that
+coverage; sibling LSF assemblies are outside this repository's measured scope.
+Use a fresh results directory for each configuration:
+
+```powershell
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release --collect:"XPlat Code Coverage" --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/coverage/Release -- RunConfiguration.TreatNoTestsAsError=true
+./.assets/scripts/assert-full-coverage.ps1 -CoverageDirectory artifacts/coverage/Release
+```
+
+Repeat with `ReleaseLean` in the configuration and output path. For coordinated
+source validation, retain the explicit local-stack flags and serial commands
+below. The same raw Cobertura gate runs in every native Windows/Linux x64/ARM64
+build/test lane and before Pages publication. It rejects missing or empty
+coverage evidence and any reported gap, using integer counts and individual
+line/branch points rather than rounded percentages. Replay observations,
+provenance capture and native comparison remain required alongside coverage.
+
+Review cyclomatic complexity above 10. Accepted exceptions justify cohesive
+algorithms and their invariants; they never waive coverage. Add meaningful tests
+for reachable gaps, or prove and remove unreachable runtime branches. Do not
+retain uncovered guards or add exclusions to satisfy the gate. Keep complexity
+rationale evergreen and put dated validation evidence in feature-work records.
+
 ## Coordinated source identities
 
 Use `-p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true` for
