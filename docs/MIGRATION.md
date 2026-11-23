@@ -2,6 +2,19 @@
 
 ## Upcoming release
 
+### FixedMathSharp v9 dependencies
+
+Use matching v9.0.0 `FixedMathSharp` and `FixedMathSharp.Chronicler` packages,
+including their Lean variants. Tests use the matching
+`FixedMathSharp.FluentAssertions` package. Rebuild consuming assemblies against
+the same dependency family: Gravitas also consumes release-coupled
+FixedMathSharp internals.
+
+FixedMathSharp v9 corrects math and geometry behavior, so verify saved-state
+round trips and deterministic replay results when upgrading. Investigate changed
+results before accepting a new replay baseline. The body rotation contract and
+schema-1 compatibility rule are described below.
+
 ### Zero spatial rotations
 
 Supply `FixedQuaternion.Identity` for an unchanged pose. The 3D body rejects
