@@ -1,7 +1,7 @@
 # Linux ARM64 VSTest Artifact Failure
 
-**Date:** 2026-11-23. **Status:** Workflow mitigation prepared; native hosted
-validation awaits commit/push. **Issue:** GRV-Issue-158.
+**Date:** 2026-11-23. **Status:** Workflow mitigation verified locally and in
+the full native hosted matrix. **Issue:** GRV-Issue-158.
 
 ## Observed Failure
 
@@ -110,6 +110,19 @@ agree. These are the original hosted executions, including both failed ARM64
 jobs; they are not post-mitigation hosted executions.
 
 Workflow static validation passes with actionlint `1.7.12`; independent ponytail
-review found no actionable workflow or RCA defects. Native ARM64 execution of
-the changed workflow remains a hosted check, not a claim from local x64
-validation.
+review found no actionable workflow or RCA defects.
+
+## Hosted Confirmation
+
+[Run 45312541465](https://github.com/mrdav30/Gravitas/actions/runs/45312541465)
+passes at committed revision `ecac88469dccabf2d3a508c9c070266e69cb06f6`.
+All eight native validation lanes succeed, including their strict coverage
+gates and replay uploads. Both Linux ARM64 logs confirm SDK `10.0.404` and
+`VSTEST_DISABLE_ARTIFACTS_POSTPROCESSING=1`: Release passes 8,572 tests and
+covers 5,787 executable methods; ReleaseLean passes 8,495 tests and covers
+5,786 executable methods. The former post-test artifact failure is absent.
+
+The hosted `compare-replay` job also passes: all eight native lanes and eight
+fixtures agree with shared expectations and with each other. No matrix lanes
+are missing. This completes native verification of the mitigation; the upstream
+SDK fix and removal criteria above remain applicable.
