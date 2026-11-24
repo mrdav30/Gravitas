@@ -15,6 +15,32 @@ round trips and deterministic replay results when upgrading. Investigate changed
 results before accepting a new replay baseline. The body rotation contract and
 schema-1 compatibility rule are described below.
 
+### SwiftCollections v9 dependencies
+
+Use SwiftCollections 9.0.0 and its matching FixedMathSharp companion, including
+their Lean variants. Rebuild hosts and adapters against the same dependency
+family and verify released packages separately from local-source builds.
+
+The bounded physics-query implementation also requires the newer GridForge
+voxel-discovery contracts. Release that GridForge provider before releasing
+Gravitas against it, then update dependent adapters. The
+[released-chain recheck](https://github.com/mrdav30/Trailblazer/blob/develop/docs/feature-work/done/physicsQueryBudgetPlan.md#2026-11-24---released-package-dependency-chain-recheck)
+records the existing package prerequisite separately from this SwiftCollections
+dependency update.
+
+Applications that persist SwiftCollections comparer-owning collections directly
+must upgrade JSON and Standard MemoryPack readers and writers together. The new
+owner format preserves comparison rules and rejects old state-only owner
+records; custom comparers require registered codecs and factories. This does not
+introduce a Gravitas body-record schema change.
+
+BVH insertion now owns one leaf per key: reinsertion updates bounds and returns
+`false`, while a new key returns `true`; null keys throw before mutation. Mesh
+BVHs continue to use unique triangle indices, so no triangle-key migration is
+required. See the
+[SwiftCollections v9 migration guide](https://github.com/mrdav30/SwiftCollections/blob/v9.0.0/docs/MIGRATION.md#migrating-from-v8-to-v9)
+for the affected owner formats and comparison registration contracts.
+
 ### Zero spatial rotations
 
 Supply `FixedQuaternion.Identity` for an unchanged pose. The 3D body rejects
