@@ -42,7 +42,6 @@ public sealed partial class GravitasPhysics2DService
             }
         }
 
-        _planarContinuousCollisionCandidates.Sort();
         if (buildMixedIndex)
             _mixedContinuousCollisionCandidates.Sort();
 

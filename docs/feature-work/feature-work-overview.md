@@ -39,12 +39,6 @@ instead of burying it in notes.
 
 ## Deferred Design
 
-- [`SwiftCollections v9 Adoption`](2026-11-24-swiftcollections-v9-adoption-plan.md)
-  - Proposed, evidence-gated reuse of native planar candidate indexes and dense
-    ticket ownership. Start with complete CCD/query workload proofs; retain
-    existing dense registries and role memberships unless lifecycle, ordering,
-    memory and full-step measurements justify their replacement.
-
 - [`Body Dissipation Parity And Configuration`](2026-10-16-body-dissipation-parity-and-configuration-plan.md)
   - Deferred while the coordination trackers are cleared. Align configurable
     drag/damping across 3D and pure/mixed 2D, including coefficient validation,
@@ -58,6 +52,13 @@ instead of burying it in notes.
     [representation gates](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#later-terrain-and-heightfield-gates).
 
 ## Recently Completed
+
+- [`SwiftCollections v9 Adoption Evaluation`](done/2026-11-24-swiftcollections-v9-adoption-plan.md)
+  - A bounded follow-up selects one native planar BVH backend with provider-owned
+    reserved traversal storage. It removes first-query allocation and preserves
+    larger CCD gains while accepting measured small-scene, projected-query and
+    memory costs. The record retains the original Phase 0 decision and both
+    consumer comparisons; dense issuer/store work remains deferred.
 
 - [`Long-Duration Physics Quality And Tuning`](done/2026-10-06-long-duration-physics-quality-and-tuning-plan.md)
   - Completed the lockstep conformance and workload guidance sequence.

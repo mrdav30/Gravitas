@@ -9,6 +9,48 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class DynamicCcdCandidateIndexTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Query2D_FirstUseAndClearReuse_ShouldNotAllocateWhenResultsFit(bool allHits, bool grow)
+    {
+        const int count = 64;
+        DynamicCcdPlanarBounds query = allHits
+            ? new DynamicCcdPlanarBounds(-Fixed64.One, -Fixed64.One, (Fixed64)(count * 8), Fixed64.One)
+            : CreatePlanarBounds((Fixed64)(31 * 8), Fixed64.Zero);
+        int resultCapacity = allHits ? count : 1;
+        var warmIndex = new DynamicCcdCandidateIndex2D(1);
+        var warmResults = new SwiftList<int>(count);
+        for (int i = count - 1; i >= 0; i--)
+            warmIndex.Add(i, CreatePlanarBounds((Fixed64)(i * 8), Fixed64.Zero));
+        // Warm sorting and query machinery on another owner; the measured index remains unqueried.
+        warmIndex.Query(new DynamicCcdPlanarBounds(-Fixed64.One, -Fixed64.One,
+            (Fixed64)(count * 8), Fixed64.One), warmResults);
+        warmIndex.Query(query, warmResults);
+        _ = System.GC.GetAllocatedBytesForCurrentThread();
+
+        var index = new DynamicCcdCandidateIndex2D(grow ? 1 : count);
+        var results = new SwiftList<int>(resultCapacity);
+        for (int generation = 0; generation < 2; generation++)
+        {
+            int idOffset = generation * 1000;
+            for (int i = count - 1; i >= 0; i--)
+                index.Add(idOffset + i, CreatePlanarBounds((Fixed64)(i * 8), Fixed64.Zero));
+
+            long before = System.GC.GetAllocatedBytesForCurrentThread();
+            index.Query(query, results);
+            long allocated = System.GC.GetAllocatedBytesForCurrentThread() - before;
+
+            allocated.Should().Be(0);
+            results.Count.Should().Be(resultCapacity);
+            for (int i = 0; i < results.Count; i++)
+                results[i].Should().Be(idOffset + (allHits ? i : 31));
+            index.Clear();
+        }
+    }
+
     [Fact]
     public void Query_ShouldIncludeTargetsWhoseSweptBoundsOverlapAfterMovement()
     {
@@ -96,7 +138,6 @@ public sealed class DynamicCcdCandidateIndexTests
                 new Vector2d((Fixed64)5, (Fixed64)16),
                 -Vector2d.Right * (Fixed64)5,
                 Fixed64.Half));
-        index.Sort();
 
         var results = new SwiftList<int>(4);
         index.Query(
@@ -117,7 +158,6 @@ public sealed class DynamicCcdCandidateIndexTests
         index.Add(30, CreatePlanarBounds(Fixed64.One, Fixed64.Zero));
         index.Add(10, CreatePlanarBounds(Fixed64.One, Fixed64.Zero));
         index.Add(20, CreatePlanarBounds(-Fixed64.One, Fixed64.Zero));
-        index.Sort();
 
         var results = new SwiftList<int>(4);
         index.Query(new DynamicCcdPlanarBounds((Fixed64)(-4), -Fixed64.One, (Fixed64)4, Fixed64.One), results);
@@ -137,7 +177,6 @@ public sealed class DynamicCcdCandidateIndexTests
         index.Add(30, new DynamicCcdPlanarBounds(Fixed64.Zero, Fixed64.Zero, (Fixed64)2, Fixed64.One));
         index.Add(20, new DynamicCcdPlanarBounds(Fixed64.Zero, Fixed64.Half, Fixed64.One, Fixed64.One));
         index.Add(10, new DynamicCcdPlanarBounds(-Fixed64.Half, Fixed64.Zero, Fixed64.One, Fixed64.One));
-        index.Sort();
 
         var results = new SwiftList<int>(6);
         index.Query(
@@ -174,7 +213,6 @@ public sealed class DynamicCcdCandidateIndexTests
         var index2D = new DynamicCcdCandidateIndex2D(2, supportsUpdates: true);
         index2D.Add(11, CreatePlanarBounds(Fixed64.Zero, Fixed64.Zero));
         index2D.Add(13, CreatePlanarBounds((Fixed64)4, Fixed64.Zero));
-        index2D.Sort();
         var results2D = new SwiftList<int>(2);
         index2D.AddOrUpdate(11, CreatePlanarBounds(Fixed64.One, Fixed64.Zero));
         index2D.Query(CreatePlanarBounds(Fixed64.One, Fixed64.Zero), results2D);
@@ -238,7 +276,6 @@ public sealed class DynamicCcdCandidateIndexTests
         Fixed64 radius2D = new Vector2d((Fixed64)60000, (Fixed64)80000).Magnitude;
         var index2D = new DynamicCcdCandidateIndex2D(1);
         index2D.Add(11, DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(Vector2d.Zero, Vector2d.Zero, radius2D));
-        index2D.Sort();
         var results2D = new SwiftList<int>(1);
         index2D.Query(CreatePlanarBounds((Fixed64)75000, Fixed64.Zero), results2D);
 

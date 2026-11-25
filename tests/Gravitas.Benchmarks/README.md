@@ -5,6 +5,20 @@ Its alias runner and deterministic fixtures cover context lifecycle,
 registration/partitioning, simulation, query services, replay hashing, and
 diagnostics.
 
+`planar-ccd-frame` measures 1/32/128 independent pairs of opposing dynamic
+circles in uniform and clustered-X layouts. Each invocation includes reset
+commands, `Simulate`, `LateSimulate`, and an overlap/raycast of the designated
+first pair. Setup checks repeated collisions against analytic stopping
+positions, zero final velocities and ordered physical hits. The one-second step
+is an analytic fixture, not a recommended host rate. The one-pair layouts share
+actor geometry but have different grid extents. These are reset-and-collide
+scenario frames, not evolving-world, connected-island or persistent-index
+measurements.
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll planar-ccd-frame --filter '*' --exporters json
+```
+
 `MixedEmptyDimensionBenchmarks` measures a complete `Simulate`/`LateSimulate`
 step with 64 sleeping movers and 64 static floors in one dimension. Automatic
 grounding crosses a physical gap, so support comes from queries rather than

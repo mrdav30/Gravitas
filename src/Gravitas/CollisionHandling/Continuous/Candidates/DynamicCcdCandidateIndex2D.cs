@@ -5,139 +5,53 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using System.Runtime.CompilerServices;
+using System.Collections.Generic;
 using FixedMathSharp;
 using SwiftCollections;
+using SwiftCollections.Query;
 
 namespace Gravitas.CollisionHandling;
 
-/// <summary>
-/// Indexes planar bounds by minimum X for CCD and projected overlap queries.
-/// </summary>
+/// <summary>Indexes planar bounds while preserving CCD and projected-query candidate order.</summary>
 internal sealed class DynamicCcdCandidateIndex2D
 {
-    private readonly SwiftList<Entry> _entries;
-    private readonly SwiftDictionary<int, int>? _entryIndices;
-    private Fixed64 _maxExtentX;
-    private int _maxExtentXCount;
-    private int _unrepresentableExtentXCount;
-    private bool _isSorted = true;
+    private readonly SwiftFixedBVH2D<int> _index;
+    private readonly bool _supportsUpdates;
+    private readonly CandidateComparer _comparer;
 
     public DynamicCcdCandidateIndex2D(int capacity = 0, bool supportsUpdates = false)
     {
-        _entries = capacity > 0 ? new SwiftList<Entry>(capacity) : new SwiftList<Entry>();
-        _entryIndices = !supportsUpdates
-            ? null
-            : capacity > 0
-                ? new SwiftDictionary<int, int>(capacity)
-                : new SwiftDictionary<int, int>();
+        _index = new SwiftFixedBVH2D<int>(capacity > 0 ? checked(capacity * 2) : 1);
+        _supportsUpdates = supportsUpdates;
+        _comparer = new CandidateComparer(_index);
     }
 
-    public int Count => _entries.Count;
+    public int Count => _index.Count;
 
-    public void Clear()
-    {
-        _entries.FastClear();
-        _entryIndices?.Clear();
-        _maxExtentX = Fixed64.Zero;
-        _maxExtentXCount = 0;
-        _unrepresentableExtentXCount = 0;
-        _isSorted = true;
-    }
+    public void Clear() => _index.Clear();
 
-    public void Add(int dynamicId, DynamicCcdPlanarBounds bounds)
-    {
-        _entryIndices?.Add(dynamicId, _entries.Count);
-        _entries.Add(new Entry(dynamicId, bounds));
-        IncludeExtent(bounds.MinX, bounds.MaxX);
-
-        _isSorted = false;
-    }
+    public void Add(int dynamicId, DynamicCcdPlanarBounds bounds) =>
+        _index.Insert(dynamicId, ToVolume(bounds));
 
     public void AddOrUpdate(int dynamicId, DynamicCcdPlanarBounds bounds)
     {
-        SwiftDictionary<int, int>? entryIndices = _entryIndices;
-        ChronicleGuard.ThrowIfTrue(
-            entryIndices == null,
-            nameof(DynamicCcdCandidateIndex2D),
+        ChronicleGuard.ThrowIfTrue(!_supportsUpdates, nameof(DynamicCcdCandidateIndex2D),
             "Candidate index was not configured for updates.");
-        if (entryIndices.TryGetValue(dynamicId, out int index))
-        {
-            Entry previous = _entries[index];
-            _entries[index] = new Entry(dynamicId, bounds);
-            bool remainsSorted = _isSorted && IsOrderedAt(index);
-            if (!DynamicCcdExtentMetadata.IsEquivalent(
-                    previous.MinX,
-                    previous.MaxX,
-                    bounds.MinX,
-                    bounds.MaxX))
-            {
-                if (RemoveExtent(previous.MinX, previous.MaxX))
-                    RebuildExtents();
-                else
-                    IncludeExtent(bounds.MinX, bounds.MaxX);
-            }
-
-            _isSorted = remainsSorted;
-            return;
-        }
-
-        Add(dynamicId, bounds);
+        _index.Insert(dynamicId, ToVolume(bounds));
     }
 
-    public bool Remove(int dynamicId)
-    {
-        SwiftDictionary<int, int>? entryIndices = _entryIndices;
-        if (entryIndices == null || !entryIndices.TryGetValue(dynamicId, out int index))
-            return false;
-
-        Entry removed = _entries[index];
-        int lastIndex = _entries.Count - 1;
-        if (index != lastIndex)
-        {
-            Entry moved = _entries[lastIndex];
-            _entries[index] = moved;
-            entryIndices[moved.DynamicId] = index;
-        }
-
-        _entries.RemoveAt(lastIndex);
-        entryIndices.Remove(dynamicId);
-        if (RemoveExtent(removed.MinX, removed.MaxX))
-            RebuildExtents();
-        _isSorted = false;
-        return true;
-    }
-
-    public void Sort()
-    {
-        if (!_isSorted && _entries.Count > 1)
-            HeapSort();
-
-        _isSorted = true;
-    }
+    public bool Remove(int dynamicId) => _supportsUpdates && _index.Remove(dynamicId);
 
     public void Query(DynamicCcdPlanarBounds queryBounds, SwiftList<int> results)
     {
         results.FastClear();
-        if (_entries.Count == 0)
-            return;
-
-        Sort();
-        Fixed64 scanMinX = _unrepresentableExtentXCount > 0
-            || !Fixed64.TrySubtract(queryBounds.MinX, _maxExtentX, out Fixed64 representableScanMinX)
-                ? Fixed64.MinValue
-                : representableScanMinX;
-        int index = FindFirstCandidateIndex(scanMinX);
-        for (; index < _entries.Count; index++)
-        {
-            Entry entry = _entries[index];
-            if (entry.MinX > queryBounds.MaxX)
-                break;
-
-            if (entry.Intersects(queryBounds))
-                results.Add(entry.DynamicId);
-        }
+        _index.Query(ToVolume(queryBounds), results);
+        if (results.Count > 1)
+            results.SortInPlace(_comparer);
     }
+
+    private static FixedBoundVolume2D ToVolume(DynamicCcdPlanarBounds bounds) =>
+        new(new Vector2d(bounds.MinX, bounds.MinZ), new Vector2d(bounds.MaxX, bounds.MaxZ));
 
     public static DynamicCcdPlanarBounds CreateSweptCircleBounds(Vector2d start, Vector2d displacement, Fixed64 radius)
         => CreateBoundsBetween(start, start + displacement, radius);
@@ -154,162 +68,24 @@ internal sealed class DynamicCcdCandidateIndex2D
         return new DynamicCcdPlanarBounds(minX, minZ, maxX, maxZ);
     }
 
-    private void IncludeExtent(Fixed64 minX, Fixed64 maxX)
+    private readonly struct CandidateComparer : IComparer<int>
     {
-        if (!Fixed64.TrySubtract(maxX, minX, out Fixed64 extentX))
+        private readonly SwiftFixedBVH2D<int> _index;
+
+        public CandidateComparer(SwiftFixedBVH2D<int> index) => _index = index;
+
+        public int Compare(int first, int second)
         {
-            _unrepresentableExtentXCount++;
-            return;
-        }
-
-        if (extentX > _maxExtentX)
-        {
-            _maxExtentX = extentX;
-            _maxExtentXCount = 1;
-        }
-        else if (extentX == _maxExtentX)
-        {
-            _maxExtentXCount++;
-        }
-    }
-
-    private bool RemoveExtent(Fixed64 minX, Fixed64 maxX)
-    {
-        if (!Fixed64.TrySubtract(maxX, minX, out Fixed64 extentX))
-        {
-            _unrepresentableExtentXCount--;
-            return false;
-        }
-
-        return extentX == _maxExtentX && --_maxExtentXCount == 0;
-    }
-
-    private void RebuildExtents()
-    {
-        _maxExtentX = Fixed64.Zero;
-        _maxExtentXCount = 0;
-        _unrepresentableExtentXCount = 0;
-        for (int i = 0; i < _entries.Count; i++)
-            IncludeExtent(_entries[i].MinX, _entries[i].MaxX);
-    }
-
-    private int FindFirstCandidateIndex(Fixed64 minX)
-    {
-        int low = 0;
-        int high = _entries.Count;
-        while (low < high)
-        {
-            int middle = low + ((high - low) >> 1);
-            if (_entries[middle].MinX < minX)
-                low = middle + 1;
-            else
-                high = middle;
-        }
-
-        return low;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool IsOrderedAt(int index)
-    {
-        Entry entry = _entries[index];
-        return (index == 0 || Compare(_entries[index - 1], entry) <= 0)
-            && (index == _entries.Count - 1 || Compare(entry, _entries[index + 1]) <= 0);
-    }
-
-    private void HeapSort()
-    {
-        int count = _entries.Count;
-        for (int start = (count >> 1) - 1; start >= 0; start--)
-            SiftDown(start, count);
-
-        for (int end = count - 1; end > 0; end--)
-        {
-            Swap(0, end);
-            SiftDown(0, end);
-        }
-    }
-
-    private void SiftDown(int root, int count)
-    {
-        while (true)
-        {
-            int child = (root << 1) + 1;
-            if (child >= count)
-                return;
-
-            int swapIndex = root;
-            if (Compare(_entries[swapIndex], _entries[child]) < 0)
-                swapIndex = child;
-
-            int right = child + 1;
-            if (right < count && Compare(_entries[swapIndex], _entries[right]) < 0)
-                swapIndex = right;
-
-            if (swapIndex == root)
-                return;
-
-            Swap(root, swapIndex);
-            root = swapIndex;
-        }
-    }
-
-    private void Swap(int first, int second)
-    {
-        Entry firstEntry = _entries[first];
-        Entry secondEntry = _entries[second];
-        _entries[first] = secondEntry;
-        _entries[second] = firstEntry;
-        if (_entryIndices != null)
-        {
-            _entryIndices[secondEntry.DynamicId] = first;
-            _entryIndices[firstEntry.DynamicId] = second;
-        }
-    }
-
-    private static int Compare(Entry x, Entry y)
-    {
-        int result = x.MinX.CompareTo(y.MinX);
-        if (result != 0)
-            return result;
-
-        result = x.MinZ.CompareTo(y.MinZ);
-        if (result != 0)
-            return result;
-
-        result = x.MaxX.CompareTo(y.MaxX);
-        if (result != 0)
-            return result;
-
-        result = x.MaxZ.CompareTo(y.MaxZ);
-        if (result != 0)
-            return result;
-
-        return x.DynamicId.CompareTo(y.DynamicId);
-    }
-
-    private readonly struct Entry
-    {
-        public Entry(int dynamicId, DynamicCcdPlanarBounds bounds)
-        {
-            DynamicId = dynamicId;
-            MinX = bounds.MinX;
-            MinZ = bounds.MinZ;
-            MaxX = bounds.MaxX;
-            MaxZ = bounds.MaxZ;
-        }
-
-        public int DynamicId { get; }
-        public Fixed64 MinX { get; }
-        public Fixed64 MinZ { get; }
-        public Fixed64 MaxX { get; }
-        public Fixed64 MaxZ { get; }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Intersects(DynamicCcdPlanarBounds queryBounds)
-        {
-            return !(MinX > queryBounds.MaxX || MaxX < queryBounds.MinX ||
-                     MinZ > queryBounds.MaxZ || MaxZ < queryBounds.MinZ);
+            FixedBoundVolume2D a = _index.NodePool[_index.FindEntry(first)].Bounds;
+            FixedBoundVolume2D b = _index.NodePool[_index.FindEntry(second)].Bounds;
+            int result = a.Min.X.CompareTo(b.Min.X);
+            if (result != 0) return result;
+            result = a.Min.Y.CompareTo(b.Min.Y);
+            if (result != 0) return result;
+            result = a.Max.X.CompareTo(b.Max.X);
+            if (result != 0) return result;
+            result = a.Max.Y.CompareTo(b.Max.Y);
+            return result != 0 ? result : first.CompareTo(second);
         }
     }
 }
