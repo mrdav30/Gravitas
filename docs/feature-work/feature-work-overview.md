@@ -39,6 +39,12 @@ instead of burying it in notes.
 
 ## Deferred Design
 
+- [`SwiftCollections v9 Adoption`](2026-11-24-swiftcollections-v9-adoption-plan.md)
+  - Proposed, evidence-gated reuse of native planar candidate indexes and dense
+    ticket ownership. Start with complete CCD/query workload proofs; retain
+    existing dense registries and role memberships unless lifecycle, ordering,
+    memory and full-step measurements justify their replacement.
+
 - [`Body Dissipation Parity And Configuration`](2026-10-16-body-dissipation-parity-and-configuration-plan.md)
   - Deferred while the coordination trackers are cleared. Align configurable
     drag/damping across 3D and pure/mixed 2D, including coefficient validation,
