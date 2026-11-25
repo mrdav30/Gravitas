@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-040`.
+  `GRV-Benchmark-042`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -71,11 +71,117 @@ No active signals.
 
 | Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
 | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-040 — Persistent planar BVH topology under relocation](#grv-benchmark-040) | Experimental. Relocation cost measured; topology attribution unconfirmed. | Persistent updates/queries consume a material share of an intended workload's budget |
+| [GRV-Benchmark-041 — High-hit planar candidate ordering cost](#grv-benchmark-041) | Experimental hypothesis. Sorting contribution has not been isolated. | A profile identifies bounds lookup/comparison as material in a real high-hit consumer |
 | [GRV-Benchmark-036 — First dynamic membership in a planar floor partition](#grv-benchmark-036--first-dynamic-membership-in-a-planar-floor-partition) | Evidence-gated. First-use allocation reproduced, representative burst frequency open. | First-touch membership allocation exceeds a representative scene’s reserved allocation or frame budget |
 | [GRV-Benchmark-039 — First-use allocation in spatial heavy-tip chains](#grv-benchmark-039) | Evidence-gated. A 3,024 B burst reproduces at 32 and 60 Hz. | A representative scene's first visits exceed its reserved allocation or frame budget |
 | [GRV-Benchmark-033 — 1,024-actor 3D partition cost and first-wake spike](#grv-benchmark-033) | Capacity-sensitive. Sustained cost profiled, first-wake allocation owner open. | An equivalent workload exceeds the host's reserved budget or the first-use burst recurs in a target scene |
 | [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental. Synthetic step costs measured, representative frequency open. | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
 | GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
+
+<a id="grv-benchmark-040"></a>
+
+### GRV-Benchmark-040 — Persistent Planar BVH Topology Under Relocation
+
+**Recorded 2026-11-25. Status:** Experimental attribution question, not a
+confirmed provider defect or a selected optimization. The user requested this
+follow-up after the measured
+[native planar BVH adoption](done/2026-11-24-swiftcollections-v9-adoption-plan.md#2026-11-25-bounded-single-index-follow-up).
+**Owners:** Gravitas's persistent projected-circle candidate index and
+SwiftCollections `SwiftBVH.UpdateEntryBounds` if provider work becomes justified.
+
+**Existing evidence:** In the recorded Windows x64 Release/source-stack
+comparison, the 128-body sustained-relocation/query scenario measured
+`2,040.744-2,119.651 us` for the sweep and `2,084.667-2,268.658 us` for the
+selected BVH, a `+4.3%` balanced mean difference. The stationary 128-body case
+was `+8.8%`, roughly `2-3 us` per four-query batch. These timings include pose
+commands, refresh, four queries and physical assertions. They do not isolate
+tree traversal or establish topology degradation as the cause. Allocation
+vectors matched; neither variant's relocation case is claimed allocation-free.
+The linked record retains exact source graphs, payload hashes, SDK/runtime,
+three-process ABBAAB protocol and outputs. Current reviewed commits are Gravitas
+`bd8ba19668ec67e5c7ab1045ada05b7349cd40cc` and SwiftCollections
+`107c886807b07b7149f2042fe58f7c11f659acb3`; do not relabel historical timings
+as measurements of later builds.
+
+**Reproduction recipe:** Register 32/128 half-unit spheres at X=0,
+Y=`id % 3 - 1`, Z=`8 * lane` in covered coarse GridForge cells. Preserve the
+occupied position set while alternating identity and multiplier-5 affine lane
+assignments with a rotating offset modulo population, using `ResetPosition`.
+After 256 evolving warm frames, query four fixed lanes with
+`Query3D.OverlapCircleAll`, X=2, Y=`Fixed64.MaxValue`, radius 2 and one-hit
+output capacity. Verify the inverse-permutation collider, distance `3/2` and
+finite physical sphere witness. Keep a stationary control. This recipe is
+self-contained; the original disposable driver is supplemental, not required.
+
+**Smallest discriminating experiment:** Freeze one evolved scene's current
+keys, bounds and insertion order. Compare the existing refitted tree with a
+fresh tree built from exactly those entries, keeping ordered results and
+physical outputs identical. First isolate query cost; then include rebuilding,
+updates, ordering and publication in the complete consumer workload. Record
+work visited/tree shape where useful, allocation and retained storage, not just
+elapsed time. A rebuild's cost must be amortized by an observed workload rather
+than a guessed cadence. Use existing operations/disposable probes before
+proposing a provider maintenance API or topology policy.
+
+**Revisit / disposition:** Revisit when a representative persistent-query
+profile makes this cost material and the evolved-versus-rebuilt control shows
+a repeatable useful difference. Otherwise retain the current refit policy.
+Correctness and synchronization contracts remain unchanged; no extra permanent
+index, automatic rebuild threshold or universal BVH speedup is implied.
+
+<a id="grv-benchmark-041"></a>
+
+### GRV-Benchmark-041 — High-Hit Planar Candidate Ordering Cost
+
+**Recorded 2026-11-25. Status:** User-requested experimental hypothesis from the
+measured adoption work, not a confirmed sorting bottleneck. **Owner:**
+[`DynamicCcdCandidateIndex2D`](../../src/Gravitas/CollisionHandling/Continuous/Candidates/DynamicCcdCandidateIndex2D.cs)
+and its CCD/projected-circle consumers. This is initially a consumer-side
+question, not evidence that SwiftCollections needs an API or layout change.
+
+**Measured context and limit:** The
+[bounded adoption record](done/2026-11-24-swiftcollections-v9-adoption-plan.md#2026-11-25-bounded-single-index-follow-up)
+reports roughly `10-12%` faster complete frames at 32 independent CCD pairs and
+`40%` faster at 128, with zero warm allocation in those cases. It does not
+attribute time to ordering. Each comparer call resolves both candidates' bounds
+through `FindEntry`; repeated lookup could matter when many candidates match.
+For zero/one hit, sorting is skipped, so this hypothesis cannot explain the
+recorded one-hit projected-query overhead. The source revisions and measurement
+protocol are the same as GRV-Benchmark-040; no high-hit attribution experiment
+was run when this entry was created.
+
+**Controls / reproduction starting point:** Build the existing benchmark
+project in explicit source mode, carrying that mode into generated children:
+
+```powershell
+$env:UseLocalLsfStack='true'
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:DisableTransitiveProjectReferences=true -m:1
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll planar-ccd-frame --filter '*' --exporters json
+```
+
+These six maintained frame cases are regression controls, not a high-hit
+ordering proof. Start a real consumer case with many eligible intersecting
+bounds, record the actual hit count, and independently verify full ordered
+candidate IDs and physical/query outputs before profiling. Preserve small-hit
+controls, dirty trajectory overrides, captured lifetime validation and callback
+reuse behavior. Kernel comparison alone cannot establish a host-frame gain.
+
+**Smallest discriminating experiment:** Profile the executed gathering/sorting
+path first. If bounds lookup/comparison is material, compare the current ID
+sort with resolving bounds once per hit and sorting those temporary records.
+Include gathering, record storage/capacity, sorting, copying/publication and
+retained peak memory in the cost; preserve the warm allocation baseline. Keep
+the exact `(MinX, MinZ, MaxX, MaxZ, DynamicId)` order and the service's surviving
+base-then-dirty concatenation. Check applicable CCD and projected-query callers
+together. A temporary record buffer is not a second spatial index, but still
+needs a measured net benefit before being retained.
+
+**Revisit / disposition:** Revisit only after an actual high-hit profile and
+equivalent-output comparison establish a repeatable full-consumer saving.
+Retain the current comparer if materialization costs erase the saving. Do not
+add a provider query/order API, permanent duplicate metadata or speculative
+helper merely to prepare for this experiment.
 
 ### GRV-Benchmark-036 — First Dynamic Membership In A Planar Floor Partition
 
